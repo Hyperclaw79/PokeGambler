@@ -188,7 +188,7 @@ class GambleCommands(Commands):
                         usr.id != self.ctx.user.id,
                         usr not in self.registered
                     ]),
-                    timeout=0.1
+                    timeout=(30 - (datetime.now() - now).total_seconds())
                 )
                 bal = Profile(self.database, usr).get()["balance"]
                 if bal < fee:
