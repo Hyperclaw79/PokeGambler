@@ -1,0 +1,14 @@
+{
+   "command_prefix": "->",
+   "owner_id": 132500768317112320,
+   "blacklist_channels": [],
+   "whitelist_channels": [],
+   "default_channelmode": "blacklist",
+   "blacklist_guilds": [],
+   "whitelist_guilds": [
+      830152229688180787
+   ],
+   "default_guildmode": "whitelist",
+   "allowed_users": [],
+   "cooldown_time": 5
+}
