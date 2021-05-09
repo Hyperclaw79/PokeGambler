@@ -126,7 +126,7 @@ def parse_command(prefix: str, msg: str) -> dict:
         symbols = ['+', '-']
         if check_float:
             if word.count('.') != 1:
-                return word
+                return False
             symbols.append('.')
         for sym in symbols:
             if sym in word:
