@@ -167,7 +167,7 @@ class ProfileCommands(Commands):
         await user.avatar_url_as(size=512).save(avatar_byio)
         avatar = Image.open(avatar_byio)
         name = profile["name"]
-        balance = str(profile["balance"])
+        balance = f'{profile["balance"]:,}'
         num_played = str(profile["num_matches"])
         num_won = str(profile["num_wins"])
         profilecard = self.pcg.get(
@@ -194,8 +194,13 @@ class ProfileCommands(Commands):
         user = message.author
         profile = Profile(self.database, message.author).get()
         data = {
-            k: str(v)
-            for k, v in profile.items()
+            key: (
+                f"{val:,}" if key in [
+                    "won_chips", "purchased_chips", "balance"
+                ]
+                else str(val)
+            )
+            for key, val in profile.items()
         }
         wallet = self.walletgen.get(data)
         discord_file = img2file(wallet, "wallet.png", ext="PNG")
@@ -239,6 +244,7 @@ class ProfileCommands(Commands):
         leaderboard = leaderboard[:12]
         for idx, data in enumerate(leaderboard):
             data["rank"] = idx + 1
+            data["balance"] = f'{data["balance"]:,}'
         for i in range(0, len(leaderboard), 4):
             batch_4 = leaderboard[i: i + 4]
             img = await self.lbg.get(self.ctx, batch_4)
@@ -265,6 +271,7 @@ class ProfileCommands(Commands):
         data = profile.get()
         rank = self.database.get_rank(str(message.author.id))
         data["rank"] = rank or 0
+        data["balance"] = f'{data["balance"]:,}'
         img = await self.lbg.get_rankcard(self.ctx, data, heading=True)
         discord_file = img2file(img, "rank.png", ext="PNG")
         await message.channel.send(file=discord_file)
