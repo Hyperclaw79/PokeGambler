@@ -110,21 +110,26 @@ class NormalCommands(Commands):
         ])
 
     @alias("cmds")
-    async def cmd_commands(self, message, **kwargs):
+    async def cmd_commands(self, message, args=None, **kwargs):
         """List all usable commands for the user.
         $```scss
-        {command_prefix}commands
+        {command_prefix}commands [admin/owner/dealer]
         ```$
 
-        @Lists out all the commands you could use
+        @Lists out all the commands you could use.
         *Admins and Dealers get access to special hidden commands.@
 
         ~To check the commands list:
             ```
             {command_prefix}commands
+            ```
+        To check the commands specific to admin:
+            ```
+            {command_prefix}commands admin
             ```~
         """
-        def get_commands(module):
+        def get_commands(module, args):
+            role = args[0] if args else None
             return '\n'.join(
                 sorted(
                     [
@@ -136,17 +141,35 @@ class NormalCommands(Commands):
                                 getattr(module, cmd),
                                 message.author
                             ),
-                            cmd not in getattr(module, "alias", [])
+                            cmd not in getattr(module, "alias", []),
+                            any([
+                                role is None,
+                                all([
+                                    role is not None,
+                                    getattr(
+                                        getattr(module, cmd),
+                                        f"{role}_only", False
+                                    )
+                                ])
+                            ])
                         ])
                     ],
                     key=len
                 )
             )
         modules = get_modules(self.ctx)
+        if kwargs.get("module", None):
+            modules = [
+                mod
+                for mod in modules
+                if mod.__class__.__name__.lower().startswith(
+                    kwargs["module"].lower()
+                )
+            ]
         command_dict = {
             module.__class__.__name__.replace(
                 "Commands", " Commands"
-            ): get_commands(module)
+            ): get_commands(module, args)
             for module in modules
         }
         embed = get_embed(
