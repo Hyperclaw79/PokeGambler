@@ -113,7 +113,7 @@ class NormalCommands(Commands):
     async def cmd_commands(self, message, args=None, **kwargs):
         """List all usable commands for the user.
         $```scss
-        {command_prefix}commands [admin/owner/dealer]
+        {command_prefix}commands [admin/owner/dealer] [--module name]
         ```$
 
         @Lists out all the commands you could use.
@@ -126,6 +126,10 @@ class NormalCommands(Commands):
         To check the commands specific to admin:
             ```
             {command_prefix}commands admin
+            ```
+        To check only profile commands:
+            ```
+            {command_prefix}commands --module profile
             ```~
         """
         def get_commands(module, args):
@@ -172,6 +176,15 @@ class NormalCommands(Commands):
             ): get_commands(module, args)
             for module in modules
         }
+        if set(command_dict.values()) == {''}:
+            await message.channel.send(
+                embed=get_embed(
+                    "Did not find ant commands for the given query.",
+                    embed_type="warning",
+                    title="No Commands found"
+                )
+            )
+            return
         embed = get_embed(
             f"Use `{self.ctx.prefix}help [command name]` for details",
             title="PokeGambler Commands List"
