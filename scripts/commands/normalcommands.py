@@ -308,3 +308,17 @@ class NormalCommands(Commands):
                 title="Cannot Join Other Servers"
             )
         )
+
+    async def cmd_info(self, message, **kwargs):
+        """Gives info about PokeGambler
+        $```scss
+        {command_prefix}info
+        ```$
+
+        @Gives new players information about PokeGambler.@
+        """
+        await message.channel.send(
+            embed=get_embed(
+                "Information will be coming soon."
+            )
+        )
