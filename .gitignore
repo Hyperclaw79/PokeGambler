@@ -8,6 +8,8 @@ run.bat
 errors.log
 pokegambler.db
 
+localcommands.py
+
 htmlcov/
 .tox/
 .nox/
