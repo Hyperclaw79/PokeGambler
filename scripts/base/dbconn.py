@@ -201,7 +201,10 @@ class DBConnector:
         SQL endpoint for triggering multiple table purges.
         """
         for attr in dir(self):
-            if attr.startswith("purge_"):
+            if all([
+                attr.startswith("purge_"),
+                not attr.endswith("tables")
+            ]):
                 getattr(self, attr)()
 
 # DML
