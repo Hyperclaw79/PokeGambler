@@ -150,3 +150,36 @@ class CommandData(Model):
         self.command = command
         self.args = args
         self.kwargs = kwargs
+
+
+class Blacklist(Model):
+    """
+    Wrapper for blacklisted users based DB actions
+    """
+
+    # pylint: disable=no-member
+
+    def __init__(
+        self, database, user, mod, reason: str = ""
+    ):
+        super().__init__(database, user, "blacklists")
+        self.user_id = str(user.id)
+        self.blacklisted_at = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        self.blacklisted_by = str(mod.id)
+        self.reason = reason
+
+    def save(self):
+        """
+        Saves the blacklisted user in the table.
+        Also resets their profile.
+        """
+        Profile(self.database, self.user).reset()
+        super().save()
+
+    def pardon(self):
+        """
+        Pardons a blacklisted user.
+        """
+        self.database.pardon_user(self.user_id)

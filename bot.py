@@ -197,6 +197,11 @@ class PokeGambler(discord.Client):
             on_cooldown = await self.__handle_cd(message)
             if on_cooldown:
                 return
+            if self.database.is_blacklisted(
+                str(message.author.id)
+            ):
+                await message.add_reaction("🚫")
+                return
             res = self.__get_method(message)
             method, cmd, args, option_dict = res
             if not method:

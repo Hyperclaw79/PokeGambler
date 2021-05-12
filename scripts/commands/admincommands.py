@@ -4,7 +4,11 @@ Administration Commands
 
 # pylint: disable=unused-argument
 
-from ..helpers.utils import get_embed, get_profile
+from ..helpers.utils import (
+    get_embed, get_profile,
+    is_admin, is_owner
+)
+from ..base.models import Blacklist
 from .basecommand import Commands, admin_only, alias
 
 
@@ -170,7 +174,7 @@ class AdminCommands(Commands):
         {command_prefix}update_user user_id --param value
         ```$
 
-        @`👑 Owner Command`
+        @`🛡️ Admin Command`
         Updates a user's profile based on the kwargs.@
 
         ~To update num_wins of user with ID 12345:
@@ -209,4 +213,106 @@ class AdminCommands(Commands):
                 timestamp=True
             )
             return
+        await message.add_reaction("👍")
+
+    @admin_only
+    @alias("bl")
+    async def cmd_blacklist_user(self, message, args=None, **kwargs):
+        """Blacklists a user from using PokeGambler.
+        $```scss
+        {command_prefix}blacklist_user user_id [--reason text]
+        ```$
+
+        @`🛡️ Admin Command`
+        Blacklists a user from using PokeGambler until pardoned.
+        A reason can be provided (recommended) using --reason kwarg.@
+
+        ~To blacklist a user with ID 12345:
+            ```
+            {command_prefix}blacklist_user 12345
+            ```
+        ~To blacklist a user with ID 67890 for spamming:
+            ```
+            {command_prefix}blacklist_user 67890 --reason spamming
+            ```~
+        """
+        if not args:
+            await message.channel.send(
+                embed=get_embed(
+                    "You need to provide a user ID.",
+                    embed_type="error",
+                    title="No User ID"
+                )
+            )
+            return
+        user_id = int(args[0])
+        user = message.guild.get_member(user_id)
+        if any([
+            is_admin(user),
+            is_owner(self.ctx, user)
+        ]):
+            await message.channel.send(
+                embed=get_embed(
+                    "You cannot blacklist owners and admins!",
+                    embed_type="error",
+                    title="Invalid User"
+                )
+            )
+            return
+        Blacklist(
+            self.database,
+            user, message.author,
+            reason=kwargs.get("reason", None)
+        ).save()
+        await message.add_reaction("👍")
+
+    @admin_only
+    @alias("pardon")
+    async def cmd_pardon_user(self, message, args=None, **kwargs):
+        """Pardons a blacklisted user.
+        $```scss
+        {command_prefix}pardon_user user_id
+        ```$
+
+        @`🛡️ Admin Command`
+        Pardons a blacklisted user so that they can use PokeGambler again.@
+
+        ~To pardon a user with ID 12345:
+            ```
+            {command_prefix}pardon 12345
+            ```~
+        """
+        if not args:
+            await message.channel.send(
+                embed=get_embed(
+                    "You need to provide a user ID.",
+                    embed_type="error",
+                    title="No User ID"
+                )
+            )
+            return
+        user_id = int(args[0])
+        user = message.guild.get_member(user_id)
+        if any([
+            is_admin(user),
+            is_owner(self.ctx, user)
+        ]):
+            await message.channel.send(
+                embed=get_embed(
+                    "Owners and Admins are never blacklisted.",
+                    embed_type="error",
+                    title="Invalid User"
+                )
+            )
+            return
+        if not self.database.is_blacklisted(args[0]):
+            await message.channel.send(
+                embed=get_embed(
+                    "User is not blacklisted.",
+                    embed_type="error",
+                    title="Invalid User"
+                )
+            )
+            return
+        Blacklist(self.database, user, message.author).pardon()
         await message.add_reaction("👍")

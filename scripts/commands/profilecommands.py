@@ -67,7 +67,10 @@ class ProfileCommands(Commands):
         num_won = str(profile["num_wins"])
         profilecard = self.pcg.get(
             name, avatar, balance,
-            num_played, num_won, badges
+            num_played, num_won, badges,
+            blacklisted=self.database.is_blacklisted(
+                str(user.id)
+            )
         )
         discord_file = img2file(profilecard, "profilecard.jpg")
         await message.channel.send(file=discord_file)

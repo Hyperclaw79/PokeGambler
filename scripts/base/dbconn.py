@@ -2,6 +2,8 @@
 The Database Wrapper Module.
 """
 
+# pylint: disable=too-many-public-methods
+
 import sqlite3
 
 
@@ -163,6 +165,24 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def create_blacklists_table(self):
+        """
+        SQL endpoint for Blacklists table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            blacklists(
+                user_id TEXT NOT NULL,
+                blacklisted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                blacklisted_by TEXT NOT NULL,
+                reason TEXT
+            );
+            '''
+        )
+        self.conn.commit()
+
     def create_tables(self):
         """
         SQL endpoint for triggering multiple table creations.
@@ -196,6 +216,17 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def purge_blacklists(self):
+        """
+        SQL endpoint for purging Blacklists table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM blacklists;
+            '''
+        )
+        self.conn.commit()
+
     def purge_tables(self):
         """
         SQL endpoint for triggering multiple table purges.
@@ -209,7 +240,7 @@ class DBConnector:
 
 # DML
 
-    def save_model(self, model, **kwargs):
+    def save_model(self, model: str, **kwargs) -> int:
         """
         Saves the model in the database and returns the primary key to it.
         """
@@ -416,6 +447,60 @@ class DBConnector:
         if res:
             return res[0] == user_id
         return False
+
+    def get_blacklists(self, limit: int = 10) -> list:
+        """
+        Retrieves all blacklisted users.
+        """
+        keys = [
+            "user_id", "blacklisted_at", "reason"
+        ]
+        self.cursor.execute(
+            '''
+            SELECT * FROM blacklists
+            ORDER BY blacklisted_at DESC
+            LIMIT ?
+            ''',
+            (limit, )
+        )
+        results = self.cursor.fetchall()
+        if results:
+            blks = []
+            for res in results:
+                blk = {
+                    col: res[idx]
+                    for idx, col in enumerate(keys)
+                }
+                blks.append(blk)
+            return blks
+        return None
+
+    def is_blacklisted(self, user_id: str) -> bool:
+        """
+        SQL endpoint for checking if user is blacklisted.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM blacklists
+            WHERE user_id = ?
+            ''',
+            (user_id, )
+        )
+        res = self.cursor.fetchone()
+        return bool(res)
+
+    def pardon_user(self, user_id: str) -> None:
+        """
+        SQL endpoint for pardoning a blacklisted user.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM blacklists
+            WHERE user_id = ?
+            ''',
+            (user_id, )
+        )
+        self.conn.commit()
 
 if __name__ == "__main__":
     dbconn = DBConnector(db_path='data/pokegambler.db')

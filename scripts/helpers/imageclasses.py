@@ -8,7 +8,10 @@ import os
 from abc import ABC, abstractmethod
 from io import BytesIO
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import (
+    Image, ImageDraw,
+    ImageFont, ImageEnhance
+)
 
 
 class AssetGenerator(ABC):
@@ -85,8 +88,11 @@ class ProfileCardGenerator(AssetGenerator):
     def get(
         self, name: str, avatar: Image,
         balance: str, num_played: str, num_won: str,
-        badges: None
-    )->Image:
+        badges: None, blacklisted: bool = False
+    ) -> Image:
+
+        # pylint: disable=too-many-locals
+
         profilecard = self.profilecard.copy()
         profilecard.paste(
             avatar.resize((280, 280)).convert('RGB'),
@@ -125,7 +131,9 @@ class ProfileCardGenerator(AssetGenerator):
                 )
             )
         profilecard = profilecard.convert('RGBA')
-        if badges:
+        if all([
+            badges, not blacklisted
+        ]):
             for idx, badge in enumerate(badges):
                 profilecard.paste(
                     self.badges[badge],
@@ -136,6 +144,31 @@ class ProfileCardGenerator(AssetGenerator):
         chip = self.pokechip.resize((80, 80), Image.ANTIALIAS)
         profilecard.paste(chip, chip_pos, chip)
         profilecard = profilecard.convert('RGB')
+        if blacklisted:
+            profilecard = self.add_bl_effect(profilecard)
+        return profilecard
+
+    def add_bl_effect(self, profilecard):
+        """
+        Adds a Blacklisted label on profilecard.
+        Also desaturates and darkens the image.
+        """
+        for task in ["Brightness", "Color"]:
+            enhancer = getattr(ImageEnhance, task)(profilecard)
+            profilecard = enhancer.enhance(0.25)
+        text_layer = Image.new('RGBA', profilecard.size, (0, 0, 0, 0))
+        canvas = ImageDraw.Draw(text_layer)
+        canvas.text(
+            (50, 205),
+            "BLACKLISTED",
+            fill=(255, 255, 255, 255),
+            font=ImageFont.truetype(self.font.path, 130)
+        )
+        profilecard.paste(
+            text_layer.rotate(-20),
+            (0, 0),
+            text_layer.rotate(-20)
+        )
         return profilecard
 
 
