@@ -441,28 +441,48 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
-    @alias('prg_cmds')
-    async def cmd_purge_commands(self, message, **kwargs):
-        """Purges the Commands table in the database.
+    @alias('prg_tbl')
+    async def cmd_purge_tables(self, message, args=None, **kwargs):
+        """Purges the tables in the database.
          $```scss
-        {command_prefix}purge_commands
+        {command_prefix}purge_tables [table_name]
         ```$
 
         @`👑 Owner Command`
-        Purges the Commands table in the database.@
+        Purges the tables in the database.
+        If no table name is given, purges all the tables.@
 
-        ~To purge the commands table:
+        ~To purge the profile table:
             ```
-            {command_prefix}prg_cmds
+            {command_prefix}prg_tbl profile
+            ```
+        ~To purge all the tables:
+            ```
+            {command_prefix}prg_tbl
             ```~
         """
-        self.database.purge_commands()
+        if args:
+            purge = getattr(self.database, f"purge_{args[0]}", None)
+            if purge:
+                purge()
+            else:
+                await message.channel.send(
+                    embed=get_embed(
+                        f"The {args[0]} table does not exist in the database.",
+                        embed_type="error",
+                        title="Invalid Table Name"
+                    )
+                )
+                return
+        else:
+            self.database.purge_tables()
         await message.add_reaction("👍")
 
     @owner_only
     @no_log
     @alias('logs')
     async def cmd_get_logs(self, message, **kwargs):
+        # pylint: disable=anomalous-backslash-in-string
         """Gets the remote logs.
          $```scss
         {command_prefix}get_logs [--since timeperiod] [--errors_only]

@@ -14,13 +14,14 @@ import aiohttp
 import discord
 from dotenv import load_dotenv
 
+from scripts.base.models import CommandData
+
 from scripts.base.cardgen import CardGambler
 from scripts.base.dbconn import DBConnector
 from scripts.helpers.logger import CustomLogger
 from scripts.helpers.utils import (
     get_ascii, prettify_discord, get_embed,
-    parse_command, get_rand_headers,
-    is_owner, is_admin
+    parse_command, get_rand_headers, is_owner
 )
 
 
@@ -38,7 +39,7 @@ class PokeGambler(discord.Client):
         intents = discord.Intents.all()
         intents.presences = False
         super().__init__(intents=intents)
-        self.version = "v0.8.0"
+        self.version = "v0.9.0"
         self.db_path = kwargs["db_path"]
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
@@ -218,18 +219,11 @@ class PokeGambler(discord.Client):
                 kwargs["mentions"] = message.mentions
             try:
                 if "no_log" not in dir(method):
-                    self.database.log_command(**{
-                        "user_id": str(message.author.id),
-                        "user_is_admin": is_admin(message.author),
-                        "used_at": datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        ),
-                        "channel": str(message.channel.id),
-                        "guild": str(message.guild.id),
-                        "command": cmd.replace("cmd_", ""),
-                        "args": args,
-                        "kwargs": option_dict
-                    })
+                    cmd_data = CommandData(
+                        self.database, message.author, message,
+                        cmd.replace("cmd_", ""), args, option_dict
+                    )
+                    cmd_data.save()
                 task = method(**kwargs)
                 # Decorators can return None
                 if task:

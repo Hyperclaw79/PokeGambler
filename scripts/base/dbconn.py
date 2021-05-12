@@ -65,8 +65,8 @@ def str2dict(sql_str: str) -> dict:
     }
 
 
-sqlite3.register_adapter(bool, int)
-sqlite3.register_converter("BOOLEAN", lambda v: v != b'0')
+sqlite3.register_adapter(bool, str)
+sqlite3.register_converter("BOOLEAN", lambda v: v == 'True')
 sqlite3.register_adapter(
     list, lambda l: ', '.join(
         str(encode_type(elem))
@@ -185,24 +185,43 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def purge_profile(self):
+        """
+        SQL endpoint for purging Profile table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM profile;
+            '''
+        )
+        self.conn.commit()
+
+    def purge_tables(self):
+        """
+        SQL endpoint for triggering multiple table purges.
+        """
+        for attr in dir(self):
+            if attr.startswith("purge_"):
+                getattr(self, attr)()
+
 # DML
 
-    def log_command(self, **kw):
+    def save_model(self, model, **kwargs):
         """
-        Logs user commands into Commands table.
+        Saves the model in the database and returns the primary key to it.
         """
-        keys = list(kw.keys())
-        vals = list(kw.values())
+        keys, vals = zip(*kwargs.items())
         self.cursor.execute(
             f'''
-            INSERT OR IGNORE INTO commands
+            INSERT OR IGNORE INTO {model}
             ({', '.join(keys)})
             VALUES
-            ({', '.join(["?" for i in range(len(vals))])});
+            ({', '.join(['?'] * len(vals))});
             ''',
             tuple(vals)
         )
         self.conn.commit()
+        return self.cursor.lastrowid
 
     def get_command_history(self, limit: int = 5, **kwargs) -> list:
         """
@@ -238,24 +257,6 @@ class DBConnector:
                 cmds.append(cmd)
             return cmds
         return None
-
-    def create_profile(self, **kwargs):
-        """
-        SQL endpoint for Profile Creation.
-        """
-        vals = ', '.join(
-            self.format_val(val)
-            for val in kwargs.values()
-        )
-        self.cursor.execute(
-            f'''
-            INSERT OR IGNORE INTO profile
-            ({', '.join(list(kwargs.keys()))})
-            VALUES
-            ({vals});
-            '''
-        )
-        self.conn.commit()
 
     def get_profile(self, user_id: str) -> dict:
         """

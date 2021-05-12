@@ -9,15 +9,11 @@ import math
 from datetime import datetime
 
 import discord
+from ..base.models import Profile
 
 from ..helpers.checks import user_rctn
-from ..helpers.utils import (
-    get_embed, get_enum_embed, img2file
-)
-from .basecommand import (
-    alias, dealer_only, Commands
-)
-from .profilecommands import Profile
+from ..helpers.utils import get_embed, get_enum_embed, img2file
+from .basecommand import Commands, alias, dealer_only
 
 
 class GambleCommands(Commands):
