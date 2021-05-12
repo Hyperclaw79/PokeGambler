@@ -61,7 +61,7 @@ class CustomLogger:
             with open(self.error_log_path, 'a', encoding='utf-8') as f:
                 f.write(
                     f"[{datetime.now().strftime('%X %p')}] <{func_name}>"
-                    " {self.ansi_escape.sub('', text)}\n"
+                    f" {self.ansi_escape.sub('', text)}\n"
                 )
         if timestamp:
             text = f"[{datetime.now().strftime('%X %p')}] {text}"
