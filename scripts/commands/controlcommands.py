@@ -458,3 +458,80 @@ class ControlCommands(Commands):
         """
         self.database.purge_commands()
         await message.add_reaction("👍")
+
+    @owner_only
+    @no_log
+    @alias('logs')
+    async def cmd_get_logs(self, message, **kwargs):
+        """Gets the remote logs.
+         $```scss
+        {command_prefix}get_logs [--since timeperiod] [--errors_only]
+        ```$
+
+        @`👑 Owner Command`
+        Get the logs since a specified time. Defaults to 10 hours ago.
+        If --errors_only kwarg is used, displays only the logs from error log file.@
+
+        ~To get the logs from 2 hours ago:
+            ```
+            {command_prefix}get_logs --since 2 hours ago
+            ```
+        To get the error logs:
+            ```
+            {command_prefix}get_logs --errors_only
+            ```~
+        """
+        if kwargs.get("errors_only", False):
+            with open(self.ctx.error_log_path) as error_log:
+                data = error_log.read()
+        else:
+            base_query = "journalctl --user-unit pokegambler"
+            since = kwargs.get("since", "10 hours ago")
+            options = f'-S "{since}" --no-pager -g "\[.+\]"'
+            pipes = [
+                " ".join([base_query, options]),
+                'cut -d " " -f 6-',
+                'sed "1d"'
+            ]
+            output = subprocess.check_output(
+                " | ".join(pipes),
+                shell=True
+            )
+            data = output.decode()
+        embeds = []
+        datalines = data.splitlines()
+        while len(datalines) > 0:
+            msg = ""
+            while len(msg) < 500:
+                if len(datalines) == 0:
+                    break
+                msg += f"\n{datalines.pop()}"
+            embeds.append(
+                get_embed(
+                    content=f"```py\n{msg}\n```",
+                    title="Logs"
+                )
+            )
+        base = await message.channel.send(embed=embeds[0])
+        pager = Paginator(message, base, embeds, self.ctx)
+        await pager.run()
+
+    @owner_only
+    @no_log
+    async def cmd_clean_logs(self, message, **kwargs):
+        """Cleans the Error Logs.
+         $```scss
+        {command_prefix}clean_logs
+        ```$
+
+        @`👑 Owner Command`
+        Cleans the error log file.@
+
+        ~To clean the error logs:
+            ```
+            {command_prefix}clean_logs
+            ```~
+        """
+        with open(self.ctx.error_log_path, 'w') as error_log:
+            error_log.write('')
+        await message.add_reaction("👍")
