@@ -25,6 +25,9 @@ class CardGambler:
         self.joker_card = Image.open(
             os.path.join(self.basecards_path, "pokecards-joker.jpg")
         )
+        self.watermark = Image.open(
+            os.path.join(self.basecards_path, "pokecards-watermark.png")
+        )
 
     def get_card(self, suit: str, card: str):
         """
@@ -32,9 +35,10 @@ class CardGambler:
         """
         if ".jpg" not in card:
             card = f"{card.upper()}.jpg"
-        return Image.open(
+        facecard = Image.open(
             os.path.join(self.pokecards_path, suit, card)
-        )
+        ).convert('RGBA')
+        return Image.alpha_composite(facecard, self.watermark).convert('RGB')
 
     def get_random_cards(self, num_cards=4, joker_chance=0.05):
         """
@@ -55,9 +59,7 @@ class CardGambler:
                 card_img = self.joker_card.copy()
                 joker_drawn = True
             else:
-                card_img = Image.open(
-                    os.path.join(self.pokecards_path, suit, card)
-                )
+                card_img = self.get_card(suit, card)
             cards.append({
                 "card_num": card_num,
                 "suit": suit,
