@@ -2,17 +2,22 @@
 Gambling Commands Module
 """
 
-# pylint: disable=too-many-arguments, too-many-locals
+# pylint: disable=too-many-arguments, too-many-locals, unused-argument
 
 import asyncio
 import math
+import os
 from datetime import datetime
 
 import discord
-from ..base.models import Profile
 
-from ..helpers.checks import user_rctn
-from ..helpers.utils import get_embed, get_enum_embed, img2file
+from ..base.models import Profile
+from ..helpers.checks import user_rctn, user_check
+from ..helpers.imageclasses import ChipFlipper
+from ..helpers.utils import (
+    get_embed, get_enum_embed,
+    img2file, wait_for
+)
 from .basecommand import Commands, alias, dealer_only
 
 
@@ -44,6 +49,7 @@ class GambleCommands(Commands):
         self.rules = {
             "lower_wins": "Lower number card wins"
         }
+        self.chipflipper = ChipFlipper(self.ctx.assets_path)
 
     def __charge_player(self, dealed_deck, fee):
         profiles = {}
@@ -363,7 +369,7 @@ class GambleCommands(Commands):
     async def cmd_gamble(self, message, args=None, **kwargs):
         """The core command of the bot - Gamble.
         $```scss
-        {command_prefix}gamble [fee] [--lower_wins]
+        {command_prefix}gamble [50 < fee] [--lower_wins]
         ```$
 
         @`🎲 Dealer Command`
@@ -398,7 +404,10 @@ class GambleCommands(Commands):
             return
         self.match_status = 1
         kwargs.pop("mentions", [])
-        fee = int(args[0]) if args else 50
+        try:
+            fee = min(int(args[0]), 50) if args else 50
+        except (ZeroDivisionError, ValueError):
+            fee = 50
         kwargs["fee"] = fee
         gamble_channel, hot_time = await self.__handle_registration(
             message, **kwargs
@@ -433,3 +442,84 @@ class GambleCommands(Commands):
             profiles, lower_wins, fee
         )
         await self.__cleanup(gamble_channel, delay=30.0)
+
+    @alias(["flip", "chipflip"])
+    async def cmd_quickflip(self, message, args=None, **kwargs):
+        """Head/Tails flip for Pokechips.
+        $```scss
+        {command_prefix}quickflip [50 < amount < 9999]
+        ```$
+
+        @A quick way to double your pokechips ||(or halve it)|| using a chip flip.
+        If no amount is specified, 50 chips will be used by default.
+        Minimum 50 chips and maximim 9999 chips can be used.@
+
+        ~To flip for 50 <:pokechip:840469159242760203>:
+            ```
+            {command_prefix}flip
+            ```
+        To flip for 1000 <:pokechip:840469159242760203>:
+            ```
+            {command_prefix}flip 1000
+            ```~
+        """
+        profile = Profile(self.database, message.author)
+        amount = int(args[0]) if args else 50
+        if profile.get()["balance"] < amount:
+            await self.__handle_low_bal(message.author, message.channel)
+            await message.add_reaction("❌")
+            return
+        opt_msg = await message.channel.send(
+            embed=get_embed(
+                "```md\n# Options\n1. Heads\n2. Tails\n```",
+                title=f"**Place your bet for {amount}** <:pokechip:840469159242760203>",
+                footer=f"⚠️ You'll either get {amount * 2} or "
+                f"lose {amount} pokechips"
+            ),
+            file=discord.File(
+                os.path.join(self.ctx.assets_path, 'blinker.gif')
+            )
+        )
+        idx, img = self.chipflipper.get()
+        reply = await wait_for(
+            message.channel, self.ctx, init_msg=opt_msg,
+            check=lambda msg: user_check(msg, message),
+            timeout="inf"
+        )
+        if not reply:
+            return
+        reply = reply.content.lower()
+        valids = ['1', '2', 'heads', 'tails']
+        valid_str = ', '.join(valids)
+        if reply not in valids:
+            await message.channel.send(
+                embed=get_embed(
+                    f"You need to choose from: ({valid_str})",
+                    embed_type="error",
+                    title="Invalid Input"
+                )
+            )
+            return
+        choice = int(reply) - 1 if reply in valids[:2] else valids[2:].index(reply)
+        chip = img2file(img, "chip.png", ext="PNG")
+        msg = f"PokeGambler choose {valids[2:][idx].title()}.\n"
+        if choice == idx:
+            msg += f"You have won {amount * 2} <:pokechip:840469159242760203>"
+            title = "Congratulations!"
+            color = 5023308
+            profile.update(
+                balance=profile.get()["balance"] + (amount * 2),
+                won_chips=profile.get()["won_chips"] + (amount * 2)
+            )
+        else:
+            msg += f"You have lost {amount} <:pokechip:840469159242760203>"
+            title = "You Lost!"
+            color = 14155786
+            profile.update(
+                balance=profile.get()["balance"] - amount,
+                won_chips=profile.get()["won_chips"] - amount
+            )
+        emb = get_embed(msg, title=title)
+        emb.color = color
+        await opt_msg.delete()
+        await message.channel.send(embed=emb, file=chip)

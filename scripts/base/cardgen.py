@@ -11,6 +11,9 @@ class CardGambler:
     """
     The Pokecard Generator class.
     """
+
+    # pylint: disable=too-many-instance-attributes
+
     def __init__(self, assets_path: str = "assets"):
         self.asset_path = assets_path
         self.pokecards_path = os.path.join(self.asset_path, "pokecards")

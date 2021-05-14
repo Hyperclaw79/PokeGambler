@@ -190,6 +190,8 @@ async def wait_for(
     """
     if not timeout:
         timeout = 5.0
+    elif timeout == "inf":
+        timeout = None
     try:
         reply = await ctx.wait_for(
             event,
