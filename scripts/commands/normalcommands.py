@@ -332,7 +332,7 @@ class NormalCommands(Commands):
             name="**Getting Started**",
             value=dedent(
                 f"""
-                ```
+                ```diff
                 You can create a new profile using:
                     {self.ctx.prefix}profile
                 Every players gets free 100 Pokechips
@@ -353,9 +353,9 @@ class NormalCommands(Commands):
             name="**Owners**",
             value=dedent(
                 """
-                ```
-                Bot Owner: Hyperclaw79#3476
-                Server Owner: justrilrx#9692
+                ```py
+                Bot Owner: 'Hyperclaw79#3476'
+                Server Owner: 'justrilrx#9692'
                 ```
                 """
             ),
