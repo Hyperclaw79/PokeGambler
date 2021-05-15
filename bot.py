@@ -21,7 +21,8 @@ from scripts.base.dbconn import DBConnector
 from scripts.helpers.logger import CustomLogger
 from scripts.helpers.utils import (
     get_ascii, prettify_discord, get_embed,
-    parse_command, get_rand_headers, is_owner
+    parse_command, get_rand_headers, is_owner,
+    online_now
 )
 
 
@@ -44,6 +45,8 @@ class PokeGambler(discord.Client):
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
         self.config_path = kwargs["config_path"]
+        for var in ["DISCORD_WEBHOOK_TOKEN", "DISCORD_WEBHOOK_CHANNEL"]:
+            setattr(self, var, os.getenv(var))
         self.update_configs()
         # Defaults
         self.active_channels = []
@@ -326,3 +329,4 @@ class PokeGambler(discord.Client):
             f"with the strings of fate. | Check: {self.prefix}info"
         )
         await self.change_presence(activity=game)
+        await online_now(self)

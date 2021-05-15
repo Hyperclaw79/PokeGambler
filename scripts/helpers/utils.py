@@ -334,3 +334,21 @@ def dedent(message):
         line.lstrip()
         for line in message.splitlines()
     )
+
+
+async def online_now(ctx):
+    """
+    Notifies on Discord, that PokeGambler is ready.
+    """
+    secret = ctx.DISCORD_WEBHOOK_TOKEN
+    channel = ctx.DISCORD_WEBHOOK_CHANNEL
+    url = f"https://discord.com/api/webhooks/{channel}/{secret}"
+    body = {
+        "username": "PokeGambler Status Monitor",
+        "content": "\n".join([
+            "<:online:841643544581111808>\t**Online**",
+            "PokeGambler is back online, you can use commands again.",
+            "\u200B\n\u200B\n"
+        ])
+    }
+    await ctx.sess.post(url=url, data=body)
