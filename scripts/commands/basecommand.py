@@ -52,7 +52,10 @@ def admin_only(func):
     func.__dict__["admin_only"] = True
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        if is_admin(message.author):
+        if any([
+            is_admin(message.author),
+            is_owner(self.ctx, message.author)
+        ]):
             return func(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", self.ctx.prefix)
         self.logger.pprint(
