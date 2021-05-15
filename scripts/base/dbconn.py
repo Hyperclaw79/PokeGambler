@@ -404,7 +404,7 @@ class DBConnector:
         self.cursor.execute(
             '''
             SELECT user_id FROM profile
-            WHERE balance > 0
+            WHERE balance > 100
             ORDER BY balance DESC
             LIMIT 1;
             '''
