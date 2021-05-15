@@ -7,6 +7,8 @@ This module is a compilation of Image Generation Classes.
 import os
 from abc import ABC, abstractmethod
 from io import BytesIO
+import random
+from typing import Tuple
 
 from PIL import (
     Image, ImageDraw,
@@ -352,3 +354,69 @@ class BadgeGenerator(AssetGenerator):
                 self.badges[badge]
             )
         return badgestrip
+
+
+class BoardGenerator(AssetGenerator):
+    """
+    The Board Generator for Wackamole minigame.
+    """
+    def __init__(self, asset_path: str):
+        super().__init__(asset_path=asset_path)
+        self.mole = Image.new('RGB', (250, 250), (0, 0, 0))
+        self.mole.paste(
+            self.pokechip.resize((250, 250)).convert('RGB')
+        )
+        self.boards = []
+        self.board_names = []
+        for board in os.listdir(
+            os.path.join(asset_path, "basecards", "boards")
+        ):
+            self.board_names.append(
+                board.split(".jpg")[0].title()
+            )
+            self.boards.append(
+                Image.open(
+                    os.path.join(
+                        asset_path, "basecards", "boards", board
+                    )
+                )
+            )
+
+    @staticmethod
+    def get_valids(level: int = 0) -> list:
+        """
+        Returns a list of possible tile names for given difficulty level.
+        """
+        return [
+            f"{chr(65+i)}{j}"
+            for i in range(level + 3)
+            for j in range(1, level + 4)
+        ]
+
+    def get_board(self, level: int = 0) -> Tuple[str, Image.Image]:
+        """
+        Returns a Wackamole board (name, Image) of given difficulty level.
+        """
+        return (
+            self.board_names[level],
+            self.boards[level].copy()
+        )
+
+    def get(self, level: int = 0) -> Tuple[str, Image.Image]:
+        """
+        Returns a Board image with a random time replaced with a pokechip.
+        """
+        pos = (
+            random.randint(0, level + 2),
+            random.randint(0, level + 2)
+        )
+        tile_w, tile_h = (250, 250)
+        board_img = self.boards[level].copy()
+        board_img.paste(
+            self.mole,
+            (pos[0] * tile_w, pos[1] * tile_h)
+        )
+        letter = ('A', 'B', 'C', 'D', 'E', 'F', 'G')[pos[0]]
+        num = pos[1] + 1
+        rolled = f"{letter}{num}"
+        return (rolled, board_img)

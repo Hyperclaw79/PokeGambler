@@ -6,13 +6,14 @@ Gambling Commands Module
 
 import asyncio
 import math
-from datetime import datetime
 import random
+from datetime import datetime
 
 import discord
 
 from ..base.models import Profile
-from ..helpers.checks import user_rctn, user_check
+from ..helpers.checks import user_check, user_rctn
+from ..helpers.imageclasses import BoardGenerator
 from ..helpers.utils import (
     get_embed, get_enum_embed,
     img2file, wait_for
@@ -48,6 +49,7 @@ class GambleCommands(Commands):
         self.rules = {
             "lower_wins": "Lower number card wins"
         }
+        self.boardgen = BoardGenerator(self.ctx.assets_path)
 
     def __charge_player(self, dealed_deck, fee):
         profiles = {}
@@ -556,6 +558,110 @@ class GambleCommands(Commands):
                 balance=profile.get()["balance"] - amount,
                 won_chips=profile.get()["won_chips"] - amount
             )
-        emb = get_embed(msg, title=title, image=img)
-        emb.color = color
+        emb = get_embed(msg, title=title, image=img, color=color)
         await opt_msg.edit(embed=emb)
+
+    @alias(["mole", "whack"])
+    async def cmd_whackamole(self, message, args=None, **kwargs):
+        """Find the chip minigame.
+        $```scss
+        {command_prefix}whackamole [--difficulty number]
+        ```$
+
+        @Find the hidden chip for a chance to win a jackpot.
+        If no amount is specified, 50 chips will be used by default.
+        Minimum 50 chips and maximim 9999 chips can be used.
+        You can choose difficulty level (default 1) and rewards will scale.
+        ```
+        ╔═══════╦═══════╦══════╦════════╗
+        ║ Level ║ Board ║ Cost ║ Reward ║
+        ╠═══════╬═══════╬══════╬════════╣
+        ║   1   ║  3x3  ║   50 ║   x2   ║
+        ║   2   ║  4x4  ║  100 ║   x4   ║
+        ║   3   ║  5x5  ║  150 ║   x6   ║
+        ║   4   ║  6x6  ║  150 ║   x8   ║
+        ║   5   ║  7x7  ║  150 ║   x10  ║
+        ╚═══════╩═══════╩══════╩════════╝
+        ```@
+
+        ~To play with the default difficulty (level 1):
+            ```
+            {command_prefix}mole
+            ```
+        To play the extreme mode (level 5):
+            ```
+            {command_prefix}mole --difficulty 5
+            ```~
+        """
+        level = kwargs.get("difficulty", 1)
+        if any([
+            not str(level).isdigit(),
+            str(level).isdigit() and int(level) not in range(1, 6)
+        ]):
+            await message.channel.send(
+                embed=get_embed(
+                    "You need to choose a number between 1 and 5.",
+                    embed_type="error",
+                    title="Invalid Input"
+                )
+            )
+            return
+        level = int(level) - 1
+        valids = self.boardgen.get_valids(level)
+        cost = [50, 100, 150, 150, 150][level]
+        multiplier = [2, 4, 6, 8, 10][level]
+        profile = Profile(self.database, message.author)
+        if profile.get()["balance"] < cost:
+            await self.__handle_low_bal(message.author, message.channel)
+            await message.add_reaction("❌")
+            return
+        board, board_img = self.boardgen.get_board(level)
+        opt_msg = await message.channel.send(
+            content=f"**Difficulty: {level + 1} ({board})**\n"
+            f"**Cost: {cost} <:pokechip:840469159242760203>** \n"
+            "> Choose a tile:",
+            file=img2file(board_img, f"{board}.jpg")
+        )
+        reply = await wait_for(
+            message.channel, self.ctx, init_msg=opt_msg,
+            check=lambda msg: user_check(msg, message),
+            timeout="inf"
+        )
+        if reply.content.title() not in valids:
+            await message.channel.send(
+                embed=get_embed(
+                    "You can only choose one of the displayed tiles.",
+                    embed_type="error",
+                    title="Invalid Input"
+                )
+            )
+            return
+        choice = reply.content.title()
+        rolled, board_img = self.boardgen.get(level)
+        await opt_msg.delete()
+        if choice == rolled:
+            content = "**Congratulations! You guessed it correctly.**\n" + \
+                f"{cost * multiplier} <:pokechip:840469159242760203> " + \
+                "have been added in your account."
+            color = 5023308
+            profile.update(
+                balance=profile.get()["balance"] + (cost * multiplier),
+                won_chips=profile.get()["won_chips"] + (cost * multiplier)
+            )
+        else:
+            content = "**Uhoh! You couldn't guess it right this time.**\n" + \
+                f"{cost} <:pokechip:840469159242760203> " + \
+                "have been taken from your account."
+            color = 14155786
+            profile.update(
+                balance=profile.get()["balance"] - cost,
+                won_chips=profile.get()["won_chips"] - cost
+            )
+        await message.channel.send(
+            embed=get_embed(
+                content=content,
+                color=color,
+                image=f"attachment://{rolled}.jpg"
+            ),
+            file=img2file(board_img, f"{rolled}.jpg")
+        )

@@ -71,7 +71,8 @@ def prettify_discord(ctx, iterable: list, mode="guild") -> str:
 def get_embed(
     content: str, embed_type: str = "info",
     title: str = None, footer: str = None,
-    image: str = None, thumbnail: str = None
+    image: str = None, thumbnail: str = None,
+    color: int = None
 ) -> discord.Embed:
     """
     Creates a Discord Embed with appropriate color, title and description.
@@ -105,6 +106,8 @@ def get_embed(
         emb.set_image(url=image)
     if thumbnail:
         emb.set_thumbnail(url=thumbnail)
+    if color:
+        emb.color = color
     return emb
 
 
