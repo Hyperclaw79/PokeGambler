@@ -48,7 +48,7 @@ class ProfileCommands(Commands):
             ```~
         """
         if args:
-            user = self.ctx.get_user(int(args[0]))
+            user = message.guild.get_member(int(args[0]))
         elif kwargs["mentions"]:
             user = kwargs["mentions"][0].id
         else:
