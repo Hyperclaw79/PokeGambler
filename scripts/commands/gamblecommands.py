@@ -364,6 +364,40 @@ class GambleCommands(Commands):
         )
         return embed
 
+    async def __input_handler(
+        self, message, args, profile,
+        default, min_chips, max_chips
+    ):
+        amount = default
+        if args:
+            try:
+                amount = int(args[0])
+            except (ZeroDivisionError, ValueError):
+                await message.channel.send(
+                    embed=get_embed(
+                        f"Amount will be defaulted to 50 chips.",
+                        embed_type="warning",
+                        title="Invalid Input"
+                    )
+                )
+        if any([
+            amount < min_chips,
+            amount > max_chips
+        ]):
+            await message.channel.send(
+                embed=get_embed(
+                    f"Amount should be more than 50 and less than 9999 chips.",
+                    embed_type="error",
+                    title="Invalid Input"
+                )
+            )
+            return None
+        if profile.get()["balance"] < amount:
+            await self.__handle_low_bal(message.author, message.channel)
+            await message.add_reaction("❌")
+            return None
+        return amount
+
     @dealer_only
     @alias(["deal", "roll"])
     async def cmd_gamble(self, message, args=None, **kwargs):
@@ -464,10 +498,11 @@ class GambleCommands(Commands):
             ```~
         """
         profile = Profile(self.database, message.author)
-        amount = int(args[0]) if args else 50
-        if profile.get()["balance"] < amount:
-            await self.__handle_low_bal(message.author, message.channel)
-            await message.add_reaction("❌")
+        amount = await self.__input_handler(
+            message, args, profile, default=50,
+            min_chips=50, max_chips=9999
+        )
+        if amount is None:
             return
         opt_msg = await message.channel.send(
             embed=get_embed(
