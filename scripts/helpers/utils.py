@@ -67,6 +67,7 @@ def prettify_discord(ctx, iterable: list, mode="guild") -> str:
     )
 
 
+# pylint: disable=too-many-arguments
 def get_embed(
     content: str, embed_type: str = "info",
     title: str = None, footer: str = None,
@@ -323,6 +324,9 @@ async def get_profile(database, message, user):
 
 
 def dedent(message):
+    """
+    Strips whitespaces from the left of every line.
+    """
     return '\n'.join(
         line.lstrip()
         for line in message.splitlines()

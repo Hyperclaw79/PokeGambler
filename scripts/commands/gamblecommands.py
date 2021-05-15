@@ -373,7 +373,7 @@ class GambleCommands(Commands):
             except (ZeroDivisionError, ValueError):
                 await message.channel.send(
                     embed=get_embed(
-                        f"Amount will be defaulted to 50 chips.",
+                        f"Amount will be defaulted to {default} chips.",
                         embed_type="warning",
                         title="Invalid Input"
                     )
@@ -384,7 +384,7 @@ class GambleCommands(Commands):
         ]):
             await message.channel.send(
                 embed=get_embed(
-                    f"Amount should be more than 50 and less than 9999 chips.",
+                    f"Amount should be more than {min_chips} and less than {max_chips} chips.",
                     embed_type="error",
                     title="Invalid Input"
                 )
