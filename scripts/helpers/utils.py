@@ -251,6 +251,7 @@ def is_owner(ctx, user):
         ctx.owner_id
     ]
 
+
 def is_admin(user):
     """
     Checks if user is a server admin.
@@ -272,6 +273,7 @@ def is_dealer(user):
     ]
     return "dealers" in roles
 
+
 def get_modules(ctx):
     """
     Returns a list of all the commands.
@@ -284,6 +286,7 @@ def get_modules(ctx):
             comtype != "load_commands"
         ])
     ])
+
 
 async def get_profile(database, message, user):
     """
@@ -312,3 +315,10 @@ async def get_profile(database, message, user):
             )
         )
         return None
+
+
+def dedent(message):
+    return '\n'.join(
+        line.lstrip()
+        for line in message.splitlines()
+    )

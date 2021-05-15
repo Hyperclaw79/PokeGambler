@@ -11,7 +11,7 @@ import discord
 
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
-    get_embed, get_modules,
+    get_embed, get_modules, dedent,
     is_owner, is_admin, is_dealer
 )
 from .basecommand import alias, Commands
@@ -49,9 +49,9 @@ class NormalCommands(Commands):
                 color=11068923
             )
             emb.set_thumbnail(
-            url="https://cdn.discordapp.com/attachments/840469669332516904/"
-            "840469820180529202/pokegambler_logo.png"
-        )
+                url="https://cdn.discordapp.com/attachments/840469669332516904/"
+                "840469820180529202/pokegambler_logo.png"
+            )
         else:
             emb = get_embed(
                 "No help message exists for this command.",
@@ -317,8 +317,57 @@ class NormalCommands(Commands):
 
         @Gives new players information about PokeGambler.@
         """
-        await message.channel.send(
-            embed=get_embed(
-                "Information will be coming soon."
-            )
+        emb = get_embed(
+            dedent(
+                """
+                > Welcome to the first `BETA` test of PokeGambler.
+                **PokeGambler** uses pokemon themed playing cards for entertaining gambling matches.
+                It has a dedicated currency and profile system.
+                Earned Pokechips can be cashed out for Poketwo credits from the admin.
+                """
+            ),
+            title="**Welcome to PokeGambler**"
         )
+        emb.add_field(
+            name="**Getting Started**",
+            value=dedent(
+                f"""
+                ```
+                You can create a new profile using:
+                    {self.ctx.prefix}profile
+                Every players gets free 100 Pokechips
+
+                For a list of commands you can access:
+                    {self.ctx.prefix}commands
+
+                For usage guide of these commands:
+                    {self.ctx.prefix}help
+
+                Also keep an eye out for sudden gambling matches.
+                ```
+                """
+            ),
+            inline=False
+        )
+        emb.add_field(
+            name="**Owners**",
+            value=dedent(
+                """
+                ```
+                Bot Owner: Hyperclaw79#3476
+                Server Owner: justrilrx#9692
+                ```
+                """
+            ),
+            inline=True
+        )
+        emb.add_field(
+            name="**Stats**",
+            value="`Disabled during BETA`",
+            inline=True
+        )
+        emb.set_image(
+            url="https://cdn.discordapp.com/attachments/"
+            "840469669332516904/843077048435736586/banner.jpg"
+        )
+        await message.channel.send(embed=emb)
