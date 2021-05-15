@@ -6,14 +6,13 @@ Gambling Commands Module
 
 import asyncio
 import math
-import os
 from datetime import datetime
+import random
 
 import discord
 
 from ..base.models import Profile
 from ..helpers.checks import user_rctn, user_check
-from ..helpers.imageclasses import ChipFlipper
 from ..helpers.utils import (
     get_embed, get_enum_embed,
     img2file, wait_for
@@ -49,7 +48,6 @@ class GambleCommands(Commands):
         self.rules = {
             "lower_wins": "Lower number card wins"
         }
-        self.chipflipper = ChipFlipper(self.ctx.assets_path)
 
     def __charge_player(self, dealed_deck, fee):
         profiles = {}
@@ -509,13 +507,18 @@ class GambleCommands(Commands):
                 "```md\n# Options\n1. Heads\n2. Tails\n```",
                 title=f"**Place your bet for {amount}** <:pokechip:840469159242760203>",
                 footer=f"⚠️ You'll either get {amount * 2} or "
-                f"lose {amount} pokechips"
-            ),
-            file=discord.File(
-                os.path.join(self.ctx.assets_path, 'blinker.gif')
+                f"lose {amount} pokechips",
+                image="https://cdn.discordapp.com/attachments/840469669332516904"
+                "/843077878816178186/blinker.gif"
             )
         )
-        idx, img = self.chipflipper.get()
+        idx = random.randint(0, 1)
+        img = [
+            "https://cdn.discordapp.com/attachments/840469669332516904/" + \
+                "843079658274422814/logochip.png",
+            "https://cdn.discordapp.com/attachments/840469669332516904/" + \
+                "843079660375638046/pokechip.png"
+        ][idx]
         reply = await wait_for(
             message.channel, self.ctx, init_msg=opt_msg,
             check=lambda msg: user_check(msg, message),
@@ -536,7 +539,6 @@ class GambleCommands(Commands):
             )
             return
         choice = int(reply) - 1 if reply in valids[:2] else valids[2:].index(reply)
-        chip = img2file(img, "chip.png", ext="PNG")
         msg = f"PokeGambler choose {valids[2:][idx].title()}.\n"
         if choice == idx:
             msg += f"You have won {amount * 2} <:pokechip:840469159242760203>"
@@ -554,7 +556,6 @@ class GambleCommands(Commands):
                 balance=profile.get()["balance"] - amount,
                 won_chips=profile.get()["won_chips"] - amount
             )
-        emb = get_embed(msg, title=title)
+        emb = get_embed(msg, title=title, image=img)
         emb.color = color
-        await opt_msg.delete()
-        await message.channel.send(embed=emb, file=chip)
+        await opt_msg.edit(embed=emb)

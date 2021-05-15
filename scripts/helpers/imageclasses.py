@@ -7,7 +7,6 @@ This module is a compilation of Image Generation Classes.
 import os
 from abc import ABC, abstractmethod
 from io import BytesIO
-import random
 
 from PIL import (
     Image, ImageDraw,
@@ -353,23 +352,3 @@ class BadgeGenerator(AssetGenerator):
                 self.badges[badge]
             )
         return badgestrip
-
-
-class ChipFlipper(AssetGenerator):
-    """
-    Simple chip generator which returns pokechip or logochip.
-    """
-    def __init__(self, asset_path: str):
-        super().__init__(asset_path=asset_path)
-        self.pokechip = self.pokechip.resize((270, 270), Image.ANTIALIAS)
-        self.logochip = Image.open(
-            os.path.join(asset_path, "logochip.png")
-        ).resize((270, 270), Image.ANTIALIAS)
-
-    def get(self):
-        """
-        Randomly returns a 270 x 270 Pokechip or Logochip.
-        """
-        choices = ["logochip", "pokechip"]
-        choice = random.choice(choices)
-        return (choices.index(choice), getattr(self, choice).copy())
