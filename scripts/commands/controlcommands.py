@@ -66,7 +66,8 @@ class ControlCommands(Commands):
         """
         props = {
             "Channel_Mode": "channel_mode",
-            "Guild_Mode": "guild_mode"
+            "Guild_Mode": "guild_mode",
+            "Owner_Mode": "owner_mode"
         }
         if args:
             if len(args) >= 2:
@@ -123,9 +124,6 @@ class ControlCommands(Commands):
             )
             await message.channel.send(embed=embed)
             return
-        self.ctx.user_changed.update({
-            props[prop]: state
-        })
         setattr(self.ctx, props[prop], state)
         await message.channel.send(
             embed=get_embed(

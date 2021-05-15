@@ -54,6 +54,7 @@ class PokeGambler(discord.Client):
         self.start_time = datetime.now()
         self.owner = None
         self.sess = None
+        self.owner_mode = False
         # Classes
         self.database = DBConnector(self.db_path)
         self.logger = CustomLogger(
@@ -204,6 +205,17 @@ class PokeGambler(discord.Client):
                 str(message.author.id)
             ):
                 await message.add_reaction("🚫")
+                return
+            if self.owner_mode and not is_owner(self, message.author):
+                await message.channel.send(
+                    embed=get_embed(
+                        "PokeGambler is currently in **owner mode**.\n"
+                        "Only the bot owner can use the commands.\n"
+                        "Please try again later.",
+                        embed_type="warning",
+                        title="Owner Mode is active."
+                    )
+                )
                 return
             res = self.__get_method(message)
             method, cmd, args, option_dict = res
