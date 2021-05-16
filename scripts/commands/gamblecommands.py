@@ -72,7 +72,7 @@ class GambleCommands(Commands):
             self.catog_channel = [
                 chan
                 for chan in message.guild.categories
-                if chan.name.lower() == "text channels"
+                if chan.name.lower() in ("pokegambler", "text channels")
             ][0]
         gamblers = [
             role
