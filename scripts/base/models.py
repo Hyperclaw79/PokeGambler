@@ -68,6 +68,14 @@ class Profile(Model):
         else:
             for key, val in profile.items():
                 setattr(self, key, val)
+            if any([
+                "dealers" in [
+                    role.name.lower()
+                    for role in user.roles
+                ],
+                not profile["is_dealer"]
+            ]):
+                self.update(is_dealer=True)
 
     def __init_dict(self):
         init_dict = {
