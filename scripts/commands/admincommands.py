@@ -4,9 +4,11 @@ Administration Commands
 
 # pylint: disable=unused-argument
 
+import os
+from ..helpers.checks import user_check
 from ..helpers.utils import (
     get_embed, get_profile,
-    is_admin, is_owner
+    is_admin, is_owner, wait_for
 )
 from ..base.models import Blacklist
 from .basecommand import Commands, admin_only, alias
@@ -316,3 +318,35 @@ class AdminCommands(Commands):
             return
         Blacklist(self.database, user, message.author).pardon()
         await message.add_reaction("👍")
+
+    @admin_only
+    async def cmd_announce(self, message, **kwargs):
+        """Send an announcement.
+        $```scss
+        {command_prefix}announce
+        ```$
+
+        @`🛡️ Admin Command`
+        Make PokeGambler send an announcement in the announcement channel.@
+
+        ~To start an announcement:
+            ```
+            {command_prefix}announce
+            ```~
+        """
+        start_msg = await message.channel.send(
+            embed=get_embed(
+                'Enter your announcement message:\n>_'
+            )
+        )
+        reply = await wait_for(
+            message.channel, self.ctx, init_msg=start_msg,
+            check=lambda msg: user_check(msg, message),
+            timeout="inf"
+        )
+        content = reply.content
+        chan = message.guild.get_channel(
+            int(os.getenv("ANNOUNCEMENT_CHANNEL"))
+        )
+        await chan.send(content=content)
+        await reply.add_reaction("👍")
