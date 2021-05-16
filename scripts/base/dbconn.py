@@ -435,7 +435,7 @@ class DBConnector:
         self.cursor.execute(
             '''
             SELECT user_id FROM profile
-            WHERE purchased_chips > 0
+            WHERE purchased_chips > 100
             ORDER BY purchased_chips DESC
             LIMIT 1;
             '''
