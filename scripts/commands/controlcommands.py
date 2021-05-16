@@ -394,6 +394,8 @@ class ControlCommands(Commands):
         embeds = [parse(cmd) for cmd in history]
         base = await message.channel.send(embed=embeds[0])
         if len(embeds) > 1:
+            for idx, emb in enumerate(embeds):
+                emb.title += f" ({idx + 1}/{len(embeds)})"
             pager = Paginator(message, base, embeds, self.ctx)
             await pager.run()
 
