@@ -112,11 +112,8 @@ class DBConnector:
         ret_val = val
         if isinstance(val, str):
             ret_val = f'"{val}"'
-        elif isinstance(val, (int, float)):
+        elif isinstance(val, (int, float, bool)):
             ret_val = str(val)
-        elif isinstance(val, bool):
-            val_num = 1 if val else 0
-            ret_val = str(val_num)
         return ret_val
 
 # DDL
