@@ -532,6 +532,13 @@ class ControlCommands(Commands):
                     title="Logs"
                 )
             )
+        if not embeds:
+            await message.channel.send(
+                embed=get_embed(
+                    "No logs found."
+                )
+            )
+            return
         base = await message.channel.send(embed=embeds[0])
         pager = Paginator(message, base, embeds, self.ctx)
         await pager.run()
