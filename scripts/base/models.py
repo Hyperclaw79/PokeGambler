@@ -8,6 +8,7 @@ from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from inspect import ismethod
+from typing import List
 
 import discord
 
@@ -191,3 +192,29 @@ class Blacklist(Model):
         Pardons a blacklisted user.
         """
         self.database.pardon_user(self.user_id)
+
+
+class Matches(Model):
+    """
+    Wrapper for matches based DB actions
+    """
+
+    # pylint: disable=no-member
+
+    def __init__(
+        self, database, user,
+        started_by: str, participants: List[str],
+        winner: str, deal_cost: int = 50,
+        lower_wins: bool = False,
+        by_joker: bool = False
+    ):
+        super().__init__(database, user, "matches")
+        self.played_at = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        self.started_by = started_by
+        self.participants = participants
+        self.winner = winner
+        self.deal_cost = deal_cost
+        self.lower_wins = lower_wins
+        self.by_joker = by_joker

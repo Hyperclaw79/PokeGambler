@@ -103,6 +103,22 @@ class DBConnector:
         )
         # self.conn.set_trace_callback(print)
         self.cursor = self.conn.cursor()
+        self.conn.create_function("in_list", 2, self.in_list)
+        self.conn.create_function("is_winner", 2, self.is_winner)
+
+    @staticmethod
+    def in_list(uid, values):
+        """
+        Custom SQL fn which checks if the uid is in the list of values.
+        """
+        return uid in values.split(", ")
+
+    @staticmethod
+    def is_winner(user_id, winner):
+        """
+        Custom SQL fn which checks if user_id is the winner.
+        """
+        return int(user_id == winner)
 
     @staticmethod
     def format_val(val):
@@ -180,6 +196,29 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def create_matches_table(self):
+        """
+        SQL endpoint for Match History table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            matches(
+                played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                started_by TEXT NOT NULL,
+                participants LIST NOT NULL,
+                deal_cost INT DEFAULT "50" NOT NULL,
+                lower_wins BOOLEAN DEFAULT FALSE NOT NULL,
+                by_joker BOOLEAN DEFAULT FALSE NOT NULL,
+                FOREIGN KEY (winner)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
     def create_tables(self):
         """
         SQL endpoint for triggering multiple table creations.
@@ -220,6 +259,17 @@ class DBConnector:
         self.cursor.execute(
             '''
             DELETE FROM blacklists;
+            '''
+        )
+        self.conn.commit()
+
+    def purge_matches(self):
+        """
+        SQL endpoint for purging Matches table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM matches;
             '''
         )
         self.conn.commit()
@@ -498,6 +548,22 @@ class DBConnector:
             (user_id, )
         )
         self.conn.commit()
+
+    def get_match_stats(self, user_id:str) -> list:
+        """
+        Gets the Wins and Losses for every participated match.
+        """
+        self.cursor.execute(
+            """
+            SELECT is_winner(?, winner) FROM matches
+            WHERE in_list(?, participants)
+            """,
+            (user_id, user_id)
+        )
+        return [
+            res[0]
+            for res in self.cursor.fetchall()
+        ]
 
 if __name__ == "__main__":
     dbconn = DBConnector(db_path='data/pokegambler.db')

@@ -11,7 +11,7 @@ from datetime import datetime
 
 import discord
 
-from ..base.models import Profile
+from ..base.models import Profile, Matches
 from ..helpers.checks import user_check, user_rctn
 from ..helpers.imageclasses import BoardGenerator
 from ..helpers.utils import (
@@ -288,6 +288,7 @@ class GambleCommands(Commands):
             footer="10% pokechips from the pot deducted as transaction fee."
         )
         await gamble_channel.send(embed=winner_embed)
+        return bool(is_joker)
 
     async def __handle_winner(
         self, dealed_deck,
@@ -327,9 +328,13 @@ class GambleCommands(Commands):
         rolled_fl = img2file(rolled_deck, "rolled.jpg")
         embed.set_image(url="attachment://rolled.jpg")
         await gamble_channel.send(embed=embed, file=rolled_fl)
-        await self.__announce_winner(
-            gamble_channel, dealed_deck,
-            winner, fee, profiles
+        # Return is_joker for saving into DB
+        return (
+            winner,
+            await self.__announce_winner(
+                gamble_channel, dealed_deck,
+                winner, fee, profiles
+            )
         )
 
     def __prep_reg_embed(
@@ -471,10 +476,19 @@ class GambleCommands(Commands):
             )
             if joker_found:
                 break
-        await self.__handle_winner(
+        winner, is_joker = await self.__handle_winner(
             dealed_deck, gamble_channel,
             profiles, lower_wins, fee
         )
+        Matches(
+            self.database, self.ctx,
+            started_by=str(message.author.id),
+            participants=list(profiles),
+            winner=str(winner.id),
+            lower_wins=lower_wins,
+            deal_cost=fee,
+            by_joker=is_joker
+        ).save()
         await self.__cleanup(gamble_channel, delay=30.0)
 
     @alias(["flip", "chipflip"])
@@ -593,7 +607,7 @@ class GambleCommands(Commands):
             {command_prefix}mole --difficulty 5
             ```~
         """
-        level = kwargs.get("difficulty", 1)
+        level = kwargs.get("difficulty", kwargs.get("level", 1))
         if any([
             not str(level).isdigit(),
             str(level).isdigit() and int(level) not in range(1, 6)
