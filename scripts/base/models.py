@@ -8,7 +8,7 @@ from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from inspect import ismethod
-from typing import List
+from typing import List, Tuple
 
 import discord
 
@@ -35,9 +35,13 @@ class Model(ABC):
                 not attr.startswith("_"),
                 attr not in [
                     "database", "user",
-                    "model_name", "objects"
+                    "model_name"
                 ],
-                not ismethod(getattr(self, attr))
+                not ismethod(getattr(self, attr)),
+                not isinstance(
+                    getattr(self.__class__, attr, None),
+                    (property, staticmethod, classmethod)
+                )
             ]):
                 yield (attr, getattr(self, attr))
 
@@ -52,6 +56,38 @@ class Model(ABC):
         Returns the Model object as a dictionary.
         """
         return dict(self)
+
+
+class Minigame(Model, ABC):
+    """
+    Base class for Minigames.
+    """
+    def get_plays(self, wins=False):
+        """
+        Returns list of minigames (of specified type) played.
+        """
+        method = getattr(
+            self.database,
+            f"get_{self.model_name}"
+        )
+        plays = method(str(self.user.id), wins=wins)
+        if plays:
+            return plays
+        return []
+
+    @property
+    def num_plays(self):
+        """
+        Returns number of minigames (of specified type) played.
+        """
+        return len(self.get_plays())
+
+    @property
+    def num_wins(self):
+        """
+        Returns number of minigames (of specified type) won.
+        """
+        return len(self.get_plays(wins=True))
 
 
 class Profile(Model):
@@ -203,8 +239,9 @@ class Matches(Model):
 
     def __init__(
         self, database, user,
-        started_by: str, participants: List[str],
-        winner: str, deal_cost: int = 50,
+        started_by: str = "",
+        participants: List[str] = None,
+        winner: str = "", deal_cost: int = 50,
         lower_wins: bool = False,
         by_joker: bool = False
     ):
@@ -218,3 +255,70 @@ class Matches(Model):
         self.deal_cost = deal_cost
         self.lower_wins = lower_wins
         self.by_joker = by_joker
+
+    @property
+    def num_matches(self):
+        """
+        Returns number of gamble matches played.
+        """
+        results = self.database.get_match_stats(str(self.user.id)) or []
+        return len(results)
+
+    @property
+    def num_wins(self):
+        """
+        Returns number of gamble matches won.
+        """
+        results = self.database.get_match_stats(str(self.user.id)) or []
+        return results.count(True)
+
+    def get_stats(self) -> Tuple[int, int]:
+        """
+        Get Match num_matches and num_wins with a single query.
+        """
+        results = self.database.get_match_stats(str(self.user.id)) or []
+        matches = len(results)
+        wins = results.count(True)
+        return (matches, wins)
+
+
+class Flips(Minigame):
+    """
+    Wrapper for flips based DB actions
+    """
+
+    # pylint: disable=no-member
+
+    def __init__(
+        self, database, user,
+        cost: int = 50, won: bool = False
+    ):
+        super().__init__(database, user, "flips")
+        self.played_at = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        self.played_by = str(user.id)
+        self.cost = cost
+        self.won = won
+
+
+class Moles(Minigame):
+    """
+    Wrapper for moles based DB actions
+    """
+
+    # pylint: disable=no-member
+
+    def __init__(
+        self, database, user,
+        cost: int = 50, level: int = 1,
+        won: bool = False
+    ):
+        super().__init__(database, user, "moles")
+        self.played_at = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        self.played_by = str(user.id)
+        self.cost = cost
+        self.level = level
+        self.won = won

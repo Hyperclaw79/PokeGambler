@@ -11,7 +11,9 @@ from datetime import datetime
 
 import discord
 
-from ..base.models import Profile, Matches
+from ..base.models import (
+    Profile, Matches, Flips, Moles
+)
 from ..helpers.checks import user_check, user_rctn
 from ..helpers.imageclasses import BoardGenerator
 from ..helpers.utils import (
@@ -564,6 +566,7 @@ class GambleCommands(Commands):
                 balance=profile.get()["balance"] + (amount * 2),
                 won_chips=profile.get()["won_chips"] + (amount * 2)
             )
+            won = True
         else:
             msg += f"You have lost {amount} <:pokechip:840469159242760203>"
             title = "You Lost!"
@@ -572,6 +575,11 @@ class GambleCommands(Commands):
                 balance=profile.get()["balance"] - amount,
                 won_chips=profile.get()["won_chips"] - amount
             )
+            won = False
+        Flips(
+            self.database, message.author,
+            amount, won
+        ).save()
         emb = get_embed(msg, title=title, image=img, color=color)
         await opt_msg.edit(embed=emb)
 
@@ -662,6 +670,7 @@ class GambleCommands(Commands):
                 balance=profile.get()["balance"] + (cost * multiplier),
                 won_chips=profile.get()["won_chips"] + (cost * multiplier)
             )
+            won = True
         else:
             content = "**Uhoh! You couldn't guess it right this time.**\n" + \
                 f"{cost} <:pokechip:840469159242760203> " + \
@@ -671,6 +680,11 @@ class GambleCommands(Commands):
                 balance=profile.get()["balance"] - cost,
                 won_chips=profile.get()["won_chips"] - cost
             )
+            won = False
+        Moles(
+            self.database, message.author,
+            cost, level, won
+        ).save()
         await message.channel.send(
             embed=get_embed(
                 content=content,

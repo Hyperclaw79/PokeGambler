@@ -8,6 +8,9 @@ from io import BytesIO
 
 from PIL import Image
 
+from ..base.models import (
+    Matches, Flips, Moles
+)
 from ..helpers.imageclasses import (
     BadgeGenerator, LeaderBoardGenerator,
     ProfileCardGenerator, WalletGenerator
@@ -193,3 +196,42 @@ class ProfileCommands(Commands):
         badgestrip = self.bdgen.get(badges)
         discord_file = img2file(badgestrip, "badges.png", ext="PNG")
         await message.channel.send(file=discord_file)
+
+    async def cmd_stats(self, message, **kwargs):
+        """Check match and minigame stats.
+        $```scss
+        {command_prefix}stats
+        ```$
+
+        @Check the number of gamble matches and minigames you've played and won.@
+
+        ~To check your rank:
+            ```
+            {command_prefix}stats
+            ```~
+        """
+        match_stats = Matches(
+            self.database, message.author
+        ).get_stats()
+        flips = Flips(
+            self.database, message.author
+        )
+        moles = Moles(
+            self.database, message.author
+        )
+        stat_dict = {
+            "Gamble Matches": f"Played: {match_stats[0]}\nWon: {match_stats[1]}",
+            "Flips": f"Played: {flips.num_plays}\nWon: {flips.num_wins}",
+            "Moles": f"Played: {moles.num_plays}\nWon: {moles.num_wins}"
+        }
+        emb = get_embed(
+            "Here's how you've performed till now.",
+            title=f"Statistics for **{message.author.name}**"
+        )
+        for key, val in stat_dict.items():
+            emb.add_field(
+                name=f"**{key}**",
+                value=f"```rb\n{val}\n```",
+                inline=False
+            )
+        await message.channel.send(embed=emb)

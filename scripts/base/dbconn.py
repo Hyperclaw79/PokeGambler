@@ -102,6 +102,7 @@ class DBConnector:
             detect_types=sqlite3.PARSE_DECLTYPES
         )
         # self.conn.set_trace_callback(print)
+        self.conn.execute("PRAGMA foreign_keys = 1")
         self.cursor = self.conn.cursor()
         self.conn.create_function("in_list", 2, self.in_list)
         self.conn.create_function("is_winner", 2, self.is_winner)
@@ -126,14 +127,15 @@ class DBConnector:
         Internal SQLizing function.
         """
         ret_val = val
-        if isinstance(val, str):
+        if isinstance(val, (str, bool)):
             ret_val = f'"{val}"'
-        elif isinstance(val, (int, float, bool)):
+        elif isinstance(val, (int, float)):
             ret_val = str(val)
         return ret_val
 
 # DDL
 
+# Creation
     def create_profile_table(self):
         """
         SQL endpoint for Profile table creation.
@@ -219,6 +221,49 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def create_flips_table(self):
+        """
+        SQL endpoint for QuickFlip table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            flips(
+                played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                played_by TEXT,
+                cost INT NOT NULL,
+                won BOOLEAN NOT NULL,
+                FOREIGN KEY (played_by)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
+    def create_moles_table(self):
+        """
+        SQL endpoint for Whackamole table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            moles(
+                played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                played_by TEXT,
+                cost INT NOT NULL,
+                level INT NOT NULL,
+                won BOOLEAN NOT NULL,
+                FOREIGN KEY (played_by)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
     def create_tables(self):
         """
         SQL endpoint for triggering multiple table creations.
@@ -229,6 +274,8 @@ class DBConnector:
                 attr.startswith("create_")
             ]):
                 getattr(self, attr)()
+
+# Purges
 
     def purge_commands(self):
         """
@@ -274,6 +321,28 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def purge_flips(self):
+        """
+        SQL endpoint for purging Flips table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM flips;
+            '''
+        )
+        self.conn.commit()
+
+    def purge_moles(self):
+        """
+        SQL endpoint for purging Moles table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM moles;
+            '''
+        )
+        self.conn.commit()
+
     def purge_tables(self):
         """
         SQL endpoint for triggering multiple table purges.
@@ -303,6 +372,8 @@ class DBConnector:
         )
         self.conn.commit()
         return self.cursor.lastrowid
+
+# Commands
 
     def get_command_history(self, limit: int = 5, **kwargs) -> list:
         """
@@ -338,6 +409,8 @@ class DBConnector:
                 cmds.append(cmd)
             return cmds
         return None
+
+# Profile
 
     def get_profile(self, user_id: str) -> dict:
         """
@@ -495,6 +568,8 @@ class DBConnector:
             return res[0] == user_id
         return False
 
+# Blacklists
+
     def get_blacklists(self, limit: int = 10) -> list:
         """
         Retrieves all blacklisted users.
@@ -549,21 +624,64 @@ class DBConnector:
         )
         self.conn.commit()
 
+# Matches
+
     def get_match_stats(self, user_id:str) -> list:
         """
         Gets the Wins and Losses for every participated match.
         """
         self.cursor.execute(
+            f"""
+            SELECT is_winner("{user_id}", winner) FROM matches
+            WHERE in_list("{user_id}", participants)
             """
-            SELECT is_winner(?, winner) FROM matches
-            WHERE in_list(?, participants)
-            """,
-            (user_id, user_id)
         )
         return [
             res[0]
             for res in self.cursor.fetchall()
         ]
+
+# Flips
+
+    def get_flips(self, user_id: str, wins: bool = False) -> list:
+        """
+        Gets the QuickFlip data of a particular player.
+        """
+        query = f'''
+        SELECT * FROM flips
+        WHERE played_by IS "{user_id}"
+        '''
+        if wins:
+            query += '\nAND won = "True"'
+        self.cursor.execute(query)
+        res = self.cursor.fetchall()
+        if res:
+            return res
+        return None
+
+# Moles
+
+    def get_moles(self, user_id: str, wins: bool = False) -> list:
+        """
+        Gets the WhackaMole data of a particular player.
+        """
+        query = f'''
+        SELECT * FROM moles
+        WHERE played_by IS "{user_id}"
+        '''
+        if wins:
+            query += '\nAND won = "True"'
+        self.cursor.execute(query)
+        res = self.cursor.fetchone()
+        if res:
+            return {
+                col: res[idx]
+                for idx, col in enumerate([
+                    "played_at", "cost", "level",
+                    "won", "played_by"
+                ])
+            }
+        return None
 
 if __name__ == "__main__":
     dbconn = DBConnector(db_path='data/pokegambler.db')
