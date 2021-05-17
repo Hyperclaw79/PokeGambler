@@ -598,11 +598,11 @@ class GambleCommands(Commands):
         ╔═══════╦═══════╦══════╦════════╗
         ║ Level ║ Board ║ Cost ║ Reward ║
         ╠═══════╬═══════╬══════╬════════╣
-        ║   1   ║  3x3  ║   50 ║   x2   ║
+        ║   1   ║  3x3  ║   50 ║   x3   ║
         ║   2   ║  4x4  ║  100 ║   x4   ║
         ║   3   ║  5x5  ║  150 ║   x6   ║
-        ║   4   ║  6x6  ║  150 ║   x8   ║
-        ║   5   ║  7x7  ║  150 ║   x10  ║
+        ║   4   ║  6x6  ║  150 ║   x10  ║
+        ║   5   ║  7x7  ║  150 ║   x20  ║
         ╚═══════╩═══════╩══════╩════════╝
         ```@
 
@@ -631,7 +631,7 @@ class GambleCommands(Commands):
         level = int(level) - 1
         valids = self.boardgen.get_valids(level)
         cost = [50, 100, 150, 150, 150][level]
-        multiplier = [2, 4, 6, 8, 10][level]
+        multiplier = [3, 4, 6, 10, 20][level]
         profile = Profile(self.database, message.author)
         if profile.get()["balance"] < cost:
             await self.__handle_low_bal(message.author, message.channel)
