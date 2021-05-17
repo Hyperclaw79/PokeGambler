@@ -178,14 +178,14 @@ class ProfileCommands(Commands):
     async def cmd_badges(self, message, **kwargs):
         """Check Badge progress.
         $```scss
-        {command_prefix}badge
+        {command_prefix}badges
         ```$
 
         @Check the list of available badges and what all you have unlocked.@
 
         ~To check your rank:
             ```
-            {command_prefix}badge
+            {command_prefix}badges
             ```~
         """
         profile = await get_profile(self.database, message,  message.author)
