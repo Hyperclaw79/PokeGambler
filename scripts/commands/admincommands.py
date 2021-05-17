@@ -4,10 +4,13 @@ Administration Commands
 
 # pylint: disable=unused-argument
 
+import asyncio
 import os
-from ..helpers.checks import user_check
+
+import discord
+from ..helpers.checks import user_check, user_rctn
 from ..helpers.utils import (
-    get_embed, get_profile,
+    dedent, get_embed, get_profile,
     is_admin, is_owner, wait_for
 )
 from ..base.models import Blacklist
@@ -350,3 +353,55 @@ class AdminCommands(Commands):
         )
         await chan.send(content=content)
         await reply.add_reaction("👍")
+
+    @admin_only
+    async def cmd_autogambler(self, message, **kwargs):
+        async def role_assign(self, gamb_msg, chan):
+            def rctn_check(rctn, usr):
+                if usr.id != self.ctx.user.id:
+                    checks = [
+                        rctn.emoji.name == "pokechip",
+                        rctn.message.id == gamb_msg.id,
+                        not usr.bot
+                    ]
+                    if all(checks):
+                        return True
+            gambler_role = [
+                role
+                for role in message.guild.roles
+                if role.name.lower() == "gamblers"
+            ][0]
+            while True:
+                _, user = await wait_for(
+                    chan, self.ctx, event="reaction_add",
+                    init_msg=gamb_msg,
+                    check=rctn_check,
+                    timeout="inf"
+                )
+                if gambler_role not in user.roles:
+                    await user.add_roles(gambler_role)
+        chan = message.guild.get_channel(
+            int(os.getenv("ANNOUNCEMENT_CHANNEL"))
+        )
+        content = """React with <:pokechip:840469159242760203> to be assigned the `Gamblers` role.
+        With this role you'll be able to participate in the special gamble matches.
+        You'll also be pinged for random Treasure drops (TBI).
+        """
+        gamb_msg = await message.guild.get_channel(
+            int(os.getenv("ANNOUNCEMENT_CHANNEL"))
+        ).send(
+            content="Hey @everyone",
+            embed=get_embed(
+                dedent(content),
+                title="React for Gamblers Role"
+            )
+        )
+        await gamb_msg.add_reaction("<:pokechip:840469159242760203>")
+        await asyncio.sleep(2.0)
+        gamb_msg = discord.utils.find(
+            lambda msg: msg.id == gamb_msg.id,
+            self.ctx.cached_messages
+        )
+        self.ctx.loop.create_task(
+            role_assign(self, gamb_msg, chan)
+        )
