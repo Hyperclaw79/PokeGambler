@@ -8,7 +8,7 @@ import asyncio
 import os
 
 import discord
-from ..helpers.checks import user_check, user_rctn
+from ..helpers.checks import user_check
 from ..helpers.utils import (
     dedent, get_embed, get_profile,
     is_admin, is_owner, wait_for
@@ -356,7 +356,16 @@ class AdminCommands(Commands):
 
     @admin_only
     async def cmd_autogambler(self, message, **kwargs):
+        """Self-assign Gambler Role.
+        $```scss
+        {command_prefix}autogambler
+        ```$
+
+        @`🛡️ Admin Command`
+        Creates a self-assign message, for Gamblers role, in the announcement channel.@
+        """
         async def role_assign(self, gamb_msg, chan):
+            # pylint: disable=inconsistent-return-statements
             def rctn_check(rctn, usr):
                 if usr.id != self.ctx.user.id:
                     checks = [
