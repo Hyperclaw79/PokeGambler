@@ -84,8 +84,8 @@ class Profile(Model):
             "balance": 100,
             "num_matches": 0,
             "num_wins": 0,
-            "purchased_chips": 100,
-            "won_chips": 0,
+            "purchased_chips": 0,
+            "won_chips": 100,
             "is_dealer": "dealers" in [
                 role.name.lower()
                 for role in self.user.roles
