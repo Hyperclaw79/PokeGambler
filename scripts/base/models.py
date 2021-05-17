@@ -105,7 +105,7 @@ class Profile(Model):
         else:
             for key, val in profile.items():
                 setattr(self, key, val)
-            if any([
+            if all([
                 "dealers" in [
                     role.name.lower()
                     for role in user.roles
@@ -113,6 +113,14 @@ class Profile(Model):
                 not profile["is_dealer"]
             ]):
                 self.update(is_dealer=True)
+            elif all([
+                "dealers" not in [
+                    role.name.lower()
+                    for role in user.roles
+                ],
+                profile["is_dealer"]
+            ]):
+                self.update(is_dealer=False)
 
     def __init_dict(self):
         init_dict = {

@@ -53,7 +53,7 @@ class ProfileCommands(Commands):
         if args:
             user = message.guild.get_member(int(args[0]))
         elif kwargs["mentions"]:
-            user = kwargs["mentions"][0].id
+            user = kwargs["mentions"][0]
         else:
             user = message.author
         profile = await get_profile(self.database, message, user)
