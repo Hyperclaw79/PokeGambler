@@ -483,7 +483,7 @@ class GambleCommands(Commands):
             profiles, lower_wins, fee
         )
         Matches(
-            self.database, self.ctx,
+            self.database, message.author,
             started_by=str(message.author.id),
             participants=list(profiles),
             winner=str(winner.id),
