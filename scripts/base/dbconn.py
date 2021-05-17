@@ -210,6 +210,7 @@ class DBConnector:
                 played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
                 started_by TEXT NOT NULL,
                 participants LIST NOT NULL,
+                winner TEXT,
                 deal_cost INT DEFAULT "50" NOT NULL,
                 lower_wins BOOLEAN DEFAULT FALSE NOT NULL,
                 by_joker BOOLEAN DEFAULT FALSE NOT NULL,
