@@ -9,13 +9,16 @@ from io import BytesIO
 from PIL import Image
 
 from ..base.models import (
-    Matches, Flips, Moles
+    Matches, Flips, Minigame, Moles, Profile
 )
 from ..helpers.imageclasses import (
     BadgeGenerator, LeaderBoardGenerator,
     ProfileCardGenerator, WalletGenerator
 )
-from ..helpers.utils import get_embed, get_profile, img2file
+from ..helpers.utils import (
+    get_embed, get_modules,
+    get_profile, img2file
+)
 from .basecommand import Commands, alias
 
 
@@ -30,6 +33,39 @@ class ProfileCommands(Commands):
         self.walletgen = WalletGenerator(self.ctx.assets_path)
         self.lbg = LeaderBoardGenerator(self.ctx.assets_path)
         self.bdgen = BadgeGenerator(self.ctx.assets_path)
+
+    def __get_minigame_lb(self, mg_name, user):
+        def _commands(module):
+            return [
+                attr.replace("cmd_", "")
+                for attr in dir(module)
+                if all([
+                    attr.startswith("cmd_"),
+                    attr not in getattr(module, "alias", [])
+                ])
+            ]
+        def _aliases(module):
+            return [
+                alias.replace("cmd_", "")
+                for alias in getattr(module, "alias", [])
+            ]
+        def _get_lb(modules, mg_name, user):
+            leaderboard = None
+            for module in modules:
+                if mg_name in _aliases(module) + _commands(module):
+                    command = getattr(module, f"cmd_{mg_name}")
+                    models = getattr(command, "models", [])
+                    if not models:
+                        continue
+                    for model in models:
+                        if issubclass(model, Minigame):
+                            leaderboard = model(
+                                self.database, user
+                            ).get_lb()
+                            return leaderboard
+            return leaderboard
+        modules = get_modules(self.ctx)
+        return _get_lb(modules, mg_name, user)
 
     @alias("pr")
     async def cmd_profile(self, message, args=None, **kwargs):
@@ -112,14 +148,17 @@ class ProfileCommands(Commands):
 
     @alias("lb")
     async def cmd_leaderboard(self, message, args=None, **kwargs):
+
+        # pylint: disable=too-many-locals
+
         """Check the global leaderboard.
         $```scss
-        {command_prefix}leaderboard
+        {command_prefix}leaderboard [balance/minigame]
         ```$
 
         @Check the global PokeGambler leaderboard.
         By default, ranks are sorted according to number of wins.
-        You can also sort it according to balance.@
+        You can also sort it according to balance and any minigame.@
 
         ~To check the leaderboard:
             ```
@@ -128,12 +167,53 @@ class ProfileCommands(Commands):
         To check the leaderboard in terms of riches:
             ```
             {command_prefix}lb balance
+            ```
+        To check the leaderboard for QuickFlip:
+            ```
+            {command_prefix}lb flip
             ```~
         """
-        sort_by = "num_wins"
-        if args and args[0].lower().startswith("bal"):
-            sort_by = "balance"
-        leaderboard = self.database.get_leaderboard(sort_by=sort_by)
+        if args and not args[0].lower().startswith("bal"):
+            lbrd = self.__get_minigame_lb(
+                args[0].lower(),
+                message.author
+            )
+            if lbrd is None:
+                await message.channel.send(
+                    embed=get_embed(
+                        "You can choose a minigame name or 'balance'.",
+                        embed_type="error",
+                        title="Invalid Input"
+                    )
+                )
+                return
+            leaderboard = []
+            lbrd = [
+                (
+                    message.guild.get_member(int(res[0])),
+                    res[1],
+                    res[2]
+                )
+                for res in lbrd
+                if message.guild.get_member(int(res[0]))
+            ]
+            for idx, res in enumerate(lbrd):
+                rank = idx + 1
+                member, num_matches, num_wins = res
+                profile = Profile(self.database, member).get()
+                balance = profile["balance"]
+                name = profile["name"]
+                leaderboard.append({
+                    "rank": rank,
+                    "user_id": member.id,
+                    "name": name,
+                    "num_matches": num_matches,
+                    "num_wins": num_wins,
+                    "balance": balance
+                })
+        else:
+            sort_by = "num_wins" if not args else "balance"
+            leaderboard = self.database.get_leaderboard(sort_by=sort_by)
         if not leaderboard:
             await message.channel.send(
                 embed=get_embed(

@@ -75,6 +75,19 @@ class Minigame(Model, ABC):
             return plays
         return []
 
+    def get_lb(self):
+        """
+        Returns leaderboard for the specified minigame.
+        """
+        method = getattr(
+            self.database,
+            f"get_{self.model_name}_lb"
+        )
+        plays = method()
+        if plays:
+            return plays
+        return []
+
     @property
     def num_plays(self):
         """

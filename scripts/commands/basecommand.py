@@ -7,8 +7,9 @@ It also has some useful decorators for the commands.
 
 from abc import ABC
 from functools import wraps
-from typing import Union
+from typing import List, Union
 
+from scripts.base.models import Model
 from ..helpers.utils import (
     get_embed, is_admin, is_dealer, is_owner
 )
@@ -17,7 +18,7 @@ from ..helpers.utils import (
 __all__ = [
     'owner_only', 'admin_only', 'dealer_only',
     'get_chan', 'maintenance', 'no_log', 'alias',
-    'Commands'
+    'model', 'Commands'
 ]
 
 
@@ -154,7 +155,7 @@ def no_log(func):
     return wrapped
 
 
-def alias(alt_names: Union[list, str]):
+def alias(alt_names: Union[List[str], str]):
     '''
     Add an alias to a function.
     '''
@@ -172,6 +173,23 @@ def alias(alt_names: Union[list, str]):
                     f"cmd_{name}",
                     getattr(self, func.__name__)
                 )
+            return func(self, *args, message=message, **kwargs)
+        return wrapped
+    return decorator
+
+
+def model(models: Union[List[Model], Model]):
+    '''
+    Marks a command with list of Models it is accessing.
+    '''
+    if isinstance(models, Model):
+        models = [models]
+
+    def decorator(func):
+        func.__dict__["models"] = models
+
+        @wraps(func)
+        def wrapped(self, message, *args, **kwargs):
             return func(self, *args, message=message, **kwargs)
         return wrapped
     return decorator

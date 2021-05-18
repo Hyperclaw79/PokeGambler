@@ -20,7 +20,9 @@ from ..helpers.utils import (
     get_embed, get_enum_embed,
     img2file, wait_for
 )
-from .basecommand import Commands, alias, dealer_only
+from .basecommand import (
+    Commands, alias, dealer_only, model
+)
 
 
 class GambleCommands(Commands):
@@ -406,6 +408,7 @@ class GambleCommands(Commands):
         return amount
 
     @dealer_only
+    @model([Profile, Matches])
     @alias(["deal", "roll"])
     async def cmd_gamble(self, message, args=None, **kwargs):
         """The core command of the bot - Gamble.
@@ -493,6 +496,7 @@ class GambleCommands(Commands):
         ).save()
         await self.__cleanup(gamble_channel, delay=30.0)
 
+    @model([Flips, Profile])
     @alias(["flip", "chipflip"])
     async def cmd_quickflip(self, message, args=None, **kwargs):
         """Head/Tails flip for Pokechips.
@@ -583,6 +587,7 @@ class GambleCommands(Commands):
         emb = get_embed(msg, title=title, image=img, color=color)
         await opt_msg.edit(embed=emb)
 
+    @model([Moles, Profile])
     @alias(["mole", "whack"])
     async def cmd_whackamole(self, message, args=None, **kwargs):
         """Find the chip minigame.

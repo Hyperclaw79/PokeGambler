@@ -5,6 +5,7 @@ The Database Wrapper Module.
 # pylint: disable=too-many-public-methods
 
 import sqlite3
+from typing import List, Union
 
 
 def encode_type(val):
@@ -376,7 +377,7 @@ class DBConnector:
 
 # Commands
 
-    def get_command_history(self, limit: int = 5, **kwargs) -> list:
+    def get_command_history(self, limit: int = 5, **kwargs) -> List:
         """
         Retrieves the list of commands used.
         """
@@ -456,7 +457,7 @@ class DBConnector:
         )
         self.conn.commit()
 
-    def get_leaderboard(self, sort_by: str = "num_wins") -> list:
+    def get_leaderboard(self, sort_by: str = "num_wins") -> List:
         """
         SQL endpoint for fetching the Leaderbaord.
         Sorts according to num_wins by default. Can accept Balance as well.
@@ -571,7 +572,7 @@ class DBConnector:
 
 # Blacklists
 
-    def get_blacklists(self, limit: int = 10) -> list:
+    def get_blacklists(self, limit: int = 10) -> List:
         """
         Retrieves all blacklisted users.
         """
@@ -627,7 +628,7 @@ class DBConnector:
 
 # Matches
 
-    def get_match_stats(self, user_id:str) -> list:
+    def get_match_stats(self, user_id:str) -> List:
         """
         Gets the Wins and Losses for every participated match.
         """
@@ -644,7 +645,7 @@ class DBConnector:
 
 # Flips
 
-    def get_flips(self, user_id: str, wins: bool = False) -> list:
+    def get_flips(self, user_id: str, wins: bool = False) -> List:
         """
         Gets the QuickFlip data of a particular player.
         """
@@ -660,9 +661,37 @@ class DBConnector:
             return res
         return None
 
+    def get_flips_lb(self) -> List[Union[str, int]]:
+        """
+        Returns player_id, total_played, total_wins for QuickFlip.
+        Sorted according to total wins.
+        """
+        self.cursor.execute(
+            """
+            SELECT
+                fp.played_by,
+                COUNT(*) AS total_played,
+                (
+                    SELECT
+                        COUNT(inner_fp.played_by)
+                    FROM flips inner_fp
+                    WHERE inner_fp.played_by = fp.played_by
+                    AND won = 'True'
+                    ORDER BY (COUNT(won) * cost) DESC
+                ) AS total_wins
+            FROM flips fp
+            GROUP BY played_by
+            ORDER BY (COUNT(won) * cost) DESC
+            """
+        )
+        res = self.cursor.fetchall()
+        if not res:
+            return []
+        return res
+
 # Moles
 
-    def get_moles(self, user_id: str, wins: bool = False) -> list:
+    def get_moles(self, user_id: str, wins: bool = False) -> List:
         """
         Gets the WhackaMole data of a particular player.
         """
@@ -683,6 +712,34 @@ class DBConnector:
                 ])
             }
         return None
+
+    def get_moles_lb(self) -> List[Union[str, int]]:
+        """
+        Returns player_id, total_played, total_wins for WhackaMole.
+        Sorted according to total wins.
+        """
+        self.cursor.execute(
+            """
+            SELECT
+                ml.played_by,
+                COUNT(*) AS total_played,
+                (
+                    SELECT
+                        COUNT(inner_ml.played_by)
+                    FROM moles inner_ml
+                    WHERE inner_ml.played_by = ml.played_by
+                    AND won = 'True'
+                    ORDER BY (COUNT(won) * level) DESC
+                ) AS total_wins
+            FROM moles ml
+            GROUP BY played_by
+            ORDER BY (COUNT(won) * level) DESC
+            """
+        )
+        res = self.cursor.fetchall()
+        if not res:
+            return []
+        return res
 
 if __name__ == "__main__":
     dbconn = DBConnector(db_path='data/pokegambler.db')
