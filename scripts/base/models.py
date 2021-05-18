@@ -4,7 +4,7 @@ This module contains a compilation of data models.
 
 # pylint: disable=too-many-instance-attributes,too-many-arguments
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from inspect import ismethod
@@ -45,17 +45,62 @@ class Model(ABC):
             ]):
                 yield (attr, getattr(self, attr))
 
+    def get(self):
+        """
+        Returns the Model object as a dictionary.
+        """
+        return dict(self)
+
     def save(self):
         """
         Saves the Model object to the database.
         """
         self.database.save_model(self.model_name, **dict(self))
 
-    def get(self):
+
+class UnlockedModel(Model, ABC):
+    """
+    The Base Unlocked Model class which can be modified after creation.
+    """
+
+    # pylint: disable=no-member
+
+    def __init__(self, database, user):
+        super().__init__(database, user, self.__class__.__name__.lower())
+        existing = self.database.get_existing(
+            self.model_name, str(self.user.id)
+        )
+        if not existing:
+            self._default()
+            self.save()
+        else:
+            for key, val in existing.items():
+                setattr(self, key, val)
+
+    @abstractmethod
+    def _default(self):
+        pass
+
+    def update(self, **kwargs):
         """
-        Returns the Model object as a dictionary.
+        Updates an existing unfrozen model.
         """
-        return dict(self)
+        if not kwargs:
+            return
+        for key, val in kwargs.items():
+            setattr(self, key, val)
+        self.database.update_model(
+            self.model_name, self.user_id, **kwargs
+        )
+
+    def reset(self):
+        """
+        Resets a model for a particular user.
+        """
+        self._default()
+        kwargs = dict(self)
+        kwargs.pop("user_id")
+        self.database.update_model(self.model_name, str(self.user_id), **kwargs)
 
 
 class Minigame(Model, ABC):
@@ -103,7 +148,7 @@ class Minigame(Model, ABC):
         return len(self.get_plays(wins=True))
 
 
-class Profile(Model):
+class Profile(UnlockedModel):
     """
     Wrapper for Profile based DB actions.
     """
@@ -111,31 +156,25 @@ class Profile(Model):
     # pylint: disable=no-member
 
     def __init__(self, database, user):
-        super().__init__(database, user, "profile")
-        profile = self.database.get_profile(str(user.id))
-        if not profile:
-            self.__create()
-        else:
-            for key, val in profile.items():
-                setattr(self, key, val)
-            if all([
-                "dealers" in [
-                    role.name.lower()
-                    for role in user.roles
-                ],
-                not profile["is_dealer"]
-            ]):
-                self.update(is_dealer=True)
-            elif all([
-                "dealers" not in [
-                    role.name.lower()
-                    for role in user.roles
-                ],
-                profile["is_dealer"]
-            ]):
-                self.update(is_dealer=False)
+        super().__init__(database, user)
+        if all([
+            "dealers" in [
+                role.name.lower()
+                for role in user.roles
+            ],
+            not self.is_dealer
+        ]):
+            self.update(is_dealer=True)
+        elif all([
+            "dealers" not in [
+                role.name.lower()
+                for role in user.roles
+            ],
+            self.is_dealer
+        ]):
+            self.update(is_dealer=False)
 
-    def __init_dict(self):
+    def _default(self):
         init_dict = {
             "user_id": str(self.user.id),
             "name": self.user.name,
@@ -151,29 +190,6 @@ class Profile(Model):
         }
         for key, val in init_dict.items():
             setattr(self, key, val)
-
-    def __create(self):
-        self.__init_dict()
-        self.save()
-
-    def update(self, **kwargs):
-        """
-        Updates an existing user profile.
-        """
-        if not kwargs:
-            return
-        for key, val in kwargs.items():
-            setattr(self, key, val)
-        self.database.update_profile(self.user_id, **kwargs)
-
-    def reset(self):
-        """
-        Resets a user's profile to the default values.
-        """
-        self.__init_dict()
-        kwargs = dict(self)
-        kwargs.pop("user_id")
-        self.database.update_profile(str(self.user_id), **kwargs)
 
     def get_badges(self):
         """
@@ -301,6 +317,18 @@ class Matches(Model):
         matches = len(results)
         wins = results.count(True)
         return (matches, wins)
+
+
+class Loots(UnlockedModel):
+    """
+    Wrapper for Loots based DB actions.
+    """
+    def _default(self):
+        self.user_id = str(self.user.id)
+        self.tier = 1
+        self.loot_boost = 1
+        self.treasure_boost = 1
+        self.earned = 0
 
 
 class Flips(Minigame):

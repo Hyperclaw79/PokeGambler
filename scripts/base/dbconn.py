@@ -5,7 +5,7 @@ The Database Wrapper Module.
 # pylint: disable=too-many-public-methods
 
 import sqlite3
-from typing import List, Union
+from typing import Dict, List, Union
 
 
 def encode_type(val):
@@ -48,7 +48,7 @@ def resolve_type(val):
     return ret_val
 
 
-def dict2str(dic: dict) -> str:
+def dict2str(dic: Dict) -> str:
     """
     Dictionary to SQLized string.
     """
@@ -58,7 +58,7 @@ def dict2str(dic: dict) -> str:
     )
 
 
-def str2dict(sql_str: str) -> dict:
+def str2dict(sql_str: str) -> Dict:
     """
     SQLized string to Dictionary
     """
@@ -266,6 +266,28 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def create_loots_table(self):
+        """
+        SQL endpoint for Loots table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            loots(
+                user_id TEXT,
+                tier INT DEFAULT "1" NOT NULL,
+                loot_boost INT DEFAULT "1" NOT NULL,
+                treasure_boost INT DEFAULT "1" NOT NULL,
+                earned INT DEFAULT "0" NOT NULL,
+                FOREIGN KEY (user_id)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
     def create_tables(self):
         """
         SQL endpoint for triggering multiple table creations.
@@ -345,6 +367,17 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def purge_loots(self):
+        """
+        SQL endpoint for purging Loots table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM loots;
+            '''
+        )
+        self.conn.commit()
+
     def purge_tables(self):
         """
         SQL endpoint for triggering multiple table purges.
@@ -356,7 +389,24 @@ class DBConnector:
             ]):
                 getattr(self, attr)()
 
-# DML
+# UnlockedModel
+
+    def get_existing(self, model: str, user_id: str) -> Dict:
+        """
+        SQL endpoint for getting existing results from UnlockedModel type table.
+        """
+        self.cursor.execute(
+            f'''
+            SELECT * FROM {model}
+            WHERE user_id IS ?
+            ''',
+            (user_id,)
+        )
+        res = self.cursor.fetchone()
+        if res:
+            names = (col[0] for col in self.cursor.description)
+            return dict(zip(names, res))
+        return None
 
     def save_model(self, model: str, **kwargs) -> int:
         """
@@ -374,6 +424,26 @@ class DBConnector:
         )
         self.conn.commit()
         return self.cursor.lastrowid
+
+    def update_model(self, model: str, user_id: str, **kwargs):
+        """
+        SQL endpoint for UnlockedModel type table Updation.
+        """
+        items = ", ".join(
+            f"{key} = {self.format_val(val)}"
+            for key, val in kwargs.items()
+        )
+
+        self.cursor.execute(
+            f'''
+            UPDATE {model}
+            SET {items}
+            WHERE user_id = ?;
+            ''',
+            (user_id, )
+        )
+        self.conn.commit()
+
 
 # Commands
 
@@ -413,49 +483,6 @@ class DBConnector:
         return None
 
 # Profile
-
-    def get_profile(self, user_id: str) -> dict:
-        """
-        SQL endpoint for Profile Retrieval.
-        """
-        self.cursor.execute(
-            '''
-            SELECT * FROM profile
-            WHERE user_id IS ?
-            ''',
-            (user_id,)
-        )
-        res = self.cursor.fetchone()
-        if res:
-            return {
-                col: res[idx]
-                for idx, col in enumerate([
-                    "user_id", "name", "balance",
-                    "num_matches", "num_wins",
-                    "purchased_chips", "won_chips",
-                    "is_dealer"
-                ])
-            }
-        return None
-
-    def update_profile(self, user_id: str, **kwargs):
-        """
-        SQL endpoint for Profile Updation.
-        """
-        items = ", ".join(
-            f"{key} = {self.format_val(val)}"
-            for key, val in kwargs.items()
-        )
-
-        self.cursor.execute(
-            f'''
-            UPDATE profile
-            SET {items}
-            WHERE user_id = ?;
-            ''',
-            (user_id, )
-        )
-        self.conn.commit()
 
     def get_leaderboard(self, sort_by: str = "num_wins") -> List:
         """

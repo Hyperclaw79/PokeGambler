@@ -20,13 +20,21 @@ __all__ = [
 ]
 
 
-def get_formatted_time(tot_secs: int) -> str:
+def get_formatted_time(
+    tot_secs: int,
+    show_hours: bool = True,
+    show_mins: bool = True
+) -> str:
     """ Converts total seconds into a human readable format."""
     hours = divmod(tot_secs, 3600)
     minutes = divmod(hours[1], 60)
     seconds = divmod(minutes[1], 1)
-    return f"{int(hours[0]):02d} hours, {int(minutes[0]):02d} minutes" + \
-        f" and {int(seconds[0]):02d} seconds"
+    disp_tm = f"**{int(seconds[0]):02d} seconds**"
+    if show_mins:
+        disp_tm = f"**{int(minutes[0]):02d} minutes** and " + disp_tm
+    if show_hours:
+        disp_tm = f"**{int(hours[0]):02d} hours**, " + disp_tm
+    return disp_tm
 
 
 def get_ascii(msg: str) -> str:

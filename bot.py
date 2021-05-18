@@ -55,6 +55,8 @@ class PokeGambler(discord.Client):
         self.owner = None
         self.sess = None
         self.owner_mode = False
+        self.cooldown_users = {}
+        self.loot_cd = {}
         # Classes
         self.database = DBConnector(self.db_path)
         self.logger = CustomLogger(
@@ -63,7 +65,6 @@ class PokeGambler(discord.Client):
         self.dealer = CardGambler(self.assets_path)
         self.database.create_tables()
         # Commands
-        self.cooldown_users = {}
         for module in os.listdir("scripts/commands"):
             if module.endswith("commands.py"):
                 module_type = module.split("commands.py")[0]

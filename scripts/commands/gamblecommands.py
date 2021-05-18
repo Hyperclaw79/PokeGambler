@@ -12,12 +12,12 @@ from datetime import datetime
 import discord
 
 from ..base.models import (
-    Profile, Matches, Flips, Moles
+    Profile, Matches, Flips, Moles, Loots
 )
 from ..helpers.checks import user_check, user_rctn
 from ..helpers.imageclasses import BoardGenerator
 from ..helpers.utils import (
-    get_embed, get_enum_embed,
+    get_embed, get_enum_embed, get_formatted_time,
     img2file, wait_for
 )
 from .basecommand import (
@@ -700,4 +700,61 @@ class GambleCommands(Commands):
                 image=f"attachment://{rolled}.jpg"
             ),
             file=img2file(board_img, f"{rolled}.jpg")
+        )
+
+    @model([Loots, Profile])
+    @alias('lt')
+    async def cmd_loot(self, message, **kwargs):
+        """Stable source of Pokechips.
+        $```scss
+        {command_prefix}loot
+        ```$
+
+        @Search the void for free <:pokechip:840469159242760203>.
+        The number of chips is randomly choosen from 5 to 10.
+        `Chip Amount Boost incoming soon`
+        `BETA boost is current active: x2 chips`
+        There is a cooldown of 10 minutes between loots.
+        `Cooldown Reduction Boost incoming soon`@
+        """
+        on_cooldown = self.ctx.loot_cd.get(message.author, None)
+        cd_time = 600
+        if on_cooldown and (
+            datetime.now() - self.ctx.loot_cd[message.author]
+        ).total_seconds() < cd_time:
+            time_remaining = get_formatted_time(
+                cd_time - (
+                    datetime.now() - self.ctx.loot_cd[message.author]
+                ).total_seconds(),
+                show_hours=False
+            )
+            await message.add_reaction("⌛")
+            await message.channel.send(
+                content=str(message.author.mention),
+                embed=get_embed(
+                    f"Please wait {time_remaining} before looting again.",
+                    embed_type="warning",
+                    title="On Cooldown"
+                )
+            )
+            return
+        self.ctx.loot_cd[message.author] = datetime.now()
+        profile = Profile(self.database, message.author)
+        loot_model = Loots(self.database, message.author)
+        loot_info = loot_model.get()
+        boost = loot_info["loot_boost"]
+        earned = loot_info["earned"]
+        # tier = loot_info["treasure_boost"]
+        # treasure_chance = 0.01 * tier
+        loot = random.randint(5, 10) * boost * 2  # x2 BETA Bonus
+        data = profile.get()
+        balance = data["balance"] + loot
+        won_chips = data["won_chips"] + loot
+        profile.update(**{
+            "balance": balance,
+            "won_chips": won_chips
+        })
+        loot_model.update(earned=earned + loot)
+        await message.channel.send(
+            f"**You found {loot} <a:blinker:843844481220083783>! Added to your balance.**"
         )
