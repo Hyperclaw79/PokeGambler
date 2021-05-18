@@ -53,11 +53,12 @@ class CardGambler:
             card = random.choice(self.cards)
             card_num = card.split(".jpg")[0]
             suit = random.choice(self.suits)
-            while (card_num, card) in [
+            while (card_num, card) in (
                 (card_["card_num"], card_["suit"])
                 for card_ in cards
-            ]:
+            ):
                 card = random.choice(self.cards)
+                card_num = card.split(".jpg")[0]
             if all([
                 (random.randint(1, 100) / 100) <= joker_chance,
                 not joker_drawn

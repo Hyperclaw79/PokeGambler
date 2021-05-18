@@ -452,7 +452,7 @@ class GambleCommands(Commands):
         self.match_status = 1
         kwargs.pop("mentions", [])
         try:
-            fee = min(int(args[0]), 50) if args else 50
+            fee = max(int(args[0]), 50) if args else 50
         except (ZeroDivisionError, ValueError):
             fee = 50
         kwargs["fee"] = fee
