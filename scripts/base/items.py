@@ -96,7 +96,7 @@ class Item(ABC):
         return str(self)
 
 
-class Treasure(Item, ABC):
+class Treasure(Item):
     """
     Any non-buyable [Item] is considered a Treasure.
     It is unique to the user and cannot be sold either.
@@ -115,7 +115,7 @@ class Treasure(Item, ABC):
         self.sellable: bool = False
 
 
-class Tradable(Item, ABC):
+class Tradable(Item):
     """
     Any sellable [Item] is a Tradeable.
     It should have a fixed base price.
@@ -135,7 +135,7 @@ class Tradable(Item, ABC):
         self.price: int = price
 
 
-class Collectible(Item, ABC):
+class Collectible(Item):
     """
     Collectibles are sellable variants of [Treasure].
     They cannot be bought off the market but can be traded among users.
