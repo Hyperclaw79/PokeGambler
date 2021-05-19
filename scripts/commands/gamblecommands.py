@@ -10,19 +10,16 @@ import random
 from datetime import datetime
 
 import discord
+from scripts.base.items import Chest
 
-from ..base.models import (
-    Profile, Matches, Flips, Moles, Loots
-)
+from ..base.models import Flips, Loots, Matches, Moles, Profile
 from ..helpers.checks import user_check, user_rctn
 from ..helpers.imageclasses import BoardGenerator
 from ..helpers.utils import (
     get_embed, get_enum_embed, get_formatted_time,
     img2file, wait_for
 )
-from .basecommand import (
-    Commands, alias, dealer_only, model
-)
+from .basecommand import Commands, alias, dealer_only, model
 
 
 class GambleCommands(Commands):
@@ -281,6 +278,12 @@ class GambleCommands(Commands):
         )
         bal += incr
         num_wins += 1
+        if num_wins in [10, 100]:
+            loot_table = Loots(self.database, winner)
+            if num_wins == 10:
+                loot_table.update(tier=2)
+            else:
+                loot_table.update(tier=3)
         won_chips += incr
         profile.update(
             balance=bal,
@@ -417,7 +420,7 @@ class GambleCommands(Commands):
         return amount
 
     @dealer_only
-    @model([Profile, Matches])
+    @model([Profile, Matches, Loots])
     @alias(["deal", "roll"])
     async def cmd_gamble(self, message, args=None, **kwargs):
         """The core command of the bot - Gamble.
@@ -708,7 +711,7 @@ class GambleCommands(Commands):
             file=img2file(board_img, f"{rolled}.jpg")
         )
 
-    @model([Loots, Profile])
+    @model([Loots, Profile, Chest])
     @alias('lt')
     async def cmd_loot(self, message, **kwargs):
         """Stable source of Pokechips.
@@ -750,14 +753,192 @@ class GambleCommands(Commands):
         loot_info = loot_model.get()
         boost = loot_info["loot_boost"]
         earned = loot_info["earned"]
-        # tier = loot_info["treasure_boost"]
-        # treasure_chance = 0.01 * tier
-        loot = random.randint(5, 10) * boost * 2  # x2 BETA Bonus
+        tier = loot_info["tier"]
+        treasure_chance = 0.01 * loot_info["treasure_boost"]
+        loot = random.randint(5, 10) * boost * (10 ** (tier - 1))
+        loot *= 2  # x2 BETA Bonus
+        treasure_chance *= 2 # x2 BETA Bonus
+        embed = None
+        proc = random.uniform(0, 1.0)
+        if proc <= treasure_chance:
+            chest = Chest.get_chest(tier=tier)
+            chest.save(self.database)
+            embed = get_embed(
+                f"Woah! You got lucky and found a **{chest}**.\n"
+                "It's been added to your inventory.",
+                title="**FOUND A TREASURE CHEST**",
+                thumbnail=chest.asset_url
+            )
         data = profile.get()
         balance = data["balance"] + loot
         won_chips = data["won_chips"] + loot
         profile.update(balance=balance, won_chips=won_chips)
         loot_model.update(earned=earned + loot)
         await message.channel.send(
-            f"**You found {loot} <a:blinker:843844481220083783>! Added to your balance.**"
+            f"**You found {loot} <a:blinker:843844481220083783>! "
+            "Added to your balance.**",
+            embed=embed
+        )
+
+    @model([Loots, Profile, Chest])
+    @alias('dl')
+    async def cmd_daily(self, message, **kwargs):
+        """Daily source of Pokechips.
+        $```scss
+        {command_prefix}daily
+        ```$
+
+        @Claim free <:pokechip:840469159242760203> and a chest everyday.
+        The chips and the chest both scale with Tier.
+        There are 3 tiers:
+            1 - Everyone starts here.
+            2 - Win 10 gamble matches.
+            3 - Win 100 gamble matches.
+        You can maintain a daily streak. Get 1K chips for every 5 day streak.
+        `BETA boost is current active: x2 chips`@
+        """
+        profile = Profile(self.database, message.author)
+        loot_model = Loots(self.database, message.author)
+        loot_info = loot_model.get()
+        boost = loot_info["loot_boost"]
+        earned = loot_info["earned"]
+        tier = loot_info["tier"]
+        daily_streak = loot_info["daily_streak"]
+        last_claim = loot_info["daily_claimed_on"]
+        cd_time = 24 * 60 * 60
+        if (
+            datetime.now() - last_claim
+        ).total_seconds() < cd_time:
+            time_remaining = get_formatted_time(
+                cd_time - (
+                    datetime.now() - last_claim
+                ).total_seconds()
+            )
+            await message.add_reaction("⌛")
+            await message.channel.send(
+                content=str(message.author.mention),
+                embed=get_embed(
+                    f"Please wait {time_remaining} before claiming Daily.",
+                    embed_type="warning",
+                    title="Too early"
+                )
+            )
+            return
+        if (
+            datetime.now() - last_claim
+        ).total_seconds() >= (cd_time * 2):
+            # Reset streak on missing by a day
+            daily_streak = 0
+        else:
+            daily_streak += 1
+        loot = random.randint(5, 10) * boost * (10 ** tier)
+        if daily_streak % 5 == 0 and daily_streak > 0:
+            loot += 1000
+        loot *= 2  # x2 BETA Bonus
+        chest = Chest.get_chest(tier=tier)
+        chest.description += f"\n[Daily for {message.author.id}]"
+        chest.save(self.database)
+        embed = get_embed(
+            f"Here's your daily **{chest}**.\n"
+            f"Claim the chest with `{self.ctx.prefix}open {chest.itemid}`.\n"
+            "(Daily Chests are not stored in the inventory.)",
+            title="**Daily Chest**",
+            thumbnail=chest.asset_url,
+            footer=f"Current Streak: {daily_streak}"
+        )
+        data = profile.get()
+        balance = data["balance"] + loot
+        won_chips = data["won_chips"] + loot
+        profile.update(balance=balance, won_chips=won_chips)
+        loot_model.update(
+            earned=(earned + loot),
+            daily_streak=daily_streak,
+            daily_claimed_on=datetime.today().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        )
+        await message.channel.send(
+            f"**Daily loot of {loot} <a:blinker:843844481220083783> "
+            "added to your balance.**",
+            embed=embed
+        )
+
+    @model([Loots, Profile, Chest])
+    @alias("chest")
+    async def cmd_open(self, message, args=None, **kwargs):
+        """Opens a PokeGambler treasure chest.
+        $```scss
+        {command_prefix}open chest_id
+        ```$
+
+        @Opens a treasure chest that you own.
+        There are 3 different chests and scale with your tier.
+        Here's a drop table:
+        ```py
+        ╔══════╦═══════════╦═══════════╦══════════════╗
+        ║ Tier ║   Chest   ║ Drop Rate ║  Pokechips   ║
+        ╠══════╬═══════════╬═══════════╬══════════════╣
+        ║   1  ║  Common   ║    66%    ║   34 - 191   ║
+        ║   2  ║   Gold    ║    25%    ║  192 - 1110  ║
+        ║   3  ║ Legendary ║     9%    ║ 1111 - 10000 ║
+        ╚══════╩═══════════╩═══════════╩══════════════╝
+        ```@
+
+        ~To open a chest with ID 0000FFFF:
+            ```
+            {command_prefix}open 0000FFFF
+            ```~
+        """
+        if not args:
+            return
+        try:
+            itemid = int(args[0], 16)
+            chest = Chest.from_id(self.database, itemid)
+        except (ValueError, ZeroDivisionError):
+            chest = None
+        if not chest:
+            await message.channel.send(
+                embed=get_embed(
+                    "Make sure you actually own this chest.",
+                    embed_type="error",
+                    title="Invalid Chest ID"
+                )
+            )
+            return
+        if str(message.author.id) not in chest.description:
+            print(chest.description)
+            await message.channel.send(
+                embed=get_embed(
+                    "That's not your own chest.",
+                    embed_type="error",
+                    title="Invalid Chest ID"
+                )
+            )
+            return
+        chips = chest.chips
+        profile = Profile(self.database, message.author)
+        data = profile.get()
+        won_chips = data["won_chips"]
+        balance = data["balance"]
+        profile.update(
+            won_chips=(won_chips + chips),
+            balance=(balance + chips)
+        )
+        loot_model = Loots(self.database, message.author)
+        earned = loot_model.get()["earned"]
+        loot_model.update(
+            earned=(earned + chips)
+        )
+        content = f"You have recieved {chips} <:pokechip:840469159242760203>."
+        if chest.name == "Legendary Chest":
+            item = chest.get_random_collectible()
+            if item:
+                content += f"\nAnd woah, you also got a {item}!"
+            # Add logic for collectible in inventory.
+        chest.delete(self.database)
+        await message.channel.send(
+            embed=get_embed(
+                content,
+                title=f"Opened a {chest.name}"
+            )
         )

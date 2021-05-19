@@ -69,7 +69,7 @@ def str2dict(sql_str: str) -> Dict:
 
 
 sqlite3.register_adapter(bool, str)
-sqlite3.register_converter("BOOLEAN", lambda v: v == 'True')
+sqlite3.register_converter("BOOLEAN", lambda v: v == b'True')
 sqlite3.register_adapter(
     list, lambda l: ', '.join(
         str(encode_type(elem))
@@ -132,6 +132,8 @@ class DBConnector:
             ret_val = f'"{val}"'
         elif isinstance(val, (int, float)):
             ret_val = str(val)
+        elif val is None:
+            ret_val = "null"
         return ret_val
 
 # DDL
@@ -280,9 +282,34 @@ class DBConnector:
                 loot_boost INT DEFAULT "1" NOT NULL,
                 treasure_boost INT DEFAULT "1" NOT NULL,
                 earned INT DEFAULT "0" NOT NULL,
+                daily_claimed_on TIMESTAMP NOT NULL,
+                daily_streak INT DEFAULT "0" NOT NULL,
                 FOREIGN KEY (user_id)
                     REFERENCES profile (user_id)
                     ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
+    def create_items_table(self):
+        """
+        SQL endpoint for Loots table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            items(
+                itemid INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                category TEXT NOT NULL,
+                asset_url TEXT NOT NULL,
+                emoji TEXT NOT NULL,
+                buyable BOOLEAN DEFAULT 'True' NOT NULL,
+                sellable BOOLEAN DEFAULT 'True' NOT NULL,
+                price INT NULL
             );
             '''
         )
@@ -378,6 +405,17 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def purge_items(self):
+        """
+        SQL endpoint for purging Items table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM items;
+            '''
+        )
+        self.conn.commit()
+
     def purge_tables(self):
         """
         SQL endpoint for triggering multiple table purges.
@@ -443,7 +481,6 @@ class DBConnector:
             (user_id, )
         )
         self.conn.commit()
-
 
 # Commands
 
@@ -767,6 +804,55 @@ class DBConnector:
         if not res:
             return []
         return res
+
+# Items
+
+    def save_item(self, **kwargs) -> int:
+        """
+        Saves the model in the database and returns the primary key to it.
+        """
+        keys, vals = zip(*kwargs.items())
+        self.cursor.execute(
+            f'''
+            INSERT OR IGNORE INTO items
+            ({', '.join(keys)})
+            VALUES
+            ({', '.join(['?'] * len(vals))});
+            ''',
+            tuple(vals)
+        )
+        self.conn.commit()
+        return self.cursor.lastrowid
+
+    def get_item(self, itemid: int) -> Dict:
+        """
+        SQL endpoint for getting an Item with id.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM items
+            WHERE itemid IS ?
+            ''',
+            (itemid,)
+        )
+        res = self.cursor.fetchone()
+        if res:
+            names = (col[0] for col in self.cursor.description)
+            return dict(zip(names, res))
+        return None
+
+    def delete_item(self, itemid: int) -> None:
+        """
+        SQL endpoint for deleting an Item with id.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM items
+            WHERE itemid IS ?
+            ''',
+            (itemid,)
+        )
+        self.conn.commit()
 
 if __name__ == "__main__":
     dbconn = DBConnector(db_path='data/pokegambler.db')

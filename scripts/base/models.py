@@ -6,7 +6,7 @@ This module contains a compilation of data models.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from inspect import ismethod
 from typing import List, Tuple
 
@@ -324,11 +324,17 @@ class Loots(UnlockedModel):
     Wrapper for Loots based DB actions.
     """
     def _default(self):
-        self.user_id = str(self.user.id)
-        self.tier = 1
-        self.loot_boost = 1
-        self.treasure_boost = 1
-        self.earned = 0
+        self.user_id: str = str(self.user.id)
+        self.tier: int = 1
+        self.loot_boost: int = 1
+        self.treasure_boost: int = 1
+        self.earned: int = 0
+        self.daily_claimed_on: str = (
+            datetime.now() - timedelta(days=1)
+        ).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        self.daily_streak: int = 0
 
 
 class Flips(Minigame):
