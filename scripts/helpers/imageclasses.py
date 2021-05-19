@@ -398,8 +398,8 @@ class BoardGenerator(AssetGenerator):
         Returns a Wackamole board (name, Image) of given difficulty level.
         """
         return (
-            self.board_names[level + 2],
-            self.boards[level + 2].copy()
+            self.board_names[level],
+            self.boards[level].copy()
         )
 
     def get(self, level: int = 0) -> Tuple[str, Image.Image]:
@@ -407,11 +407,11 @@ class BoardGenerator(AssetGenerator):
         Returns a Board image with a random time replaced with a pokechip.
         """
         pos = (
-            random.randint(0, level + 2),
-            random.randint(0, level + 2)
+            random.randint(0, level + 1),
+            random.randint(0, level + 1)
         )
         tile_w, tile_h = (250, 250)
-        board_img = self.boards[level + 2].copy()
+        board_img = self.boards[level].copy()
         board_img.paste(
             self.mole,
             (pos[0] * tile_w, pos[1] * tile_h)
