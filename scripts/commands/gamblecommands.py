@@ -62,11 +62,14 @@ class GambleCommands(Commands):
             data = profile.get()
             bal = data["balance"]
             num_matches = data["num_matches"]
+            won_chips = data["won_chips"]
             bal -= fee
+            won_chips -= fee
             num_matches += 1
             profile.update(
                 balance=bal,
-                num_matches=num_matches
+                num_matches=num_matches,
+                won_chips=won_chips
             )
             self.registered.remove(player)
         return profiles
@@ -266,6 +269,7 @@ class GambleCommands(Commands):
         data = profile.get()
         bal = data["balance"]
         num_wins = data["num_wins"]
+        won_chips = data["won_chips"]
         transaction_rate = 0.1 + 0.05 * math.floor(
             max(
                 0,
@@ -277,9 +281,11 @@ class GambleCommands(Commands):
         )
         bal += incr
         num_wins += 1
+        won_chips += incr
         profile.update(
             balance=bal,
-            num_wins=num_wins
+            num_wins=num_wins,
+            won_chips=won_chips
         )
         title = f"The winner is {winner}!"
         is_joker = [
@@ -566,12 +572,12 @@ class GambleCommands(Commands):
         choice = int(reply) - 1 if reply in valids[:2] else valids[2:].index(reply)
         msg = f"PokeGambler choose {valids[2:][idx].title()}.\n"
         if choice == idx:
-            msg += f"You have won {amount * 2} <:pokechip:840469159242760203>"
+            msg += f"You have won {amount} <:pokechip:840469159242760203>"
             title = "Congratulations!"
             color = 5023308
             profile.update(
-                balance=profile.get()["balance"] + (amount * 2),
-                won_chips=profile.get()["won_chips"] + (amount * 2)
+                balance=profile.get()["balance"] + amount,
+                won_chips=profile.get()["won_chips"] + amount
             )
             won = True
         else:
@@ -750,10 +756,7 @@ class GambleCommands(Commands):
         data = profile.get()
         balance = data["balance"] + loot
         won_chips = data["won_chips"] + loot
-        profile.update(**{
-            "balance": balance,
-            "won_chips": won_chips
-        })
+        profile.update(balance=balance, won_chips=won_chips)
         loot_model.update(earned=earned + loot)
         await message.channel.send(
             f"**You found {loot} <a:blinker:843844481220083783>! Added to your balance.**"

@@ -132,12 +132,16 @@ class AdminCommands(Commands):
         data = profile.get()
         balance = data["balance"]
         purchased_chips = data["purchased_chips"]
+        won_chips = data["won_chips"]
         balance += increment
         if kwargs.get("purchased", False):
             purchased_chips += increment
+        else:
+            won_chips += increment
         profile.update(
             balance=balance,
-            purchased_chips=purchased_chips
+            purchased_chips=purchased_chips,
+            won_chips=won_chips
         )
         await message.add_reaction("👍")
 
