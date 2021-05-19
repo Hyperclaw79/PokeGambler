@@ -389,8 +389,8 @@ class BoardGenerator(AssetGenerator):
         """
         return [
             f"{chr(65+i)}{j}"
-            for i in range(level + 2)
-            for j in range(1, level + 3)
+            for i in range(level + 3)
+            for j in range(1, level + 4)
         ]
 
     def get_board(self, level: int = 0) -> Tuple[str, Image.Image]:
