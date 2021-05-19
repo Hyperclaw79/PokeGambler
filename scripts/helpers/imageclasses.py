@@ -368,9 +368,9 @@ class BoardGenerator(AssetGenerator):
         )
         self.boards = []
         self.board_names = []
-        for board in os.listdir(
+        for board in sorted(os.listdir(
             os.path.join(asset_path, "basecards", "boards")
-        ):
+        )):
             self.board_names.append(
                 board.split(".jpg")[0].title()
             )
@@ -389,8 +389,8 @@ class BoardGenerator(AssetGenerator):
         """
         return [
             f"{chr(65+i)}{j}"
-            for i in range(level + 3)
-            for j in range(1, level + 4)
+            for i in range(level + 2)
+            for j in range(1, level + 3)
         ]
 
     def get_board(self, level: int = 0) -> Tuple[str, Image.Image]:
