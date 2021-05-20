@@ -732,20 +732,22 @@ class DBConnector:
         """
         self.cursor.execute(
             """
+            WITH winners AS (
+                SELECT
+                    COUNT(inner_fp.played_by) AS tw,
+                    SUM(inner_fp.cost) AS te
+                FROM flips inner_fp
+                WHERE inner_fp.played_by = fp.played_by
+                AND won = 'True'
+            )
             SELECT
                 fp.played_by,
                 COUNT(*) AS total_played,
-                (
-                    SELECT
-                        COUNT(inner_fp.played_by)
-                    FROM flips inner_fp
-                    WHERE inner_fp.played_by = fp.played_by
-                    AND won = 'True'
-                    ORDER BY (COUNT(won) * cost) DESC
-                ) AS total_wins
+                (SELECT tw FROM winners) AS total_wins,
+                (SELECT te FROM winners) AS total_earned
             FROM flips fp
             GROUP BY played_by
-            ORDER BY (COUNT(won) * cost) DESC
+            ORDER BY total_earned DESC;
             """
         )
         res = self.cursor.fetchall()
@@ -784,20 +786,20 @@ class DBConnector:
         """
         self.cursor.execute(
             """
+            WITH winners AS (
+                SELECT
+                    COUNT(inner_ml.played_by)
+                FROM moles inner_ml
+                WHERE inner_ml.played_by = ml.played_by
+                AND won = 'True'
+            )
             SELECT
                 ml.played_by,
                 COUNT(*) AS total_played,
-                (
-                    SELECT
-                        COUNT(inner_ml.played_by)
-                    FROM moles inner_ml
-                    WHERE inner_ml.played_by = ml.played_by
-                    AND won = 'True'
-                    ORDER BY (COUNT(won) * level) DESC
-                ) AS total_wins
+                (SELECT * FROM winners) AS total_wins
             FROM moles ml
             GROUP BY played_by
-            ORDER BY (COUNT(won) * level) DESC
+            ORDER BY COUNT(won) DESC, level DESC;
             """
         )
         res = self.cursor.fetchall()

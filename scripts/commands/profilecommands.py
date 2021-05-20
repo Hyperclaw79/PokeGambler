@@ -194,18 +194,20 @@ class ProfileCommands(Commands):
             leaderboard = []
             lbrd = [
                 (
-                    message.guild.get_member(int(res[0])),
-                    res[1],
-                    res[2]
+                    message.guild.get_member(int(res[0])), *res[1:]
                 )
                 for res in lbrd
                 if message.guild.get_member(int(res[0]))
             ]
             for idx, res in enumerate(lbrd):
                 rank = idx + 1
-                member, num_matches, num_wins = res
+                earned = None
+                if len(res) == 4:
+                    member, num_matches, num_wins, earned = res
+                else:
+                    member, num_matches, num_wins = res
                 profile = Profile(self.database, member).get()
-                balance = profile["balance"]
+                balance = earned or profile["balance"]
                 name = profile["name"]
                 leaderboard.append({
                     "rank": rank,
