@@ -184,7 +184,11 @@ def parse_command(prefix: str, msg: str) -> dict:
         main_parsed_dict["Kwargs"] = ''.join(kwarg_str)
     parsed["Command"] = main_parsed_dict["Command"]
     if main_parsed_dict["Args"]:
-        parsed["Args"] = main_parsed_dict["Args"].rstrip(' ').split(' ')
+        parsed["Args"] = [
+            arg
+            for arg in main_parsed_dict["Args"].rstrip(' ').split(' ')
+            if arg
+        ]
     if main_parsed_dict.get("Kwargs", None):
         kwargs = main_parsed_dict["Kwargs"].split(' --')
         kwargs[0] = kwargs[0].lstrip('-')

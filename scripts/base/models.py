@@ -206,6 +206,13 @@ class Profile(UnlockedModel):
             badges.append("dealer")
         return badges
 
+    @property
+    def full_info(self):
+        """
+        Wrapper for Get Full Profile DB call.
+        """
+        return self.database.get_full_profile(self.user.id)
+
 
 class CommandData(Model):
     """

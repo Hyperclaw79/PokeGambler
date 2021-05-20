@@ -521,6 +521,26 @@ class DBConnector:
 
 # Profile
 
+    def get_full_profile(self, user_id: str) -> Dict:
+        """
+        Returns info about the user obtained from joining
+        Profile and Loots tables.
+        """
+        self.cursor.execute(
+            """
+            SELECT * FROM profile
+            JOIN loots
+            USING (user_id)
+            WHERE user_id IS ?;
+            """,
+            (user_id, )
+        )
+        res = self.cursor.fetchone()
+        if res:
+            names = (col[0] for col in self.cursor.description)
+            return dict(zip(names, res))
+        return None
+
     def get_leaderboard(self, sort_by: str = "num_wins") -> List:
         """
         SQL endpoint for fetching the Leaderbaord.

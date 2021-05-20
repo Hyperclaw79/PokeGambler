@@ -195,6 +195,32 @@ def model(models: Union[List[Model], Model]):
     return decorator
 
 
+def ensure_user(func):
+    '''
+    Make sure user ID is given in the command.
+    '''
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        if not kwargs.get("args", None):
+            return message.channel.send(
+                embed=get_embed(
+                    "You need to provide a user ID.",
+                    embed_type="error",
+                    title="No User ID"
+                )
+            )
+        if not message.guild.get_member(int(kwargs["args"][0])):
+            return message.channel.send(
+                embed=get_embed(
+                    "Unable to fetch this user.\nMake sure they're still in the server.",
+                    embed_type="error",
+                    title="Invalid User"
+                )
+            )
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
+
+
 class Commands(ABC):
     '''
     The Base command class which serves as the starting point for all commands.

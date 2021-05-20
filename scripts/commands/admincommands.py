@@ -6,6 +6,7 @@ Administration Commands
 
 import asyncio
 import os
+import json
 
 import discord
 from ..helpers.checks import user_check
@@ -14,7 +15,9 @@ from ..helpers.utils import (
     is_admin, is_owner, wait_for
 )
 from ..base.models import Blacklist
-from .basecommand import Commands, admin_only, alias
+from .basecommand import (
+    Commands, admin_only, alias, ensure_user
+)
 
 
 class AdminCommands(Commands):
@@ -24,6 +27,7 @@ class AdminCommands(Commands):
     """
 
     @admin_only
+    @ensure_user
     @alias("upd_bal")
     async def cmd_update_balance(self, message, args=None, **kwargs):
         """Updates user's balance.
@@ -39,15 +43,6 @@ class AdminCommands(Commands):
             {command_prefix}update_balance 12345 100
             ```~
         """
-        if not args:
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to provide a user ID.",
-                    embed_type="error",
-                    title="No User ID"
-                )
-            )
-            return
         if len(args) < 2:
             await message.channel.send(
                 embed=get_embed(
@@ -76,6 +71,7 @@ class AdminCommands(Commands):
         await message.add_reaction("👍")
 
     @admin_only
+    @ensure_user
     @alias("chips+")
     async def cmd_add_chips(self, message, args=None, **kwargs):
         """Adds chips to user's balance.
@@ -96,15 +92,6 @@ class AdminCommands(Commands):
             {command_prefix}add_chips 67890 500 --purchased
             ```~
         """
-        if not args:
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to provide a user ID.",
-                    embed_type="error",
-                    title="No User ID"
-                )
-            )
-            return
         if len(args) < 2:
             await message.channel.send(
                 embed=get_embed(
@@ -146,6 +133,34 @@ class AdminCommands(Commands):
         await message.add_reaction("👍")
 
     @admin_only
+    @ensure_user
+    @alias("usr_pr")
+    async def cmd_get_user_profile(self, message, args=None, **kwargs):
+        """Get Complete User Profile.
+        $```scss
+        {command_prefix}get_user_profile user_id
+        ```$
+
+        @`🛡️ Admin Command`
+        Get the complete profile of a user, including their loot information.@
+
+        ~To get the profile of user with ID 12345:
+            ```
+            {command_prefix}usr_pr 12345
+            ```~
+        """
+        user_id = int(args[0])
+        profile = await get_profile(self.database, message, user_id)
+        if not profile:
+            return
+        data = profile.full_info
+        if not data:
+            return
+        content = f'```json\n{json.dumps(data, indent=3, default=str)}\n```'
+        await message.channel.send(content)
+
+    @admin_only
+    @ensure_user
     @alias("rst_usr")
     async def cmd_reset_user(self, message, args=None, **kwargs):
         """Completely resets a user's profile.
@@ -161,21 +176,13 @@ class AdminCommands(Commands):
             {command_prefix}reset_user 12345
             ```~
         """
-        if not args:
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to provide a user ID.",
-                    embed_type="error",
-                    title="No User ID"
-                )
-            )
-            return
         user_id = int(args[0])
         profile = await get_profile(self.database, message, user_id)
         profile.reset()
         await message.add_reaction("👍")
 
     @admin_only
+    @ensure_user
     @alias("upd_usr")
     async def cmd_update_user(self, message, args=None, **kwargs):
         """Updates a user's profile.
@@ -191,15 +198,6 @@ class AdminCommands(Commands):
             {command_prefix}update_user 12345 --num_wins 10
             ```~
         """
-        if not args:
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to provide a user ID.",
-                    embed_type="error",
-                    title="No User ID"
-                )
-            )
-            return
         user_id = int(args[0])
         kwargs.pop("mentions", [])
         profile = await get_profile(self.database, message, user_id)
@@ -225,6 +223,7 @@ class AdminCommands(Commands):
         await message.add_reaction("👍")
 
     @admin_only
+    @ensure_user
     @alias("bl")
     async def cmd_blacklist_user(self, message, args=None, **kwargs):
         """Blacklists a user from using PokeGambler.
@@ -245,15 +244,6 @@ class AdminCommands(Commands):
             {command_prefix}blacklist_user 67890 --reason spamming
             ```~
         """
-        if not args:
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to provide a user ID.",
-                    embed_type="error",
-                    title="No User ID"
-                )
-            )
-            return
         user_id = int(args[0])
         user = message.guild.get_member(user_id)
         if any([
@@ -276,6 +266,7 @@ class AdminCommands(Commands):
         await message.add_reaction("👍")
 
     @admin_only
+    @ensure_user
     @alias("pardon")
     async def cmd_pardon_user(self, message, args=None, **kwargs):
         """Pardons a blacklisted user.
@@ -291,15 +282,6 @@ class AdminCommands(Commands):
             {command_prefix}pardon 12345
             ```~
         """
-        if not args:
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to provide a user ID.",
-                    embed_type="error",
-                    title="No User ID"
-                )
-            )
-            return
         user_id = int(args[0])
         user = message.guild.get_member(user_id)
         if any([
