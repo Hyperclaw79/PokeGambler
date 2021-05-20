@@ -11,10 +11,11 @@ import json
 import discord
 from ..helpers.checks import user_check
 from ..helpers.utils import (
-    dedent, get_embed, get_profile,
+    dedent, get_embed, get_enum_embed, get_profile,
     is_admin, is_owner, wait_for
 )
 from ..base.models import Blacklist
+from ..base.items import Item
 from .basecommand import (
     Commands, admin_only, alias, ensure_user
 )
@@ -400,3 +401,104 @@ class AdminCommands(Commands):
         self.ctx.loop.create_task(
             role_assign(self, gamb_msg, chan)
         )
+
+    @admin_only
+    @alias("item+")
+    async def cmd_create_item(self, message, **kwargs):
+        """Self-assign Gambler Role.
+        $```scss
+        {command_prefix}create_item
+        ```$
+
+        @`🛡️ Admin Command`
+        Creates a PokeGambler world [Item] and saves it in the database.
+        :information_source: Chests cannot be created using this.@
+        """
+
+        # pylint: disable=no-member
+
+        def item_factory(category: str, name: str, **kwargs) -> Item:
+            def get_category(category):
+                return [
+                    catog
+                    for catog in Item.__subclasses__()
+                    if catog.__name__ == category.title()
+                ][0]
+            cls_name = ''.join(
+                word.title()
+                for word in name.split(' ')
+            )
+            catog_cls = get_category(category)
+            item_cls = type(cls_name, (catog_cls, ), kwargs)
+            return item_cls(**kwargs)
+        categories = ["Tradable", "Collectible", "Treasure"]
+        inp_msg = await message.channel.send(
+            embed=get_enum_embed(
+                categories,
+                title="Choose the Item Category"
+            )
+        )
+        reply = await wait_for(
+            message.channel, self.ctx, init_msg=inp_msg,
+            check=lambda msg: user_check(msg, message),
+            timeout="inf"
+        )
+        if reply.content.isdigit():
+            category = categories[int(reply.content) - 1]
+        elif reply.content.title() in categories:
+            category = reply.content.title()
+        else:
+            await message.channel.send(
+                embed=get_embed(
+                    "That's not a valid category.",
+                    embed_type="error",
+                    title="Invalid Category"
+                )
+            )
+            return
+        details = {}
+        for col in [
+            "name", "description",
+            "asset_url", "emoji"
+        ]:
+            inp_msg = await message.channel.send(
+                embed=get_embed(
+                    f"Please enter a value for `{col}`:\n>_",
+                    title="Input"
+                )
+            )
+            reply = await wait_for(
+                message.channel, self.ctx, init_msg=inp_msg,
+                check=lambda msg: user_check(msg, message),
+                timeout="inf"
+            )
+            details[col] = reply.content
+            await inp_msg.delete()
+        if category == "Tradable":
+            inp_msg = await message.channel.send(
+                embed=get_embed(
+                    f"Please enter a price for `{details['name']}`:\n>_",
+                    title="Input"
+                )
+            )
+            reply = await wait_for(
+                message.channel, self.ctx, init_msg=inp_msg,
+                check=lambda msg: user_check(msg, message),
+                timeout="inf"
+            )
+            if not reply.content.isdigit():
+                await message.channel.send(
+                    embed=get_embed(
+                        "Price must be an integer.",
+                        embed_type="error",
+                        title="Invalid Price"
+                    )
+                )
+                return
+            details["price"] = int(reply.content)
+            await inp_msg.delete()
+        item = item_factory(
+            category=category, **details
+        )
+        item.save(self.database)
+        await reply.add_reaction("👍")

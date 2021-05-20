@@ -876,5 +876,66 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def get_tradables(self, limit: int = 10) -> List:
+        """
+        SQL endpoint for getting a list of Tradables.
+        Useful for displaying them in a shop.
+        A limit can be provided, defaults to 10.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM items
+            WHERE category IS "Tradable"
+            LIMIT ?;
+            ''',
+            (limit,)
+        )
+        res = self.cursor.fetchone()
+        if res:
+            names = (col[0] for col in self.cursor.description)
+            return dict(zip(names, res))
+        return None
+
+    def get_collectibles(self, limit: int = 10) -> List:
+        """
+        SQL endpoint for getting a list of Collectibles.
+        Useful for trading with other players.
+        A limit can be provided, defaults to 10.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM items
+            WHERE category IS "Collectible"
+            LIMIT ?;
+            ''',
+            (limit,)
+        )
+        res = self.cursor.fetchone()
+        if res:
+            names = (col[0] for col in self.cursor.description)
+            return dict(zip(names, res))
+        return None
+
+    def get_treasures(self, limit: int = 10) -> List:
+        """
+        SQL endpoint for getting a list of Treasures.
+        Useful for flexing in the inventory.
+        A limit can be provided, defaults to 10.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM items
+            WHERE category IS "Treasure"
+            ORDER BY itemid DESC
+            LIMIT ?;
+            ''',
+            (limit,)
+        )
+        res = self.cursor.fetchone()
+        if res:
+            names = (col[0] for col in self.cursor.description)
+            return dict(zip(names, res))
+        return None
+
 if __name__ == "__main__":
     dbconn = DBConnector(db_path='data/pokegambler.db')

@@ -2,7 +2,7 @@
 This module contains all the items in the Pokegambler world.
 """
 
-# pylint: disable=no-member
+# pylint: disable=no-member, unused-argument
 
 import random
 import re
@@ -10,11 +10,12 @@ from abc import ABC
 from dataclasses import dataclass
 from functools import total_ordering
 from inspect import ismethod
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
-from scripts.base.dbconn import DBConnector
+import discord
 
-from ..helpers.utils import dedent
+from ..base.dbconn import DBConnector
+from ..helpers.utils import dedent, get_embed
 
 # region BaseClasses
 
@@ -78,6 +79,35 @@ class Item(ABC):
         uid = self.itemid
         database.delete_item(uid)
 
+    @property
+    def name(self) -> str:
+        """
+        Returns the name of the Item.
+        """
+        return str(self)
+
+    @property
+    def details(self) -> discord.Embed:
+        """
+        Returns a rich embed containing full details of an item.
+        """
+        emb = get_embed(
+            content=f"[{self.emoji}] | **{self.description}**",
+            title=f"Information for [{self.name}]",
+            image=self.asset_url,
+            footer=f"Item Id: {self.itemid}"
+        )
+        fields = ["category", "buyable", "sellable"]
+        if self.category == "Tradable":
+            fields.append("price")
+        for field in fields:
+            emb.add_field(
+                name=field,
+                value=f"**`{getattr(self, field)}`**",
+                inline=True
+            )
+        return emb
+
     @classmethod
     def get(
         cls, database: DBConnector, itemid: int
@@ -88,12 +118,47 @@ class Item(ABC):
         """
         return database.get_item(itemid)
 
-    @property
-    def name(self) -> str:
+    @classmethod
+    def from_id(cls, database: DBConnector, itemid: int):
         """
-        Returns the name of the Item.
+        Returns a item of specified ID or None.
         """
-        return str(self)
+        result = database.get_item(itemid)
+        if not result:
+            return None
+        category = result["category"]
+        category = [
+            catog
+            for catog in cls.__subclasses__()
+            if catog.__name__ == category.title()
+        ][0]
+        item = type(
+            "".join(
+                word.title()
+                for word in result["name"].split(" ")
+            ),
+            (category, ),
+            result
+        )(**result)
+        item.itemid = f'{result["itemid"]:0>8X}'
+        return item
+
+    @classmethod
+    def list_items(
+        cls,
+        database:DBConnector,
+        category: str = "Tradable",
+        limit: int = 5
+    ) -> List:
+        """
+        Unified Wrapper for the SQL endpoints,
+        which fetches items of specified category.
+        """
+        method_type = f"get_{category.lower()}s"
+        method = getattr(database, method_type, None)
+        if not method:
+            return []
+        return method(limit)
 
 
 class Treasure(Item):
@@ -103,7 +168,8 @@ class Treasure(Item):
     """
     def __init__(
         self, description: str,
-        asset_url: str, emoji: str
+        asset_url: str, emoji: str,
+        **kwargs
     ):
         super().__init__(
             description=description,
@@ -124,7 +190,8 @@ class Tradable(Item):
     def __init__(
         self, description: str,
         asset_url: str, emoji: str,
-        price: int
+        price: int,
+        **kwargs
     ):
         super().__init__(
             description=description,
@@ -143,6 +210,7 @@ class Collectible(Item):
     def __init__(
         self, description: str,
         asset_url: str, emoji: str,
+        **kwargs
     ):
         super().__init__(
             description=description,
@@ -164,7 +232,8 @@ class Chest(Treasure):
     def __init__(
         self, description: str,
         asset_url: str, emoji: str,
-        tier: int = 1
+        tier: int = 1,
+        **kwargs
     ):
         super().__init__(
             description=description,
@@ -201,19 +270,6 @@ class Chest(Treasure):
         return chests[tier - 1]()
 
     @classmethod
-    def get_random_chest(cls):
-        """
-        Get a random tier Chest with weight of (90, 35, 12)
-        for common, gold and legendary resp.
-        """
-        chest_class = random.choices(
-            cls.__subclasses__(),
-            k=1,
-            weights=(90, 35, 12)
-        )[0]
-        return chest_class()
-
-    @classmethod
     def from_id(cls, database: DBConnector, itemid: int):
         """
         Returns a chest of specified ID or None.
@@ -232,13 +288,26 @@ class Chest(Treasure):
         chest.description = item["description"]
         return chest
 
+    @classmethod
+    def get_random_chest(cls):
+        """
+        Get a random tier Chest with weight of (90, 35, 12)
+        for common, gold and legendary resp.
+        """
+        chest_class = random.choices(
+            cls.__subclasses__(),
+            k=1,
+            weights=(90, 35, 12)
+        )[0]
+        return chest_class()
+
 
 class CommonChest(Chest):
     """
     Lowest Tier [Chest].
     Chips scale in 100s.
     """
-    def __init__(self):
+    def __init__(self, **kwargs):
         description: str = dedent(
             """This is a Tier 1 chest which contains gold in the range of a few hundreds.
             Does not contain any other items."""
@@ -260,7 +329,7 @@ class GoldChest(Chest):
     Mid tier [Chest].
     Chips scale in high-hundreds to low-thousands.
     """
-    def __init__(self):
+    def __init__(self, **kwargs):
         description: str = dedent(
             """This is a Tier 2 chest which contains gold in the range of
             high-hundreds to low-thousands.
@@ -284,7 +353,7 @@ class LegendaryChest(Chest):
     Chips scale in the thousands.
     Legendary Chests have a small chance of containing [Collectible]s.
     """
-    def __init__(self):
+    def __init__(self, **kwargs):
         description: str = dedent(
             """This is a Tier 3 chest which contains gold in the range of thousands.
             Has a small chance of containing [Collectible]s."""
