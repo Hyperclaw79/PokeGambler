@@ -12,7 +12,7 @@ from typing import Dict, List, Tuple
 
 import discord
 
-from ..base.items import Item
+from ..base.items import Chest, Item
 from .dbconn import DBConnector
 
 
@@ -316,24 +316,24 @@ class Matches(Model):
         """
         Returns number of gamble matches played.
         """
-        results = self.database.get_match_stats(str(self.user.id)) or []
-        return len(results)
+        items = self.database.get_match_stats(str(self.user.id)) or []
+        return len(items)
 
     @property
     def num_wins(self):
         """
         Returns number of gamble matches won.
         """
-        results = self.database.get_match_stats(str(self.user.id)) or []
-        return results.count(True)
+        items = self.database.get_match_stats(str(self.user.id)) or []
+        return items.count(True)
 
     def get_stats(self) -> Tuple[int, int]:
         """
         Get Match num_matches and num_wins with a single query.
         """
-        results = self.database.get_match_stats(str(self.user.id)) or []
-        matches = len(results)
-        wins = results.count(True)
+        items = self.database.get_match_stats(str(self.user.id)) or []
+        matches = len(items)
+        wins = items.count(True)
         return (matches, wins)
 
 
@@ -392,11 +392,18 @@ class Inventory(Model):
                 item.pop(attr)
             name = item.pop('name')
             cls_name = ''.join(name.split(' '))
-            category = [
-                catog
-                for catog in Item.__subclasses__()
-                if catog.__name__ == item['category'].title()
-            ]
+            category = item["category"]
+            if category == "Chest":
+                category = Chest
+                item["description"] = item["description"].split(
+                    "[Daily"
+                )[0]
+            else:
+                category = [
+                    catog
+                    for catog in Item.__subclasses__()
+                    if catog.__name__ == category.title()
+                ]
             category = category[0]
             new_item = type(
                 cls_name,
