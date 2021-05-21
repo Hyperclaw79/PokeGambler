@@ -320,6 +320,8 @@ class Chest(Treasure):
         if proc >= chance:
             return None
         collectibles = database.get_collectibles(limit=20)
+        if not collectibles:
+            return None
         col_dict = random.choice(collectibles)
         return Item.from_id(database, col_dict["itemid"])
 
