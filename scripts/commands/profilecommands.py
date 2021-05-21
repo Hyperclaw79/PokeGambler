@@ -12,7 +12,7 @@ from PIL import Image
 
 from ..base.items import Chest
 from ..base.models import (
-    Flips, Loots, Matches,
+    Flips, Inventory, Loots, Matches,
     Minigame, Moles, Profile
 )
 from ..helpers.imageclasses import (
@@ -20,10 +20,13 @@ from ..helpers.imageclasses import (
     ProfileCardGenerator, WalletGenerator
 )
 from ..helpers.utils import (
-    get_embed, get_formatted_time, get_modules,
-    get_profile, img2file
+    get_embed, get_formatted_time,
+    get_modules, img2file
 )
-from .basecommand import Commands, alias, model
+from .basecommand import (
+    Commands, alias,
+    model, get_profile
+)
 
 
 class ProfileCommands(Commands):
@@ -322,7 +325,7 @@ class ProfileCommands(Commands):
             )
         await message.channel.send(embed=emb)
 
-    @model([Loots, Profile, Chest])
+    @model([Loots, Profile, Chest, Inventory])
     @alias('lt')
     async def cmd_loot(self, message, **kwargs):
         """Stable source of Pokechips.
@@ -374,6 +377,9 @@ class ProfileCommands(Commands):
         if proc <= treasure_chance:
             chest = Chest.get_chest(tier=tier)
             chest.save(self.database)
+            Inventory(self.database, message.author).save(
+                int(chest.itemid, 16)
+            )
             embed = get_embed(
                 f"Woah! You got lucky and found a **{chest}**.\n"
                 "It's been added to your inventory.",

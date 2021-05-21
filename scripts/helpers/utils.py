@@ -9,7 +9,6 @@ from io import BytesIO
 from typing import Iterable
 
 import discord
-from ..base.models import Profile
 
 __all__ = [
     'get_formatted_time', 'get_ascii',
@@ -307,35 +306,6 @@ def get_modules(ctx):
             comtype != "load_commands"
         ])
     ])
-
-
-async def get_profile(database, message, user):
-    """
-    Retrieves the Profile for a user (creates for new users).
-    If the user is not found in the guild, returns None.
-    """
-    try:
-        if isinstance(user, (int, str)):
-            user = message.guild.get_member(user)
-            if not user:
-                await message.channel.send(
-                    embed=get_embed(
-                        "Could not retrieve the user.",
-                        embed_type="error",
-                        title="User not found"
-                    )
-                )
-                return None
-        return Profile(database, user)
-    except discord.HTTPException:
-        await message.channel.send(
-            embed=get_embed(
-                "Could not retrieve the user.",
-                embed_type="error",
-                title="User not found"
-            )
-        )
-        return None
 
 
 def dedent(message):

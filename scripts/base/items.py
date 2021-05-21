@@ -76,7 +76,7 @@ class Item(ABC):
             raise AttributeError(
                 f"{self.name} is not yet saved in the database."
             )
-        uid = self.itemid
+        uid = int(self.itemid, 16)
         database.delete_item(uid)
 
     @property

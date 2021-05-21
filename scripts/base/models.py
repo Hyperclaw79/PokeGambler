@@ -12,6 +12,7 @@ from typing import Dict, List, Tuple
 
 import discord
 
+from ..base.items import Item
 from .dbconn import DBConnector
 
 
@@ -206,6 +207,16 @@ class Profile(UnlockedModel):
             badges.append("dealer")
         return badges
 
+    @classmethod
+    def get_all(
+        cls, database: DBConnector,
+        ids_only: bool = False
+    ) -> List[Dict]:
+        """
+        Wrapper for the DB query to get all whitelist profiles.
+        """
+        return database.get_all_profiles(ids_only)
+
     @property
     def full_info(self):
         """
@@ -370,11 +381,30 @@ class Inventory(Model):
             for itemid in itemids
         ]
 
-    # pylint: disable=arguments-differ
+    # pylint: disable=arguments-differ, no-member
     def save(self, itemid: int):
         """
         Saves an item in a player's inventory.
         """
+        item = self.database.item_in_inv(itemid)
+        if item:
+            for attr in ('user_id', 'itemid'):
+                item.pop(attr)
+            name = item.pop('name')
+            cls_name = ''.join(name.split(' '))
+            category = [
+                catog
+                for catog in Item.__subclasses__()
+                if catog.__name__ == item['category'].title()
+            ]
+            category = category[0]
+            new_item = type(
+                cls_name,
+                (category, ),
+                item
+            )(**item)
+            new_item.save(self.database)
+            itemid = int(new_item.itemid, 16)
         self.database.save_model(
             self.model_name,
             user_id=self.user_id,
@@ -384,6 +414,12 @@ class Inventory(Model):
             )
         )
 
+    def destroy(self):
+        """
+        Wrapper for clean_inv DB query.
+        Completely resets a user's inventory.
+        """
+        self.database.clear_inv(self.user_id)
 
 
 class Loots(UnlockedModel):

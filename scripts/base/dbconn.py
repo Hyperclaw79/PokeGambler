@@ -324,8 +324,8 @@ class DBConnector:
             CREATE TABLE
             IF NOT EXISTS
             inventory(
-                user_id TEXT NOT NULL,
-                itemid INT NOT NULL,
+                user_id TEXT,
+                itemid INT,
                 obtained_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
                 FOREIGN KEY (user_id)
                     REFERENCES profile (user_id)
@@ -573,6 +573,37 @@ class DBConnector:
         if res:
             names = (col[0] for col in self.cursor.description)
             return dict(zip(names, res))
+        return None
+
+    def get_all_profiles(self, ids_only: bool = False) -> List:
+        """
+        SQL endpoint to get a list of all profiles which are not blacklisted.
+        If ids_only is True, a list of only the user_ids is returned.
+        """
+        param = "user_id" if ids_only else "*"
+        self.cursor.execute(
+            f"""
+            SELECT {param} FROM profile
+            WHERE user_id NOT IN (
+                SELECT user_id FROM blacklists
+            );
+            """
+        )
+        results = self.cursor.fetchall()
+        if results:
+            if ids_only:
+                return [
+                    res[0]
+                    for res in results
+                ]
+            names = [
+                col[0]
+                for col in self.cursor.description
+            ]
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
         return None
 
     def get_leaderboard(self, sort_by: str = "num_wins") -> List:
@@ -1029,7 +1060,7 @@ class DBConnector:
                     WHEN 'Chest' THEN 2
                     WHEN 'Tradable' THEN 3
                     WHEN 'Collectible' THEN 4
-                END, (count * items.price) DESC;
+                END;
             '''
         self.cursor.execute(statement, (user_id, ))
         results = self.cursor.fetchall()
@@ -1042,7 +1073,7 @@ class DBConnector:
                 dict(zip(names, res))
                 for res in results
             ]
-        return None
+        return []
 
     def get_inv_ids(self, user_id: str, name: str) -> List:
         """
@@ -1066,7 +1097,56 @@ class DBConnector:
                 res[0]
                 for res in results
             ]
-        return None
+        return []
+
+    def item_in_inv(self, itemid: int) -> Dict:
+        """
+        Checks if an Item is already in the Inventory Table.
+        If item exists, it is returned.
+        """
+        self.cursor.execute(
+            '''
+            SELECT inventory.user_id, items.* FROM inventory
+            JOIN items
+            USING(itemid)
+            WHERE items.itemid IS ?
+            ''',
+            (itemid, )
+        )
+        res = self.cursor.fetchone()
+        if res:
+            names = (
+                col[0]
+                for col in self.cursor.description
+            )
+            return dict(zip(names, res))
+        return {}
+
+    def remove_from_inv(self, itemid: int):
+        """
+        SQL endpoint to delete an item from the Inventory.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM inventory
+            WHERE itemid IS ?
+            ''',
+            (itemid, )
+        )
+        self.conn.commit()
+
+    def clear_inv(self, user_id: str):
+        """
+        SQL endpoint to purge a user's Inventory.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM inventory
+            WHERE user_id IS ?
+            ''',
+            (user_id, )
+        )
+        self.conn.commit()
 
 if __name__ == "__main__":
     dbconn = DBConnector(db_path='data/pokegambler.db')

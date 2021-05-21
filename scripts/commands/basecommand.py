@@ -9,11 +9,14 @@ from abc import ABC
 from functools import wraps
 from typing import List, Union
 
-from scripts.base.models import Model
-from ..helpers.utils import (
-    get_embed, is_admin, is_dealer, is_owner
-)
+import discord
 
+from ..base.items import Item
+from ..base.models import Model, Profile
+from ..helpers.utils import (
+    get_embed, is_admin,
+    is_dealer, is_owner
+)
 
 __all__ = [
     'owner_only', 'admin_only', 'dealer_only',
@@ -221,6 +224,47 @@ def ensure_user(func):
     return wrapped
 
 
+def ensure_item(func):
+    '''
+    Make sure that the Item with the given ID exists already.
+    '''
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        args = kwargs.pop("args", None)
+        if not args:
+            return message.channel.send(
+                embed=get_embed(
+                    "You need to provide am Item ID.",
+                    embed_type="error",
+                    title="No Item ID"
+                )
+            )
+        try:
+            itemid = int(args[0], 16)
+            kwargs["args"] = args
+            args = []
+        except (ValueError, ZeroDivisionError):
+            return message.channel.send(
+                embed=get_embed(
+                    "That doesn't seems like a valid Item ID.",
+                    embed_type="error",
+                    title="Invalid Item ID"
+                )
+            )
+        item = Item.from_id(self.database, itemid)
+        if not item:
+            return message.channel.send(
+                embed=get_embed(
+                    "Could not find any item with the given ID.",
+                    embed_type="error",
+                    title="Item Does Not Exist"
+                )
+            )
+        kwargs["item"] = item
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
+
+
 class Commands(ABC):
     '''
     The Base command class which serves as the starting point for all commands.
@@ -260,3 +304,31 @@ class Commands(ABC):
         '''
         self.enabled = False
         return self.enabled
+
+async def get_profile(database, message, user):
+    """
+    Retrieves the Profile for a user (creates for new users).
+    If the user is not found in the guild, returns None.
+    """
+    try:
+        if isinstance(user, (int, str)):
+            user = message.guild.get_member(user)
+            if not user:
+                await message.channel.send(
+                    embed=get_embed(
+                        "Could not retrieve the user.",
+                        embed_type="error",
+                        title="User not found"
+                    )
+                )
+                return None
+        return Profile(database, user)
+    except discord.HTTPException:
+        await message.channel.send(
+            embed=get_embed(
+                "Could not retrieve the user.",
+                embed_type="error",
+                title="User not found"
+            )
+        )
+        return None

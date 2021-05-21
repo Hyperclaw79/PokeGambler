@@ -8,7 +8,7 @@ from ..base.items import Item, Chest
 from ..base.models import Inventory, Loots, Profile
 from ..helpers.utils import get_embed
 from .basecommand import (
-    Commands, alias, model
+    Commands, alias, model, ensure_item
 )
 
 
@@ -60,8 +60,10 @@ class TradeCommands(Commands):
                 )
             )
             return
-        if str(message.author.id) not in chest.description:
-            print(chest.description)
+        if str(message.author.id) not in (
+            chest.description +
+            self.database.item_in_inv(itemid).get("user_id", "")
+        ):
             await message.channel.send(
                 embed=get_embed(
                     "That's not your own chest.",
@@ -99,6 +101,7 @@ class TradeCommands(Commands):
         )
 
     @model(Item)
+    @ensure_item
     @alias('item')
     async def cmd_details(self, message, args=None, **kwargs):
         """Check the details of a PokeGambler Item.
@@ -114,31 +117,7 @@ class TradeCommands(Commands):
             ```~
         """
 
-        # pylint: disable=no-member
-
-        if not args:
-            return
-        try:
-            itemid = int(args[0], 16)
-        except (ValueError, ZeroDivisionError):
-            await message.channel.send(
-                embed=get_embed(
-                    "That doesn't seems like a valid Item ID.",
-                    embed_type="error",
-                    title="Invalid Item ID"
-                )
-            )
-            return
-        item = Item.from_id(self.database, itemid)
-        if not item:
-            await message.channel.send(
-                embed=get_embed(
-                    "Could not find any item with the given ID.",
-                    embed_type="error",
-                    title="Item Does Not Exist"
-                )
-            )
-            return
+        item = kwargs["item"]
         await message.channel.send(embed=item.details)
 
     @model(Inventory)

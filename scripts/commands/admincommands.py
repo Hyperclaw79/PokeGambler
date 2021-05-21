@@ -11,13 +11,14 @@ import json
 import discord
 from ..helpers.checks import user_check
 from ..helpers.utils import (
-    dedent, get_embed, get_enum_embed, get_profile,
+    dedent, get_embed, get_enum_embed,
     is_admin, is_owner, wait_for
 )
-from ..base.models import Blacklist
+from ..base.models import Blacklist, Inventory, Profile
 from ..base.items import Item
 from .basecommand import (
-    Commands, admin_only, alias, ensure_user
+    Commands, admin_only, alias,
+    ensure_user, get_profile, ensure_item
 )
 
 
@@ -264,6 +265,7 @@ class AdminCommands(Commands):
             user, message.author,
             reason=kwargs.get("reason", None)
         ).save()
+        Inventory(self.database, user).destroy()
         await message.add_reaction("👍")
 
     @admin_only
@@ -502,3 +504,75 @@ class AdminCommands(Commands):
         )
         item.save(self.database)
         await reply.add_reaction("👍")
+
+    @admin_only
+    @ensure_user
+    @alias("usr_itm")
+    async def cmd_give_item(self, message, args=None, **kwargs):
+        """Adds item to User's inventory.
+        $```scss
+        {command_prefix}give_item itemid
+        ```$
+
+        @`🛡️ Admin Command`
+        Give the user an item and add it to the inventory.@
+
+        ~To give a user, with ID 12345, a Golden Cigar with ID 0000FFFF:
+            ```
+            {command_prefix}usr_itm 12345 0000FFFF
+            ```~
+        """
+        if len(args) < 2:
+            await message.channel.send(
+                embed=get_embed(
+                    "You need to provide a user ID and item ID.",
+                    embed_type="error",
+                    title="Not enough args"
+                )
+            )
+            return
+        try:
+            user_id = int(args[0])
+            itemid = int(args[1], 16)
+        except (ValueError, ZeroDivisionError):
+            await message.channel.send(
+                embed=get_embed(
+                    "Make sure those IDs are correct.",
+                    embed_type="error",
+                    title="Invalid Input"
+                )
+            )
+            return
+        user = message.guild.get_member(user_id)
+        inv = Inventory(self.database, user)
+        inv.save(itemid)
+        await message.add_reaction("👍")
+
+    @admin_only
+    @ensure_item
+    @alias("item_all")
+    async def cmd_distribute_item(self, message, args=None, **kwargs):
+        """Adds item to User's inventory.
+        $```scss
+        {command_prefix}distribute_item itemid
+        ```$
+
+        @`🛡️ Admin Command`
+        Distribute an item to everyone.@
+
+        ~To distribute a Golden Cigar with ID 0000FFFF:
+            ```
+            {command_prefix}item_all 0000FFFF
+            ```~
+        """
+        itemid = int(args[0], 16)
+        ids = Profile.get_all(self.database, ids_only=True)
+        for uid in ids:
+            user = message.guild.get_member(int(uid))
+            if not user:
+                continue
+            Inventory(
+                self.database,
+                user
+            ).save(itemid)
+        await message.add_reaction("👍")
