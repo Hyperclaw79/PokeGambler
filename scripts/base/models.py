@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from inspect import ismethod
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import discord
 
@@ -324,6 +324,66 @@ class Matches(Model):
         matches = len(results)
         wins = results.count(True)
         return (matches, wins)
+
+
+class Inventory(Model):
+    """
+    Wrapper for Inventory based DB operations.
+    """
+    def __init__(
+        self, database: DBConnector, user: discord.User
+    ) -> None:
+        super().__init__(database, user, "inventory")
+        self.user_id = str(self.user.id)
+
+    # pylint: disable=arguments-differ
+    def get(self, counts_only=False) -> Tuple[Dict[str, List], int]:
+        """
+        Returns a list of items in user's Inventory.
+        """
+        items = self.database.get_inventory_items(
+            self.user_id, counts_only
+        )
+        if not items:
+            return ({}, 0)
+        net_worth = 0
+        item_dict = {}
+        for item in items:
+            category = item.pop("category")
+            if category not in item_dict:
+                item_dict[category] = []
+            item_dict[category].append(item)
+            net_worth += item.pop('Net Worth')
+        return item_dict, net_worth
+
+    def get_ids(self, name: str) -> List:
+        """
+        Returns a list of ItemIDs if they exist in user's Inventory.
+        """
+        itemids = self.database.get_inv_ids(
+            self.user_id, name
+        )
+        if not itemids:
+            return None
+        return [
+            f'{itemid:0>8X}'
+            for itemid in itemids
+        ]
+
+    # pylint: disable=arguments-differ
+    def save(self, itemid: int):
+        """
+        Saves an item in a player's inventory.
+        """
+        self.database.save_model(
+            self.model_name,
+            user_id=self.user_id,
+            itemid=itemid,
+            obtained_on=datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        )
+
 
 
 class Loots(UnlockedModel):

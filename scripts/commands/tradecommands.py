@@ -5,9 +5,11 @@ Trade Commands Module
 # pylint: disable=unused-argument, too-many-locals
 
 from ..base.items import Item, Chest
-from ..base.models import Loots, Profile
+from ..base.models import Inventory, Loots, Profile
 from ..helpers.utils import get_embed
-from .basecommand import Commands, alias, model
+from .basecommand import (
+    Commands, alias, model
+)
 
 
 class TradeCommands(Commands):
@@ -16,7 +18,7 @@ class TradeCommands(Commands):
     Shop related commands fall under this category as well.
     """
 
-    @model([Loots, Profile, Chest])
+    @model([Loots, Profile, Chest, Inventory])
     @alias("chest")
     async def cmd_open(self, message, args=None, **kwargs):
         """Opens a PokeGambler treasure chest.
@@ -86,8 +88,8 @@ class TradeCommands(Commands):
         if chest.name == "Legendary Chest":
             item = chest.get_random_collectible(self.database)
             if item:
-                content += f"\nAnd woah, you also got a **[{item.emoji}] {item}**!"
-            # Add logic for collectible in inventory.
+                content += f"\nAnd woah, you also got a **『{item.emoji}』 {item}**!"
+                Inventory(self.database, message.author).save(item.itemid)
         chest.delete(self.database)
         await message.channel.send(
             embed=get_embed(
@@ -99,7 +101,7 @@ class TradeCommands(Commands):
     @model(Item)
     @alias('item')
     async def cmd_details(self, message, args=None, **kwargs):
-        """Check the detials of a PokeGambler Item.
+        """Check the details of a PokeGambler Item.
         $```scss
         {command_prefix}details chest_id
         ```$
@@ -138,3 +140,68 @@ class TradeCommands(Commands):
             )
             return
         await message.channel.send(embed=item.details)
+
+    @model(Inventory)
+    @alias('inv')
+    async def cmd_inventory(self, message, **kwargs):
+        """Check personal inventory.
+        $```scss
+        {command_prefix}inventory
+        ```$
+
+        @Check your personal inventory for collected Chests, Treasures, etc.@
+        """
+        inv = Inventory(self.database, message.author)
+        catog_dict, net_worth = inv.get(counts_only=True)
+        emb = get_embed(
+            "This is your personal inventory categorized according to item type.\n"
+            "You can get the list of IDs for an item using "
+            f"`{self.ctx.prefix}ids item_name`.\n"
+            "\n> Your net worth, excluding Chests, is "
+            f"**{net_worth}** <:pokechip:840469159242760203>.",
+            title=f"{message.author.name}'s Inventory"
+        )
+        for idx, (catog, items) in enumerate(catog_dict.items()):
+            emb.add_field(
+                name=f"**{catog}s** ({len(items)})",
+                value="\n".join(
+                    f"『{item['emoji']}』 **{item['name']}** x{item['count']}"
+                    for item in items
+                ),
+                inline=True
+            )
+            if idx % 2 == 0:
+                emb.add_field(
+                    name="\u200B",
+                    value="\u200B",
+                    inline=True
+                )
+        await message.channel.send(embed=emb)
+
+    @model(Inventory)
+    async def cmd_ids(self, message, args=None, **kwargs):
+        """Check IDs of possessed items.
+        $```scss
+        {command_prefix}ids item_name
+        ```$
+
+        @Get a list of IDs of an item you own using its name.@
+
+        ~To get the list of IDs for Common Chest:
+            ```
+            {command_prefix}ids Common Chest
+            ```~
+        """
+        if not args:
+            return
+        item_name = " ".join(arg.title() for arg in args)
+        ids = Inventory(
+            self.database, message.author
+        ).get_ids(item_name)
+        id_str = '\n'.join(ids) if ids else "You have **0** of those."
+        await message.channel.send(
+            embed=get_embed(
+                f'**{item_name}**\n{id_str}',
+                title=f"{message.author.name}'s Item IDs"
+            )
+        )

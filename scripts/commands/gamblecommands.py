@@ -314,7 +314,7 @@ class GambleCommands(Commands):
     ):
         embed = get_enum_embed(
             [
-                f"{player} rolled a [{card['card_num']} {card['suit']}]."
+                f"{player} rolled a 『{card['card_num']} {card['suit']}』."
                 for player, card in dealed_deck.items()
             ],
             title="Roll Table"
@@ -374,7 +374,7 @@ class GambleCommands(Commands):
         )
         embed.add_field(
             name=f"Current Participants "
-            f"[{len(self.registered)}/{max_players}]",
+            f"『{len(self.registered)}/{max_players}』",
             value=players,
             inline=False
         )

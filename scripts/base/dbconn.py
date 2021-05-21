@@ -2,7 +2,7 @@
 The Database Wrapper Module.
 """
 
-# pylint: disable=too-many-public-methods
+# pylint: disable=too-many-public-methods, too-many-lines
 
 import sqlite3
 from typing import Dict, List, Union
@@ -315,6 +315,29 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def create_iventory_table(self):
+        """
+        SQL endpoint for Loots table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            inventory(
+                user_id TEXT NOT NULL,
+                itemid INT NOT NULL,
+                obtained_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                FOREIGN KEY (user_id)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL,
+                FOREIGN KEY (itemid)
+                    REFERENCES items (itemid)
+                    ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
     def create_tables(self):
         """
         SQL endpoint for triggering multiple table creations.
@@ -412,6 +435,17 @@ class DBConnector:
         self.cursor.execute(
             '''
             DELETE FROM items;
+            '''
+        )
+        self.conn.commit()
+
+    def purge_inventory(self):
+        """
+        SQL endpoint for purging Inventory table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM inventory;
             '''
         )
         self.conn.commit()
@@ -892,10 +926,10 @@ class DBConnector:
         )
         results = self.cursor.fetchall()
         if results:
-            names = (
+            names = [
                 col[0]
                 for col in self.cursor.description
-            )
+            ]
             return [
                 dict(zip(names, res))
                 for res in results
@@ -918,10 +952,10 @@ class DBConnector:
         )
         results = self.cursor.fetchall()
         if results:
-            names = (
+            names = [
                 col[0]
                 for col in self.cursor.description
-            )
+            ]
             return [
                 dict(zip(names, res))
                 for res in results
@@ -945,12 +979,91 @@ class DBConnector:
         )
         results = self.cursor.fetchall()
         if results:
-            names = (
+            names = [
                 col[0]
                 for col in self.cursor.description
-            )
+            ]
             return [
                 dict(zip(names, res))
+                for res in results
+            ]
+        return None
+
+# Inventory
+
+    def get_inventory_items(self, user_id: str, display_mode=False) -> List:
+        """
+        SQL endpoint for getting a list of items in a user's Inventory.
+        If counts_only is True, it will return a list of item names and their counts.
+        """
+        if display_mode:
+            statement = '''SELECT
+                items.name,
+                Count(items.name) AS count,
+                items.category,
+                items.emoji,
+                Coalesce(Sum(items.price), 0) AS 'Net Worth'
+            FROM inventory
+            JOIN items
+            USING(itemid)
+            WHERE user_id IS ?
+            GROUP BY items.name
+            ORDER BY
+                CASE category
+                    WHEN 'Teasure' THEN 1
+                    WHEN 'Chest' THEN 2
+                    WHEN 'Tradable' THEN 3
+                    WHEN 'Collectible' THEN 4
+                END, (count * items.price) DESC;
+            '''
+        else:
+            statement = '''
+            SELECT items.*
+            FROM inventory
+            JOIN items
+            USING(itemid)
+            WHERE user_id IS ?
+            ORDER BY
+                CASE category
+                    WHEN 'Teasure' THEN 1
+                    WHEN 'Chest' THEN 2
+                    WHEN 'Tradable' THEN 3
+                    WHEN 'Collectible' THEN 4
+                END, (count * items.price) DESC;
+            '''
+        self.cursor.execute(statement, (user_id, ))
+        results = self.cursor.fetchall()
+        if results:
+            names = [
+                col[0]
+                for col in self.cursor.description
+            ]
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
+        return None
+
+    def get_inv_ids(self, user_id: str, name: str) -> List:
+        """
+        SQL endpoint for listing IDs of an Item in user's inventory.
+        """
+        self.cursor.execute(
+            '''
+            SELECT items.itemid
+            FROM inventory
+            JOIN items
+            USING(itemid)
+            WHERE
+                user_id IS ?
+                AND items.name is ?
+            ''',
+            (user_id, name)
+        )
+        results = self.cursor.fetchall()
+        if results:
+            return [
+                res[0]
                 for res in results
             ]
         return None

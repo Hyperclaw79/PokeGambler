@@ -92,8 +92,8 @@ class Item(ABC):
         Returns a rich embed containing full details of an item.
         """
         emb = get_embed(
-            content=f"[{self.emoji}] | **{self.description}**",
-            title=f"Information for [{self.name}]",
+            content=f"『{self.emoji}』 **{self.description}**",
+            title=f"Information for 『{self.name}』",
             image=self.asset_url,
             footer=f"Item Id: {self.itemid}"
         )
