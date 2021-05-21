@@ -102,7 +102,7 @@ class TradeCommands(Commands):
 
     @model(Item)
     @ensure_item
-    @alias('item')
+    @alias(['item', 'detail'])
     async def cmd_details(self, message, args=None, **kwargs):
         """Check the details of a PokeGambler Item.
         $```scss
@@ -181,6 +181,7 @@ class TradeCommands(Commands):
         await message.channel.send(
             embed=get_embed(
                 f'**{item_name}**\n{id_str}',
-                title=f"{message.author.name}'s Item IDs"
+                title=f"{message.author.name}'s Item IDs",
+                footer=f"Use 『{self.ctx.prefix}details itemid』for detailed view."
             )
         )
