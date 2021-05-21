@@ -612,7 +612,7 @@ class DBConnector:
         Sorts according to num_wins by default. Can accept Balance as well.
         """
         if sort_by == "num_wins":
-            sort_by = "win_rate DESC, num_wins DESC, balance"
+            sort_by = "num_wins DESC, win_rate DESC, balance"
         self.cursor.execute(
             f'''
             SELECT
