@@ -404,7 +404,7 @@ class Inventory(Model):
                     for catog in Item.__subclasses__()
                     if catog.__name__ == category.title()
                 ]
-            category = category[0]
+                category = category[0]
             new_item = type(
                 cls_name,
                 (category, ),
