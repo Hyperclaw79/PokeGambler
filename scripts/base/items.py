@@ -127,11 +127,18 @@ class Item(ABC):
         if not result:
             return None
         category = result["category"]
-        category = [
-            catog
-            for catog in cls.__subclasses__()
-            if catog.__name__ == category.title()
-        ][0]
+        if category == "Chest":
+            category = Chest
+            result["description"] = result["description"].split(
+                "[Daily"
+            )[0]
+        else:
+            category = [
+                catog
+                for catog in cls.__subclasses__()
+                if catog.__name__ == category.title()
+            ]
+            category = category[0]
         item = type(
             "".join(
                 word.title()
@@ -301,6 +308,21 @@ class Chest(Treasure):
         )[0]
         return chest_class()
 
+    def get_random_collectible(self, database: DBConnector) -> Collectible:
+        """
+        Get a random [Collectible] with chance based on chest tier.
+        Common Chest - 0%
+        Gold Chest - 25%
+        Legendary Chest - 50%
+        """
+        chance = (self.tier - 1) * 0.25
+        proc = random.uniform(0.1, 0.99)
+        if proc >= chance:
+            return None
+        collectibles = database.get_collectibles(limit=20)
+        col_dict = random.choice(collectibles)
+        return Item.from_id(database, col_dict["itemid"])
+
 
 class CommonChest(Chest):
     """
@@ -368,16 +390,5 @@ class LegendaryChest(Chest):
             emoji=emoji,
             tier=tier
         )
-
-    @classmethod
-    def get_random_collectible(cls, chance: float = 0.1):
-        """
-        Get a random collectible with a specified chance.
-        Defaults to 10%.
-        """
-        proc = random.uniform(0.1, 0.99)
-        if proc >= chance:
-            return None
-        return random.choice(Collectible.__subclasses__())[0]()
 
 #endregion

@@ -545,11 +545,11 @@ class ProfileCommands(Commands):
         loot_model.update(
             earned=(earned + chips)
         )
-        content = f"You have recieved {chips} <:pokechip:840469159242760203>."
+        content = f"You have recieved **{chips}** <:pokechip:840469159242760203>."
         if chest.name == "Legendary Chest":
-            item = chest.get_random_collectible()
+            item = chest.get_random_collectible(self.database)
             if item:
-                content += f"\nAnd woah, you also got a {item}!"
+                content += f"\nAnd woah, you also got a **[{item.emoji}] {item}**!"
             # Add logic for collectible in inventory.
         chest.delete(self.database)
         await message.channel.send(

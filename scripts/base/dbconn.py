@@ -890,10 +890,16 @@ class DBConnector:
             ''',
             (limit,)
         )
-        res = self.cursor.fetchone()
-        if res:
-            names = (col[0] for col in self.cursor.description)
-            return dict(zip(names, res))
+        results = self.cursor.fetchall()
+        if results:
+            names = (
+                col[0]
+                for col in self.cursor.description
+            )
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
         return None
 
     def get_collectibles(self, limit: int = 10) -> List:
@@ -910,10 +916,16 @@ class DBConnector:
             ''',
             (limit,)
         )
-        res = self.cursor.fetchone()
-        if res:
-            names = (col[0] for col in self.cursor.description)
-            return dict(zip(names, res))
+        results = self.cursor.fetchall()
+        if results:
+            names = (
+                col[0]
+                for col in self.cursor.description
+            )
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
         return None
 
     def get_treasures(self, limit: int = 10) -> List:
@@ -931,10 +943,16 @@ class DBConnector:
             ''',
             (limit,)
         )
-        res = self.cursor.fetchone()
-        if res:
-            names = (col[0] for col in self.cursor.description)
-            return dict(zip(names, res))
+        results = self.cursor.fetchall()
+        if results:
+            names = (
+                col[0]
+                for col in self.cursor.description
+            )
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
         return None
 
 if __name__ == "__main__":
