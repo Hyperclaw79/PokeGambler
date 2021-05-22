@@ -4,13 +4,18 @@ This module contains all the items in the Pokegambler world.
 
 # pylint: disable=no-member, unused-argument
 
+from __future__ import annotations
+
 import random
 import re
 from abc import ABC
 from dataclasses import dataclass
 from functools import total_ordering
 from inspect import ismethod
-from typing import Dict, List, Optional, Tuple, Union
+from typing import (
+    Dict, List, Optional,
+    Tuple, Type, Union
+)
 
 import discord
 
@@ -119,17 +124,35 @@ class Item(ABC):
         return database.get_item(itemid)
 
     @classmethod
-    def from_id(cls, database: DBConnector, itemid: int):
+    def from_id(cls, database: DBConnector, itemid: int) -> Item:
         """
         Returns a item of specified ID or None.
         """
-        result = database.get_item(itemid)
-        if not result:
+        item = database.get_item(itemid)
+        if not item:
             return None
-        category = result["category"]
+        category = cls.get_category(item)
+        new_item = type(
+            "".join(
+                word.title()
+                for word in item["name"].split(" ")
+            ),
+            (category, ),
+            item
+        )(**item)
+        new_item.itemid = f'{item["itemid"]:0>8X}'
+        return new_item
+
+    @classmethod
+    def get_category(cls, item: Dict) -> Type[Item]:
+        """
+        Resolves category to handle chests differently.
+        Returns the base Category of the Item.
+        """
+        category = item["category"]
         if category == "Chest":
             category = Chest
-            result["description"] = result["description"].split(
+            item["description"] = item["description"].split(
                 "[Daily"
             )[0]
         else:
@@ -139,16 +162,7 @@ class Item(ABC):
                 if catog.__name__ == category.title()
             ]
             category = category[0]
-        item = type(
-            "".join(
-                word.title()
-                for word in result["name"].split(" ")
-            ),
-            (category, ),
-            result
-        )(**result)
-        item.itemid = f'{result["itemid"]:0>8X}'
-        return item
+        return category
 
     @classmethod
     def list_items(

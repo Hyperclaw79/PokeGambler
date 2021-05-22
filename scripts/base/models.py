@@ -12,7 +12,7 @@ from typing import Dict, List, Tuple
 
 import discord
 
-from ..base.items import Chest, Item
+from ..base.items import Item
 from .dbconn import DBConnector
 
 
@@ -392,19 +392,7 @@ class Inventory(Model):
                 item.pop(attr)
             name = item.pop('name')
             cls_name = ''.join(name.split(' '))
-            category = item["category"]
-            if category == "Chest":
-                category = Chest
-                item["description"] = item["description"].split(
-                    "[Daily"
-                )[0]
-            else:
-                category = [
-                    catog
-                    for catog in Item.__subclasses__()
-                    if catog.__name__ == category.title()
-                ]
-                category = category[0]
+            category = Item.get_category(item)
             new_item = type(
                 cls_name,
                 (category, ),
