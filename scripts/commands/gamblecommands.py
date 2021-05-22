@@ -20,7 +20,7 @@ from ..helpers.utils import (
     get_embed, get_enum_embed,
     img2file, wait_for
 )
-from .basecommand import Commands, alias, dealer_only, model
+from .basecommand import Commands, alias, dealer_only, model, no_thumb
 
 
 class GambleCommands(Commands):
@@ -602,6 +602,7 @@ class GambleCommands(Commands):
 
     @model([Moles, Profile])
     @alias(["mole", "whack"])
+    @no_thumb
     async def cmd_whackamole(self, message, args=None, **kwargs):
         """Find the chip minigame.
         $```scss
@@ -612,7 +613,7 @@ class GambleCommands(Commands):
         If no amount is specified, 50 chips will be used by default.
         Minimum 50 chips and maximim 9999 chips can be used.
         You can choose difficulty level (default 1) and rewards will scale.
-        ```
+        ```py
         ╔═══════╦═══════╦══════╦════════╗
         ║ Level ║ Board ║ Cost ║ Reward ║
         ╠═══════╬═══════╬══════╬════════╣

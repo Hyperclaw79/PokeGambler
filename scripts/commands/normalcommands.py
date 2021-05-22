@@ -48,10 +48,11 @@ class NormalCommands(Commands):
                 description='\u200B',
                 color=11068923
             )
-            emb.set_thumbnail(
-                url="https://cdn.discordapp.com/attachments/840469669332516904/"
-                "840469820180529202/pokegambler_logo.png"
-            )
+            if "no_thumb" not in dir(cmd):
+                emb.set_thumbnail(
+                    url="https://cdn.discordapp.com/attachments/840469669332516904/"
+                    "840469820180529202/pokegambler_logo.png"
+                )
         else:
             emb = get_embed(
                 "No help message exists for this command.",

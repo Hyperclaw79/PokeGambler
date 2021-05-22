@@ -8,7 +8,7 @@ from ..base.items import Item, Chest
 from ..base.models import Inventory, Loots, Profile
 from ..helpers.utils import get_embed
 from .basecommand import (
-    Commands, alias, model, ensure_item
+    Commands, alias, model, ensure_item, no_thumb
 )
 
 
@@ -20,6 +20,7 @@ class TradeCommands(Commands):
 
     @model([Loots, Profile, Chest, Inventory])
     @alias("chest")
+    @no_thumb
     async def cmd_open(self, message, args=None, **kwargs):
         """Opens a PokeGambler treasure chest.
         $```scss

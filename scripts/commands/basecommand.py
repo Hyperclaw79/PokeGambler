@@ -265,6 +265,19 @@ def ensure_item(func):
     return wrapped
 
 
+def no_thumb(func):
+    '''
+    Mark a command to prevent thumbnail in it's help.
+    Useful for commands with Ascii tables in their docs.
+    '''
+    func.__dict__["no_thumb"] = True
+
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
+
+
 class Commands(ABC):
     '''
     The Base command class which serves as the starting point for all commands.
