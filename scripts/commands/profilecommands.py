@@ -386,10 +386,7 @@ class ProfileCommands(Commands):
                 title="**FOUND A TREASURE CHEST**",
                 thumbnail=chest.asset_url
             )
-        data = profile.get()
-        balance = data["balance"] + loot
-        won_chips = data["won_chips"] + loot
-        profile.update(balance=balance, won_chips=won_chips)
+        profile.credit(loot)
         loot_model.update(earned=earned + loot)
         await message.channel.send(
             f"**You found {loot} <a:blinker:843844481220083783>! "
@@ -468,10 +465,7 @@ class ProfileCommands(Commands):
             thumbnail=chest.asset_url,
             footer=f"Current Streak: {daily_streak}"
         )
-        data = profile.get()
-        balance = data["balance"] + loot
-        won_chips = data["won_chips"] + loot
-        profile.update(balance=balance, won_chips=won_chips)
+        profile.credit(loot)
         loot_model.update(
             earned=(earned + loot),
             daily_streak=daily_streak,

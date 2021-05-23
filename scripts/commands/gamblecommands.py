@@ -578,19 +578,13 @@ class GambleCommands(Commands):
             msg += f"You have won {amount * 2} <:pokechip:840469159242760203>"
             title = "Congratulations!"
             color = 5023308
-            profile.update(
-                balance=profile.get()["balance"] + amount,
-                won_chips=profile.get()["won_chips"] + amount
-            )
+            profile.credit(amount)
             won = True
         else:
             msg += f"You have lost {amount} <:pokechip:840469159242760203>"
             title = "You Lost!"
             color = 14155786
-            profile.update(
-                balance=profile.get()["balance"] - amount,
-                won_chips=profile.get()["won_chips"] - amount
-            )
+            profile.debit(amount)
             won = False
         Flips(
             self.database, message.author,
@@ -684,20 +678,14 @@ class GambleCommands(Commands):
                 f"{cost * multiplier} <:pokechip:840469159242760203> " + \
                 "have been added in your account."
             color = 5023308
-            profile.update(
-                balance=profile.get()["balance"] + (cost * multiplier),
-                won_chips=profile.get()["won_chips"] + (cost * multiplier)
-            )
+            profile.credit(cost * multiplier)
             won = True
         else:
             content = "**Uhoh! You couldn't guess it right this time.**\n" + \
                 f"{cost} <:pokechip:840469159242760203> " + \
                 "have been taken from your account."
             color = 14155786
-            profile.update(
-                balance=profile.get()["balance"] - cost,
-                won_chips=profile.get()["won_chips"] - cost
-            )
+            profile.debit(cost)
             won = False
         Moles(
             self.database, message.author,

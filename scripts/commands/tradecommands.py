@@ -74,14 +74,7 @@ class TradeCommands(Commands):
             )
             return
         chips = chest.chips
-        profile = Profile(self.database, message.author)
-        data = profile.get()
-        won_chips = data["won_chips"]
-        balance = data["balance"]
-        profile.update(
-            won_chips=(won_chips + chips),
-            balance=(balance + chips)
-        )
+        Profile(self.database, message.author).credit(chips)
         loot_model = Loots(self.database, message.author)
         earned = loot_model.get()["earned"]
         loot_model.update(

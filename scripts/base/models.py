@@ -207,6 +207,24 @@ class Profile(UnlockedModel):
             badges.append("dealer")
         return badges
 
+    def debit(self, amount: int):
+        """
+        Shorthand method to subtract from balance and won_chips.
+        """
+        self.update(
+            balance=self.balance - amount,
+            won_chips=self.won_chips - amount
+        )
+
+    def credit(self, amount: int):
+        """
+        Shorthand method to add to balance and won_chips.
+        """
+        self.update(
+            balance=self.balance + amount,
+            won_chips=self.won_chips + amount
+        )
+
     @classmethod
     def get_all(
         cls, database: DBConnector,
