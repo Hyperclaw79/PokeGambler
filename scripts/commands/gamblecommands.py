@@ -245,11 +245,10 @@ class GambleCommands(Commands):
                 )
             )
             await closed_msg.delete()
-            dealed_deck[player] = {
+            dealed_deck[player].update({
                 "card_num": "0",
-                "suit": "Disqualified",
                 "card_img": self.ctx.dealer.closed_card.copy()
-            }
+            })
             return
         await closed_msg.delete()
         await gamble_channel.send(
