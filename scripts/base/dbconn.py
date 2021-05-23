@@ -928,6 +928,24 @@ class DBConnector:
             return dict(zip(names, res))
         return None
 
+    def get_item_from_name(self, name: str) -> Dict:
+        """
+        SQL endpoint for getting an Item with name.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM items
+            WHERE name IS ?
+            LIMIT 1
+            ''',
+            (name,)
+        )
+        res = self.cursor.fetchone()
+        if res:
+            names = (col[0] for col in self.cursor.description)
+            return dict(zip(names, res))
+        return None
+
     def delete_item(self, itemid: int) -> None:
         """
         SQL endpoint for deleting an Item with id.
@@ -951,6 +969,8 @@ class DBConnector:
             '''
             SELECT * FROM items
             WHERE category IS "Tradable"
+            GROUP BY name
+            ORDER BY itemid DESC
             LIMIT ?;
             ''',
             (limit,)
@@ -977,6 +997,7 @@ class DBConnector:
             '''
             SELECT * FROM items
             WHERE category IS "Collectible"
+            GROUP BY name
             LIMIT ?;
             ''',
             (limit,)
@@ -1003,6 +1024,7 @@ class DBConnector:
             '''
             SELECT * FROM items
             WHERE category IS "Treasure"
+            GROUP BY name
             ORDER BY itemid DESC
             LIMIT ?;
             ''',
@@ -1099,17 +1121,46 @@ class DBConnector:
             ]
         return []
 
-    def item_in_inv(self, itemid: int) -> Dict:
+    def inv_name2items(self, user_id: str, name: str) -> List:
+        """
+        SQL endpoint for getting Items in user's inventory from name.
+        """
+        self.cursor.execute(
+            '''
+            SELECT *
+            FROM inventory
+            JOIN items
+            USING(itemid)
+            WHERE
+                user_id IS ?
+                AND items.name is ?
+            ''',
+            (user_id, name)
+        )
+        results = self.cursor.fetchall()
+        if results:
+            names = [
+                col[0]
+                for col in self.cursor.description
+            ]
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
+        return []
+
+    def item_in_inv(self, itemid: int, user_id: str = None) -> Dict:
         """
         Checks if an Item is already in the Inventory Table.
         If item exists, it is returned.
         """
         self.cursor.execute(
-            '''
+            f'''
             SELECT inventory.user_id, items.* FROM inventory
             JOIN items
             USING(itemid)
             WHERE items.itemid IS ?
+            {('AND user_id IS ' + user_id) if user_id else ''}
             ''',
             (itemid, )
         )
@@ -1122,18 +1173,36 @@ class DBConnector:
             return dict(zip(names, res))
         return {}
 
-    def remove_from_inv(self, itemid: int):
+    def remove_from_inv(
+        self, item_inp: Union[List[int], str],
+        quantity: int = -1,
+        user_id: str = None
+    ) -> int:
         """
         SQL endpoint to delete an item from the Inventory.
+        Input can either be a name or list of itemids.
+        If item name is given, a quantity can be provided.
+        If quantity is -1, all items of the name will be removed.
+        Returns number of records actually deleted.
         """
-        self.cursor.execute(
+        statement = 'DELETE FROM inventory'
+        if isinstance(item_inp, list):
+            statement += 'WHERE itemid IN ?'
+        else:
+            statement += f'''
+            WHERE itemid IN (
+                SELECT inventory.itemid FROM items
+                JOIN inventory USING(itemid)
+                WHERE items.name IS ?
+                LIMIT {quantity}
+            )
             '''
-            DELETE FROM inventory
-            WHERE itemid IS ?
-            ''',
-            (itemid, )
-        )
+        if user_id:
+            statement += f" AND user_id IS '{user_id}'"
+        self.cursor.execute(statement, (item_inp, ))
         self.conn.commit()
+        self.cursor.execute('SELECT changes();')
+        return self.cursor.fetchone()[0]
 
     def clear_inv(self, user_id: str):
         """

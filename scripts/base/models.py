@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from inspect import ismethod
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import discord
 
@@ -399,6 +399,15 @@ class Inventory(Model):
             for itemid in itemids
         ]
 
+    def from_id(self, itemid) -> Item:
+        """
+        Gets an item using ItemID if it exists in user's inventory.
+        """
+        item = self.database.item_in_inv(itemid, self.user_id)
+        if item:
+            return item
+        return None
+
     # pylint: disable=arguments-differ, no-member
     def save(self, itemid: int):
         """
@@ -426,6 +435,22 @@ class Inventory(Model):
                 "%Y-%m-%d %H:%M:%S"
             )
         )
+
+    def delete(
+        self, item_inp: Union[int, str],
+        quantity: int = -1
+    ) -> int:
+        """
+        Deletes an Item from user's Inventory.
+        Input can either be a name or List of itemids.
+        If item name is given, a quantity can be provided.
+        If quantity is -1, all items of the name will be removed.
+        Returns number of records deleted.
+        """
+        return self.database.remove_from_inv(
+            item_inp, quantity, self.user_id
+        )
+
 
     def destroy(self):
         """

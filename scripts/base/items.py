@@ -124,13 +124,7 @@ class Item(ABC):
         return database.get_item(itemid)
 
     @classmethod
-    def from_id(cls, database: DBConnector, itemid: int) -> Item:
-        """
-        Returns a item of specified ID or None.
-        """
-        item = database.get_item(itemid)
-        if not item:
-            return None
+    def _new_item(cls, item) -> Item:
         category = cls.get_category(item)
         new_item = type(
             "".join(
@@ -142,6 +136,26 @@ class Item(ABC):
         )(**item)
         new_item.itemid = f'{item["itemid"]:0>8X}'
         return new_item
+
+    @classmethod
+    def from_id(cls, database: DBConnector, itemid: int) -> Item:
+        """
+        Returns a item of specified ID or None.
+        """
+        item = database.get_item(itemid)
+        if not item:
+            return None
+        return cls._new_item(item)
+
+    @classmethod
+    def from_name(cls, database: DBConnector, name: str) -> Item:
+        """
+        Returns a item of specified ID or None.
+        """
+        item = database.get_item_from_name(name)
+        if not item:
+            return None
+        return cls._new_item(item)
 
     @classmethod
     def get_category(cls, item: Dict) -> Type[Item]:

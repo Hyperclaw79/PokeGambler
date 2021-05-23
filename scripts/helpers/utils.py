@@ -79,7 +79,7 @@ def get_embed(
     content: str, embed_type: str = "info",
     title: str = None, footer: str = None,
     image: str = None, thumbnail: str = None,
-    color: int = None
+    color: int = None, no_icon: bool = False
 ) -> discord.Embed:
     """
     Creates a Discord Embed with appropriate color, title and description.
@@ -102,8 +102,12 @@ def get_embed(
         }
     }
     params = embed_params[embed_type]
+    if no_icon:
+        title = f"{title or params['name']}"
+    else:
+        title = f"{params['icon']} {title or params['name']}"
     emb = discord.Embed(
-        title=f"{params['icon']} {title or params['name']}",
+        title=title,
         description=content,
         color=params['color']
     )
