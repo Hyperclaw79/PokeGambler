@@ -5,12 +5,15 @@ Trade Commands Module
 # pylint: disable=unused-argument, too-many-locals
 
 import asyncio
+from datetime import datetime
 
 from ..base.items import Item, Chest
 from ..base.models import Inventory, Loots, Profile
 from ..base.shop import Shop, TradebleItem
 
-from ..helpers.utils import dedent, get_embed
+from ..helpers.utils import (
+    dedent, get_embed, get_formatted_time
+)
 from ..helpers.paginator import Paginator
 
 from .basecommand import (
@@ -316,10 +319,6 @@ class TradeCommands(Commands):
             return
         itemid = args[0].lower()
         quantity = int(kwargs.get('quantity', 1))
-        # try:
-        #     itemid = int(itemid, 16)
-        # except ValueError: # Title or Boost
-        #     pass
         Shop.refresh_tradables(self.database)
         item = Shop.get_item(self.database, itemid)
         if not item:
@@ -345,7 +344,8 @@ class TradeCommands(Commands):
         task = item.buy(
             database=self.database,
             message=message,
-            quantity=quantity
+            quantity=quantity,
+            ctx=self.ctx
         )
         quant_str = f"x {quantity}" if isinstance(item, TradebleItem) else ''
         if asyncio.iscoroutinefunction(item.buy):
@@ -421,3 +421,43 @@ class TradeCommands(Commands):
                 title="Item(s) Sold"
             )
         )
+
+    async def cmd_boosts(self, message, **kwargs):
+        """Check active boosts.
+        $```scss
+        {command_prefix}boosts
+        ```$
+
+        @Check your active purchased boosts.@
+        """
+        def __get_desc(boost):
+            desc_str = f"{boost['description']}\nStack: {boost['stack']}"
+            expires_in = (30 * 60) - (datetime.now() - boost["added_on"]).total_seconds()
+            if expires_in > 0 and boost['stack'] > 0:
+                expires_in = get_formatted_time(
+                    expires_in, show_hours=False
+                ).replace('**', '')
+            else:
+                expires_in = "Expired / Not Purchased Yet"
+            desc_str += f"\nExpires in: {expires_in}"
+            return f"```css\n{desc_str}\n```"
+        boosts = self.ctx.boost_dict.get(message.author.id, None)
+        if not boosts:
+            await message.channel.send(
+                embed=get_embed(
+                    "You don't have any active boosts.",
+                    title="No Boosts"
+                )
+            )
+            return
+        emb = get_embed(
+            "\u200B",
+            title="Active Boosts"
+        )
+        for val in boosts.values():
+            emb.add_field(
+                name=val["name"],
+                value=__get_desc(val),
+                inline=False
+            )
+        await message.channel.send(embed=emb)

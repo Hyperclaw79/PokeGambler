@@ -341,7 +341,15 @@ class ProfileCommands(Commands):
         `Cooldown Reduction Boost incoming soon`@
         """
         on_cooldown = self.ctx.loot_cd.get(message.author, None)
-        cd_time = 600
+        cd_reducer = 0
+        loot_mult = 1
+        tr_mult = 1
+        boosts = self.ctx.boost_dict.get(message.author.id, None)
+        if boosts:
+            cd_reducer = boosts['boost_lt_cd']['stack']
+            loot_mult += 0.05 * boosts['boost_lt']['stack']
+            tr_mult += 0.1 * boosts['boost_tr']['stack']
+        cd_time = 60 * (10 - cd_reducer)
         if on_cooldown and (
             datetime.now() - self.ctx.loot_cd[message.author]
         ).total_seconds() < cd_time:
@@ -368,8 +376,12 @@ class ProfileCommands(Commands):
         boost = loot_info["loot_boost"]
         earned = loot_info["earned"]
         tier = loot_info["tier"]
-        treasure_chance = 0.01 * loot_info["treasure_boost"]
-        loot = random.randint(5, 10) * boost * (10 ** (tier - 1))
+        treasure_chance = 0.01 * loot_info["treasure_boost"] * tr_mult
+        loot = int(
+            random.randint(5, 10) * boost * (
+                10 ** (tier - 1)
+            ) * loot_mult
+        )
         loot *= 2  # x2 BETA Bonus
         treasure_chance *= 2 # x2 BETA Bonus
         embed = None

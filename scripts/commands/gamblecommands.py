@@ -575,10 +575,14 @@ class GambleCommands(Commands):
         choice = int(reply) - 1 if reply in valids[:2] else valids[2:].index(reply)
         msg = f"PokeGambler choose {valids[2:][idx].title()}.\n"
         if choice == idx:
-            msg += f"You have won {amount * 2} <:pokechip:840469159242760203>"
+            amt_mult = 1
+            boosts = self.ctx.boost_dict.get(message.author.id, None)
+            if boosts:
+                amt_mult += boosts['boost_flip']['stack'] * 0.1
+            msg += f"You have won {amount + int(amount * amt_mult)} <:pokechip:840469159242760203>"
             title = "Congratulations!"
             color = 5023308
-            profile.credit(amount)
+            profile.credit(int(amount * amt_mult))
             won = True
         else:
             msg += f"You have lost {amount} <:pokechip:840469159242760203>"

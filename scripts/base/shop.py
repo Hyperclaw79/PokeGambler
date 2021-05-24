@@ -7,7 +7,9 @@ This module is a compilation of all shop related classed.
 # pylint: disable=too-many-instance-attributes
 
 from abc import abstractmethod
+import asyncio
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, List, Union
 
 from discord import Member, Message
@@ -110,11 +112,46 @@ class BoostItem(ShopItem):
     """
     This class represents a purchasable temporary boost.
     """
-    def buy(self, **kwargs):
+    async def buy(
+        self, ctx, database: DBConnector,
+        message: Message, quantity: int = 1,
+        **kwargs
+    ):
         """
         Applies the relevant temporary boost to the user.
         """
-        # TODO: Implement Boost logic
+        async def __boost_handler(ctx, user):
+            if user.id not in ctx.boost_dict:
+                ctx.boost_dict[user.id] = {
+                    item.itemid: {
+                        "stack": 0,
+                        "name": item.name,
+                        "description": item.description,
+                        "added_on": datetime.now()
+                    }
+                    for item in Shop.categories["Boosts"].items
+                }
+            ctx.boost_dict[user.id][self.itemid]["stack"] += quantity
+            ctx.boost_dict[user.id][self.itemid].update({
+                "added_on": datetime.now()
+            })
+            await asyncio.sleep(30 * 60)
+            ctx.boost_dict[user.id][self.itemid]["stack"] = 0
+        user = message.author
+        if (
+            user.id not in ctx.boost_dict
+            or ctx.boost_dict[user.id][self.itemid]["stack"] == 0
+        ):
+            ctx.loop.create_task(
+                __boost_handler(ctx, user)
+            )
+        else:
+            ctx.boost_dict[user.id][self.itemid]["stack"] += quantity
+        self.debit_player(
+            database=database,
+            user=message.author,
+            quantity=quantity
+        )
 
 
 @dataclass
@@ -208,7 +245,7 @@ class Shop:
                 BoostItem(
                     "boost_flip",
                     "Flipster",
-                    "Increase reward from QuickFlip minigame by 10%.",
+                    "Increase reward for QuickFlip minigame by 10%.",
                     1000, "🎲"
                 )
             ]

@@ -57,6 +57,7 @@ class PokeGambler(discord.Client):
         self.owner_mode = False
         self.cooldown_users = {}
         self.loot_cd = {}
+        self.boost_dict = {}
         # Classes
         self.database = DBConnector(self.db_path)
         self.logger = CustomLogger(
