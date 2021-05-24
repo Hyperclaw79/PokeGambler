@@ -343,7 +343,7 @@ class ProfileCommands(Commands):
         on_cooldown = self.ctx.loot_cd.get(message.author, None)
         cd_reducer = 0
         loot_mult = 1
-        tr_mult = 1
+        tr_mult = 0
         boosts = self.ctx.boost_dict.get(message.author.id, None)
         if boosts:
             cd_reducer = boosts['boost_lt_cd']['stack']
@@ -376,7 +376,7 @@ class ProfileCommands(Commands):
         boost = loot_info["loot_boost"]
         earned = loot_info["earned"]
         tier = loot_info["tier"]
-        treasure_chance = 0.01 * loot_info["treasure_boost"] * tr_mult
+        treasure_chance = 0.1 * loot_info["treasure_boost"] + tr_mult
         loot = int(
             random.randint(5, 10) * boost * (
                 10 ** (tier - 1)

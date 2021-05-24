@@ -229,25 +229,25 @@ class Shop:
                     "boost_lt",
                     "Lucky Looter",
                     "Increases your loot by 5%.",
-                    500, "💰"
+                    100, "💰"
                 ),
                 BoostItem(
                     "boost_lt_cd",
                     "Loot Lust",
                     "Decreases Loot Cooldown by 1 minute.",
-                    500, "⌛"
+                    100, "⌛"
                 ),
                 BoostItem(
                     "boost_tr",
                     "Fortune Burst",
                     "Increase Treasure Chance while looting by 10%.",
-                    1000, "💎"
+                    500, "💎"
                 ),
                 BoostItem(
                     "boost_flip",
                     "Flipster",
                     "Increase reward for QuickFlip minigame by 10%.",
-                    1000, "🎲"
+                    200, "🎲"
                 )
             ]
         ),
