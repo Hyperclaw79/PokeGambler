@@ -234,8 +234,8 @@ class TradeCommands(Commands):
             ```~
         """
         categories = Shop.categories
-        alias = Shop.alias_map
-        if args and args[0].title() not in alias:
+        shop_alias = Shop.alias_map
+        if args and args[0].title() not in shop_alias:
             cat_str = "\n".join(categories)
             await message.channel.send(
                 embed=get_embed(
@@ -349,8 +349,18 @@ class TradeCommands(Commands):
             ctx=self.ctx
         )
         quant_str = f"x {quantity}" if isinstance(item, TradebleItem) else ''
-        if asyncio.iscoroutinefunction(item.buy):
-            await task
+        res = (await task) if asyncio.iscoroutinefunction(
+            item.buy
+        ) else task
+        if res != "success":
+            await message.channel.send(
+                embed=get_embed(
+                    f"{res}\nYour account has not been charged.",
+                    embed_type="error",
+                    title="Purchase failed"
+                )
+            )
+            return
         await message.channel.send(
             embed=get_embed(
                 f"Successfully purchased **{item}**{quant_str}.\n"

@@ -77,6 +77,7 @@ class TradebleItem(ShopItem):
             user=message.author,
             quantity=quantity
         )
+        return "success"
 
 
 class Title(ShopItem):
@@ -101,8 +102,9 @@ class Title(ShopItem):
                 nick=f"『{role.name}』 {message.author.nick or message.author.name}"
             )
             self.debit_player(database, message.author)
+            return "success"
         except Forbidden:
-            await message.channel.send(
+            return str(
                 "**You're too OP for me to give you a role.**\n"
                 "**Please ask an admin to give you the role.**\n"
             )
@@ -146,12 +148,15 @@ class BoostItem(ShopItem):
                 __boost_handler(ctx, user)
             )
         else:
+            if ctx.boost_dict[user.id][self.itemid]["stack"] == 5:
+                return "You've maxed out to 5 stacks for this boost."
             ctx.boost_dict[user.id][self.itemid]["stack"] += quantity
         self.debit_player(
             database=database,
             user=message.author,
             quantity=quantity
         )
+        return "success"
 
 
 @dataclass
