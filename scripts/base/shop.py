@@ -28,6 +28,7 @@ class ShopItem:
     description: str
     price: int
     emoji: str = ""
+    pinned: bool = False
     # Safely ignore these kwargs while casting from Item
     category: field(default_factory=str) = "Tradable"
     asset_url: field(default_factory=str) = ""
@@ -258,14 +259,27 @@ class Shop:
         """
         Updates an existing category in the Shop.
         """
-        if len(cls.categories[category].items) >= 5:
-            # Refresh to keep only keep 5 items in Shop.
-            for _ in items:
-                cls.categories[category].items.pop()
-        for item in items:
-            if item not in cls.categories[category].items:
-                cls.categories[category].items.append(item)
-                cls.ids_dict[item.itemid] = item
+        new_items = [
+            item
+            for item in items
+            if item.name not in (
+                itm.name
+                for itm in cls.categories[category].items
+            )
+        ]
+        removables = [
+            item
+            for item in cls.categories[category].items[::-1]
+            if not item.pinned
+        ][:len(new_items)]
+        num_in_stock = len(cls.categories[category].items) - len(removables)
+        num_updatable = len(new_items) - num_in_stock
+        updates = new_items[::-1][:num_updatable][::-1]
+        for item in removables:
+            cls.categories[category].items.remove(item)
+        cls.categories[category].items = (
+            updates + cls.categories[category].items
+        )
 
     @classmethod
     def refresh_tradables(cls, database: DBConnector):
@@ -276,7 +290,8 @@ class Shop:
             TradebleItem(
                 item["itemid"], item["name"],
                 item["description"], item["price"],
-                item["emoji"]
+                item["emoji"],
+                pinned="permanent" in item["description"].lower()
             )
             for item in database.get_tradables(limit=5)
         ]

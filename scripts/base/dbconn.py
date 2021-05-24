@@ -970,7 +970,11 @@ class DBConnector:
             SELECT * FROM items
             WHERE category IS "Tradable"
             GROUP BY name
-            ORDER BY itemid DESC
+            ORDER BY
+                CASE
+                    WHEN description LIKE '%Permanent%' THEN 0
+                    ELSE 1
+                END, itemid DESC
             LIMIT ?;
             ''',
             (limit,)
