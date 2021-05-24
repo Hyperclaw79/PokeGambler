@@ -551,7 +551,7 @@ class DBConnector:
                 }
                 cmds.append(cmd)
             return cmds
-        return None
+        return []
 
 # Profile
 
@@ -604,7 +604,7 @@ class DBConnector:
                 dict(zip(names, res))
                 for res in results
             ]
-        return None
+        return []
 
     def get_leaderboard(self, sort_by: str = "num_wins") -> List:
         """
@@ -640,7 +640,7 @@ class DBConnector:
                 }
                 profiles.append(profile)
             return profiles
-        return None
+        return []
 
     def get_rank(self, user_id: str) -> int:
         """
@@ -746,7 +746,7 @@ class DBConnector:
                 }
                 blks.append(blk)
             return blks
-        return None
+        return []
 
     def is_blacklisted(self, user_id: str) -> bool:
         """
@@ -808,7 +808,7 @@ class DBConnector:
         res = self.cursor.fetchall()
         if res:
             return res
-        return None
+        return []
 
     def get_flips_lb(self) -> List[Union[str, int]]:
         """
@@ -989,7 +989,7 @@ class DBConnector:
                 dict(zip(names, res))
                 for res in results
             ]
-        return None
+        return []
 
     def get_collectibles(self, limit: int = 10) -> List:
         """
@@ -1016,7 +1016,7 @@ class DBConnector:
                 dict(zip(names, res))
                 for res in results
             ]
-        return None
+        return []
 
     def get_treasures(self, limit: int = 10) -> List:
         """
@@ -1044,7 +1044,7 @@ class DBConnector:
                 dict(zip(names, res))
                 for res in results
             ]
-        return None
+        return []
 
 # Inventory
 

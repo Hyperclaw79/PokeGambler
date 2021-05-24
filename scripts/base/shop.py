@@ -190,7 +190,7 @@ class Shop:
                 Title(
                     "title_cnm",
                     "Commoner No More",
-                    "You're wealthier than the causals.",
+                    "You're wealthier than the casuals.",
                     20_000
                 ),
                 Title(
@@ -208,7 +208,8 @@ class Shop:
                 Title(
                     "title_insane",
                     "Insane",
-                    "Dude what the hell?! That's too much chips for a lifetime.",
+                    "Dude what the hell?! That's way more than enough chips"
+                    " for a lifetime.",
                     1_000_000
                 )
             ]
