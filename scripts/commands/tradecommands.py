@@ -234,7 +234,8 @@ class TradeCommands(Commands):
             ```~
         """
         categories = Shop.categories
-        if args and args[0].title() not in categories:
+        alias = Shop.alias_map
+        if args and args[0].title() not in alias:
             cat_str = "\n".join(categories)
             await message.channel.send(
                 embed=get_embed(
@@ -261,7 +262,7 @@ class TradeCommands(Commands):
                     inline=False
                 )
         else:
-            catog = categories[args[0].title()]
+            catog = categories[Shop.alias_map[args[0].title()]]
             if args[0].title() == "Tradables":
                 Shop.refresh_tradables(self.database)
             if len(catog.items) < 1:

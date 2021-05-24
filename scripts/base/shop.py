@@ -262,6 +262,16 @@ class Shop:
             []
         )
     }
+    alias_map: Dict[str, str] = {
+        "Title": "Titles",
+        "Titles": "Titles",
+        "Boost": "Boosts",
+        "Boosts": "Boosts",
+        "Trade": "Tradables",
+        "Trades": "Tradables",
+        "Tradable": "Tradables",
+        "Tradables": "Tradables"
+    }
 
     ids_dict: Dict[str, ShopItem] = {}
     for catog in categories.values():
