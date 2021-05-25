@@ -203,8 +203,9 @@ class TradeCommands(Commands):
                 )
             )
         base = await message.channel.send(embed=embeds[0])
-        pager = Paginator(message, base, embeds, self.ctx)
-        await pager.run()
+        if len(embeds) > 1:
+            pager = Paginator(message, base, embeds, self.ctx)
+            await pager.run()
 
     @no_thumb
     async def cmd_shop(self, message, args=None, **kwargs):
