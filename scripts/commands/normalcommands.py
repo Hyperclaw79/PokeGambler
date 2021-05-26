@@ -372,3 +372,20 @@ class NormalCommands(Commands):
             "840469669332516904/843077048435736586/banner.jpg"
         )
         await message.channel.send(embed=emb)
+
+    @alias('latency')
+    async def cmd_ping(self, message, **kwargs):
+        """PokeGambler Latency
+        $```scss
+        {command_prefix}ping
+        ```$
+
+        @Check the current latency of PokeGambler.@
+        """
+        ping = round(self.ctx.latency * 1000, 2)
+        await message.channel.send(
+            embed=get_embed(
+                f"**{ping}** ms",
+                title="Current Latency"
+            )
+        )
