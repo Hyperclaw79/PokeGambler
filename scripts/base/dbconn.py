@@ -309,7 +309,8 @@ class DBConnector:
                 emoji TEXT NOT NULL,
                 buyable BOOLEAN DEFAULT 'True' NOT NULL,
                 sellable BOOLEAN DEFAULT 'True' NOT NULL,
-                price INT NULL
+                price INT NULL,
+                premium BOOLEAN DEFAULT 'False' NOT NULL
             );
             '''
         )
@@ -959,7 +960,10 @@ class DBConnector:
         )
         self.conn.commit()
 
-    def get_tradables(self, limit: int = 10) -> List:
+    def get_tradables(
+        self, limit: int = 10,
+        premium:bool = False
+    ) -> List:
         """
         SQL endpoint for getting a list of Tradables.
         Useful for displaying them in a shop.
@@ -969,6 +973,7 @@ class DBConnector:
             '''
             SELECT * FROM items
             WHERE category IS "Tradable"
+                AND premium IS ?
             GROUP BY name
             ORDER BY
                 CASE
@@ -977,7 +982,7 @@ class DBConnector:
                 END, itemid DESC
             LIMIT ?;
             ''',
-            (limit,)
+            (premium, limit)
         )
         results = self.cursor.fetchall()
         if results:
@@ -991,7 +996,10 @@ class DBConnector:
             ]
         return []
 
-    def get_collectibles(self, limit: int = 10) -> List:
+    def get_collectibles(
+        self, limit: int = 10,
+        premium:bool = False
+    ) -> List:
         """
         SQL endpoint for getting a list of Collectibles.
         Useful for trading with other players.
@@ -1001,10 +1009,11 @@ class DBConnector:
             '''
             SELECT * FROM items
             WHERE category IS "Collectible"
+                AND premium is ?
             GROUP BY name
             LIMIT ?;
             ''',
-            (limit,)
+            (premium, limit)
         )
         results = self.cursor.fetchall()
         if results:
@@ -1018,7 +1027,10 @@ class DBConnector:
             ]
         return []
 
-    def get_treasures(self, limit: int = 10) -> List:
+    def get_treasures(
+        self, limit: int = 10,
+        premium:bool = False
+    ) -> List:
         """
         SQL endpoint for getting a list of Treasures.
         Useful for flexing in the inventory.
@@ -1028,11 +1040,43 @@ class DBConnector:
             '''
             SELECT * FROM items
             WHERE category IS "Treasure"
+                AND premium is ?
             GROUP BY name
             ORDER BY itemid DESC
             LIMIT ?;
             ''',
-            (limit,)
+            (premium, limit)
+        )
+        results = self.cursor.fetchall()
+        if results:
+            names = [
+                col[0]
+                for col in self.cursor.description
+            ]
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
+        return []
+
+    def get_consumables(
+        self, limit: int = 10,
+        premium:bool = False
+    ) -> List:
+        """
+        SQL endpoint for getting a list of Consumables.
+        A limit can be provided, defaults to 10.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM items
+            WHERE category IS "Consumable"
+                AND premium is ?
+            GROUP BY name
+            ORDER BY itemid DESC
+            LIMIT ?;
+            ''',
+            (premium, limit)
         )
         results = self.cursor.fetchall()
         if results:

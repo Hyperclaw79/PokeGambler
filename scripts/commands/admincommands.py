@@ -5,8 +5,10 @@ Administration Commands
 # pylint: disable=unused-argument
 
 import asyncio
+from dataclasses import MISSING, fields
 import os
 import json
+from typing import Dict, Type
 
 import discord
 from ..helpers.checks import user_check
@@ -15,7 +17,7 @@ from ..helpers.utils import (
     is_admin, is_owner, wait_for
 )
 from ..base.models import Blacklist, Inventory, Profile
-from ..base.items import Item
+from ..base.items import Item, Tradable
 from .basecommand import (
     Commands, admin_only, alias,
     ensure_user, get_profile, ensure_item
@@ -27,6 +29,27 @@ class AdminCommands(Commands):
     Commands that deal with the moderation tasks.
     Only Admins and Owners will have access to these.
     """
+
+    @staticmethod
+    def __item_factory(category: Type[Item], name: str, **kwargs) -> Item:
+        cls_name = ''.join(
+            word.title()
+            for word in name.split(' ')
+        )
+        item_cls = type(cls_name, (category, ), kwargs)
+        return item_cls(**kwargs)
+
+    def __populate_categories(
+        self, catog: Type[Item],
+        categories: Dict, curr_recc: int
+    ):
+        if curr_recc > 3:
+            return
+        for subcatog in catog.__subclasses__():
+            if subcatog.__name__ != 'Chest':
+                categories[subcatog.__name__] = subcatog
+                curr_recc += 1
+                self.__populate_categories(subcatog, categories, curr_recc)
 
     @admin_only
     @ensure_user
@@ -419,21 +442,8 @@ class AdminCommands(Commands):
 
         # pylint: disable=no-member
 
-        def item_factory(category: str, name: str, **kwargs) -> Item:
-            def get_category(category):
-                return [
-                    catog
-                    for catog in Item.__subclasses__()
-                    if catog.__name__ == category.title()
-                ][0]
-            cls_name = ''.join(
-                word.title()
-                for word in name.split(' ')
-            )
-            catog_cls = get_category(category)
-            item_cls = type(cls_name, (catog_cls, ), kwargs)
-            return item_cls(**kwargs)
-        categories = ["Tradable", "Collectible", "Treasure"]
+        categories = {}
+        self.__populate_categories(Item, categories, curr_recc=0)
         inp_msg = await message.channel.send(
             embed=get_enum_embed(
                 categories,
@@ -446,7 +456,7 @@ class AdminCommands(Commands):
             timeout="inf"
         )
         if reply.content.isdigit():
-            category = categories[int(reply.content) - 1]
+            category = list(categories.keys())[int(reply.content) - 1]
         elif reply.content.title() in categories:
             category = reply.content.title()
         else:
@@ -459,10 +469,19 @@ class AdminCommands(Commands):
             )
             return
         details = {}
-        for col in [
-            "name", "description",
-            "asset_url", "emoji"
-        ]:
+        catogclass = categories[category]
+        labels = {"name": "str"}
+        labels.update({
+            field.name: field.type
+            for field in fields(catogclass)
+            if all([
+                field.default is MISSING,
+                field.name != 'category'
+            ])
+        })
+        if issubclass(catogclass, Tradable):
+            labels.update({"price": "int"})
+        for col, dtype in labels.items():
             inp_msg = await message.channel.send(
                 embed=get_embed(
                     f"Please enter a value for `{col}`:\n>_",
@@ -474,33 +493,22 @@ class AdminCommands(Commands):
                 check=lambda msg: user_check(msg, message),
                 timeout="inf"
             )
-            details[col] = reply.content
-            await inp_msg.delete()
-        if category == "Tradable":
-            inp_msg = await message.channel.send(
-                embed=get_embed(
-                    f"Please enter a price for `{details['name']}`:\n>_",
-                    title="Input"
-                )
-            )
-            reply = await wait_for(
-                message.channel, self.ctx, init_msg=inp_msg,
-                check=lambda msg: user_check(msg, message),
-                timeout="inf"
-            )
-            if not reply.content.isdigit():
-                await message.channel.send(
-                    embed=get_embed(
-                        "Price must be an integer.",
-                        embed_type="error",
-                        title="Invalid Price"
+            if dtype == 'int':
+                if not reply.content.isdigit():
+                    await message.channel.send(
+                        embed=get_embed(
+                            f"{col.title()} must be an integer.",
+                            embed_type="error",
+                            title=f"Invalid {col.title()}"
+                        )
                     )
-                )
-                return
-            details["price"] = int(reply.content)
+                    return
+                details[col] = int(reply.content)
+            else:
+                details[col] = reply.content
             await inp_msg.delete()
-        item = item_factory(
-            category=category, **details
+        item = self.__item_factory(
+            category=catogclass, **details
         )
         item.save(self.database)
         await reply.add_reaction("👍")

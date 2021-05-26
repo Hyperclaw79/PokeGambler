@@ -3,6 +3,7 @@ This module contains all the items in the Pokegambler world.
 """
 
 # pylint: disable=no-member, unused-argument
+# pylint: disable=too-many-instance-attributes
 
 from __future__ import annotations
 
@@ -36,12 +37,13 @@ class Item(ABC):
     buyable: bool = True
     sellable: bool = True
     price: Optional[int] = None
+    premium: bool = False
 
     def __iter__(self) -> Tuple:
         for attr in (
             "name", "description", "category",
             "asset_url", "emoji", "buyable",
-            "sellable", "price"
+            "sellable", "price", "premium"
         ):
             yield (attr, getattr(self, attr))
 
@@ -126,15 +128,17 @@ class Item(ABC):
     @classmethod
     def _new_item(cls, item) -> Item:
         category = cls.get_category(item)
+        item.pop('category', None)
+        itemid = item.pop('itemid', None)
         new_item = type(
             "".join(
                 word.title()
-                for word in item["name"].split(" ")
+                for word in item.pop("name").split(" ")
             ),
             (category, ),
             item
         )(**item)
-        new_item.itemid = f'{item["itemid"]:0>8X}'
+        new_item.itemid = f'{itemid:0>8X}'
         return new_item
 
     @classmethod
@@ -163,6 +167,22 @@ class Item(ABC):
         Resolves category to handle chests differently.
         Returns the base Category of the Item.
         """
+        def catog_crawl(cls, catog_name):
+            result = set()
+            path = [cls]
+            while path:
+                parent = path.pop()
+                for child in parent.__subclasses__():
+                    if '.' not in str(child):
+                        # In a multi inheritance scenario, __subclasses__()
+                        # also returns interim-classes that don't have all the
+                        # methods. With this hack, we skip them.
+                        continue
+                    if child not in result:
+                        if child.__name__ == catog_name:
+                            result.add(child)
+                        path.append(child)
+            return result
         category = item["category"]
         if category == "Chest":
             category = Chest
@@ -173,9 +193,11 @@ class Item(ABC):
             category = [
                 catog
                 for catog in cls.__subclasses__()
-                if catog.__name__ == category.title()
+                if catog.__name__ == category
             ]
-            category = category[0]
+            if not category:
+                category = catog_crawl(cls, item["category"].title())
+            category = next(iter(category))
         return category
 
     @classmethod
@@ -196,64 +218,73 @@ class Item(ABC):
         return method(limit)
 
 
+@dataclass
 class Treasure(Item):
     """
     Any non-buyable [Item] is considered a Treasure.
     It is unique to the user and cannot be sold either.
     """
-    def __init__(
-        self, description: str,
-        asset_url: str, emoji: str,
-        **kwargs
-    ):
+    def __init__(self, **kwargs):
         super().__init__(
-            description=description,
-            category="Treasure",
-            asset_url=asset_url,
-            emoji=emoji
+            category=kwargs.pop(
+                "category",
+                "Treasure"
+            ),
+            **kwargs
         )
         self.buyable: bool = False
         self.sellable: bool = False
 
 
+@dataclass
 class Tradable(Item):
     """
     Any sellable [Item] is a Tradeable.
     It should have a fixed base price.
     Tradables can be bought.
     """
-    def __init__(
-        self, description: str,
-        asset_url: str, emoji: str,
-        price: int,
-        **kwargs
-    ):
+    def __init__(self, **kwargs):
         super().__init__(
-            description=description,
-            category="Tradable",
-            asset_url=asset_url,
-            emoji=emoji
+            category=kwargs.pop(
+                "category",
+                "Tradable"
+            ),
+            **kwargs
         )
-        self.price: int = price
+        self.price: int = kwargs['price']
 
 
+@dataclass
 class Collectible(Item):
     """
     Collectibles are sellable variants of [Treasure].
     They cannot be bought off the market but can be traded among users.
     """
-    def __init__(
-        self, description: str,
-        asset_url: str, emoji: str,
-        **kwargs
-    ):
+    def __init__(self, **kwargs):
         super().__init__(
-            description=description,
-            category="Collectible",
-            asset_url=asset_url,
-            emoji=emoji
+            category=kwargs.pop(
+                "category",
+                "Collectible"
+            ),
+            **kwargs
         )
         self.buyable: bool = False
+
+
+@dataclass
+class Consumable(Tradable):
+    """
+    Consumables can be bought from the shop but cannot be sold back.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(
+            category=kwargs.pop(
+                "category",
+                "Consumable"
+            ),
+            **kwargs
+        )
+        self.sellable: bool = False
 
 #endregion
 

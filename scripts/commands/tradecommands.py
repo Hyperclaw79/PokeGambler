@@ -28,6 +28,41 @@ class TradeCommands(Commands):
     Shop related commands fall under this category as well.
     """
 
+    def __get_shop_page(self, args, categories):
+        catog = categories[Shop.alias_map[args[0].title()]]
+        if Shop.alias_map[args[0].title()] in [
+                "Tradables", "Consumables", "Gladiators"
+            ]:
+            Shop.refresh_tradables(self.database)
+        if len(catog.items) < 1:
+            emb = get_embed(
+                    f"`{catog.name} Shop` seems to be empty right now.\n"
+                    "Please try again later.",
+                    embed_type="warning",
+                    title="No items found",
+                    thumbnail="https://raw.githubusercontent.com/twitter/"
+                    f"twemoji/master/assets/72x72/{ord(catog.emoji):x}.png"
+                )
+        else:
+            emb = get_embed(
+                    f"**To buy any item, use `{self.ctx.prefix}buy itemid`**",
+                    title=f"{catog} Shop",
+                    no_icon=True
+                )
+            for item in catog.items:
+                itemid = f"{item.itemid:0>8X}" if isinstance(
+                        item.itemid, int
+                    ) else item.itemid
+                emb.add_field(
+                        name=f"『{itemid}』 _{item}_ "
+                        f"{item.price:,} <:pokechip:840469159242760203>",
+                        value=f"```\n{item.description}\n```",
+                        inline=False
+                    )
+            # pylint: disable=undefined-loop-variable
+            emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
+        return emb
+
     @model([Loots, Profile, Chest, Inventory])
     @alias("chest")
     @no_thumb
@@ -251,6 +286,7 @@ class TradeCommands(Commands):
                 )
             )
             return
+        embeds = []
         if not args:
             emb = get_embed(
                 "**To view the items in a specific category:**\n"
@@ -258,46 +294,31 @@ class TradeCommands(Commands):
                 title="PokeGambler Shop",
                 footer="All purchases except Tradables are non-refundable."
             )
-            for catog in categories.values():
-                emb.add_field(
-                    name=str(catog),
-                    value=f"```diff\n{dedent(catog.description)}\n"
-                    "To view the items:\n"
-                    f"{self.ctx.prefix}shop {catog.name}\n```",
-                    inline=False
+            categories = dict(
+                sorted(
+                    categories.items(),
+                    key=lambda x: len(x[1].items),
+                    reverse=True
                 )
-        else:
-            catog = categories[Shop.alias_map[args[0].title()]]
-            if args[0].title() == "Tradables":
-                Shop.refresh_tradables(self.database)
-            if len(catog.items) < 1:
-                emb = get_embed(
-                    f"`{catog.name} Shop` seems to be empty right now.\n"
-                    "Please try again later.",
-                    embed_type="warning",
-                    title="No items found",
-                    thumbnail="https://raw.githubusercontent.com/twitter/"
-                    f"twemoji/master/assets/72x72/{ord(catog.emoji):x}.png"
-                )
-            else:
-                emb = get_embed(
-                    f"**To buy any item, use `{self.ctx.prefix}buy itemid`**",
-                    title=f"{catog} Shop",
-                    no_icon=True
-                )
-                for item in catog.items:
-                    itemid = f"{item.itemid:0>8X}" if isinstance(
-                        item.itemid, int
-                    ) else item.itemid
+            )
+            catogs = list(categories.values())
+            for i in range(0, len(catogs), 3):
+                for catog in catogs[i:i+3]:
                     emb.add_field(
-                        name=f"『{itemid}』 _{item}_ "
-                        f"{item.price:,} <:pokechip:840469159242760203>",
-                        value=f"```\n{item.description}\n```",
+                        name=str(catog),
+                        value=f"```diff\n{dedent(catog.description)}\n"
+                        "To view the items:\n"
+                        f"{self.ctx.prefix}shop {catog.name}\n```",
                         inline=False
                     )
-                # pylint: disable=undefined-loop-variable
-                emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
-        await message.channel.send(embed=emb)
+                embeds.append(emb)
+        else:
+            emb = self.__get_shop_page(args, categories)
+            embeds.append(emb)
+        base = await message.channel.send(embed=embeds[0])
+        if len(embeds) > 1:
+            pager = Paginator(message, base, embeds, self.ctx)
+            await pager.run()
 
     async def cmd_buy(self, message, args=None, **kwargs):
         """Buy item from Shop.
@@ -410,6 +431,16 @@ class TradeCommands(Commands):
                 )
                 return
             new_item = Item.from_id(self.database, itemid)
+            # pylint: disable=no-member
+            if not new_item.sellable:
+                await message.channel.send(
+                    embed=get_embed(
+                        "You cannot sell that Item.",
+                        embed_type="error",
+                        title="Invalid Item type"
+                    )
+                )
+                return
             deleted = inventory.delete([itemid], 1)
         except ValueError: # Item Name
             quantity = int(kwargs.get('quantity', 1))

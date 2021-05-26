@@ -36,6 +36,7 @@ class ShopItem:
     asset_url: field(default_factory=str) = ""
     buyable: field(default_factory=bool) = True
     sellable: field(default_factory=bool) = True
+    premium: field(default_factory=bool) = False
 
     def __str__(self) -> str:
         if not self.emoji:
@@ -265,6 +266,15 @@ class Shop:
             """,
             "📦",
             []
+        ),
+        "Consumables": ShopCategory(
+            "Consumables",
+            """
+            These items exists solely for your consumption.
+            They cannot be sold back to the shop.
+            """,
+            "🛒",
+            []
         )
     }
     alias_map: Dict[str, str] = {
@@ -275,7 +285,11 @@ class Shop:
         "Trade": "Tradables",
         "Trades": "Tradables",
         "Tradable": "Tradables",
-        "Tradables": "Tradables"
+        "Tradables": "Tradables",
+        "Consumable": "Consumables",
+        "Consumables": "Consumables",
+        "Consume": "Consumables",
+        "Consumes": "Consumables"
     }
 
     ids_dict: Dict[str, ShopItem] = {}
@@ -307,7 +321,7 @@ class Shop:
     @classmethod
     def update_category(
         cls, category: str,
-        *items: List[ShopItem]
+        items: List[ShopItem]
     ):
         """
         Updates an existing category in the Shop.
@@ -339,16 +353,18 @@ class Shop:
         """
         Similar to Shop.update_category, but exclusive for Tradables.
         """
-        items = [
-            TradebleItem(
-                item["itemid"], item["name"],
-                item["description"], item["price"],
-                item["emoji"],
-                pinned="permanent" in item["description"].lower()
-            )
-            for item in database.get_tradables(limit=5)
-        ]
-        cls.update_category("Tradables", *items)
+        item_types = ["Tradables", "Consumables"]
+        for item_type in item_types:
+            items = [
+                TradebleItem(
+                    item["itemid"], item["name"],
+                    item["description"], item["price"],
+                    item["emoji"],
+                    pinned="permanent" in item["description"].lower()
+                )
+                for item in getattr(database, f"get_{item_type.lower()}")(limit=5)
+            ]
+            cls.update_category(item_type, items)
 
     @classmethod
     def validate(
