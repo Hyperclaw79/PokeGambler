@@ -324,7 +324,7 @@ class GambleCommands(Commands):
                 self.conv_table[
                     x[1]["card_num"]
                 ],
-                self.suits.index(
+                -self.suits.index(
                     x[1]["suit"]
                 )
             ),
@@ -332,6 +332,8 @@ class GambleCommands(Commands):
         )
         if lower_wins:
             players = players[::-1]
+            if self.conv_table[players[0][1]['card_num']] == 0:
+                players.append(players.pop(0))
         winner = players[0][0]
         rolled = [
             dealed_deck[player]["card_img"]

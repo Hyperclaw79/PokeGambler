@@ -53,7 +53,7 @@ class CardGambler:
             card = random.choice(self.cards)
             card_num = card.split(".jpg")[0]
             suit = random.choice(self.suits)
-            while (card_num, card) in (
+            while (card_num, suit) in (
                 (card_["card_num"], card_["suit"])
                 for card_ in cards
             ):
