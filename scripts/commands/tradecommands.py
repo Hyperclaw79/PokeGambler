@@ -193,15 +193,19 @@ class TradeCommands(Commands):
             return
         embeds = []
         for i in range(0, len(ids), 10):
-            id_str = '\n'.join(ids[i:i+10])
             cnt_str = f'{i + 1} - {min(i + 11, len(ids))} / {len(ids)}'
-            embeds.append(
-                get_embed(
-                    f'**{item_name}**『{cnt_str}』\n{id_str}',
-                    title=f"{message.author.name}'s Item IDs",
-                    footer=f"Use 『{self.ctx.prefix}details itemid』for detailed view."
-                )
+            emb = get_embed(
+                f'**{item_name}**『{cnt_str}』',
+                title=f"{message.author.name}'s Item IDs",
+                footer=f"Use 『{self.ctx.prefix}details itemid』for detailed view."
             )
+            for id_ in ids[i:i+10]:
+                emb.add_field(
+                    name="\u200B",
+                    value=f"**{id_}**",
+                    inline=False
+                )
+            embeds.append(emb)
         base = await message.channel.send(embed=embeds[0])
         if len(embeds) > 1:
             pager = Paginator(message, base, embeds, self.ctx)
