@@ -14,7 +14,6 @@ from ..base.shop import Shop, TradebleItem
 from ..helpers.utils import (
     dedent, get_embed, get_formatted_time
 )
-from ..helpers.paginator import Paginator
 
 from .basecommand import (
     Commands, alias, model,
@@ -241,10 +240,7 @@ class TradeCommands(Commands):
                     inline=False
                 )
             embeds.append(emb)
-        base = await message.channel.send(embed=embeds[0])
-        if len(embeds) > 1:
-            pager = Paginator(message, base, embeds, self.ctx)
-            await pager.run()
+        await self.paginate(message, embeds)
 
     @no_thumb
     async def cmd_shop(self, message, args=None, **kwargs):
@@ -288,12 +284,6 @@ class TradeCommands(Commands):
             return
         embeds = []
         if not args:
-            emb = get_embed(
-                "**To view the items in a specific category:**\n"
-                f"**`{self.ctx.prefix}shop category`**",
-                title="PokeGambler Shop",
-                footer="All purchases except Tradables are non-refundable."
-            )
             categories = dict(
                 sorted(
                     categories.items(),
@@ -303,6 +293,12 @@ class TradeCommands(Commands):
             )
             catogs = list(categories.values())
             for i in range(0, len(catogs), 3):
+                emb = get_embed(
+                    "**To view the items in a specific category:**\n"
+                    f"**`{self.ctx.prefix}shop category`**",
+                    title="PokeGambler Shop",
+                    footer="All purchases except Tradables are non-refundable."
+                )
                 for catog in catogs[i:i+3]:
                     emb.add_field(
                         name=str(catog),
@@ -315,10 +311,7 @@ class TradeCommands(Commands):
         else:
             emb = self.__get_shop_page(args, categories)
             embeds.append(emb)
-        base = await message.channel.send(embed=embeds[0])
-        if len(embeds) > 1:
-            pager = Paginator(message, base, embeds, self.ctx)
-            await pager.run()
+        await self.paginate(message, embeds)
 
     async def cmd_buy(self, message, args=None, **kwargs):
         """Buy item from Shop.

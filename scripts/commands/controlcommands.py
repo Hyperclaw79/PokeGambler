@@ -539,9 +539,7 @@ class ControlCommands(Commands):
                 )
             )
             return
-        base = await message.channel.send(embed=embeds[0])
-        pager = Paginator(message, base, embeds, self.ctx)
-        await pager.run()
+        await self.paginate(message, embeds)
 
     @owner_only
     @no_log

@@ -20,7 +20,10 @@ from ..helpers.utils import (
     get_embed, get_enum_embed,
     img2file, wait_for
 )
-from .basecommand import Commands, alias, dealer_only, model, no_thumb
+from .basecommand import (
+    Commands, alias, dealer_only,
+    model, no_thumb
+)
 
 
 class GambleCommands(Commands):
@@ -705,3 +708,82 @@ class GambleCommands(Commands):
             ),
             file=img2file(board_img, f"{rolled}.jpg")
         )
+
+    async def cmd_matches(self, message, args=None, **kwargs):
+        """List latest gamble matches.
+        $```scss
+        {command_prefix}matches [quantity] [--verbose]
+        ```$
+
+        @Lists out the results of latest gamble matches.
+        If no quantity is given, defaults to 10.
+        If --verbose is used, lists the mode and if joker spawned.@
+
+        ~To list latest matches:
+            ```
+            {command_prefix}matches
+            ```
+        To latest 5 matches:
+            ```
+            {command_prefix}matches 5
+            ```
+        To see if Joker spawned in last 5 matches:
+            ```
+            {command_prefix}matches 5 --verbose
+            ```~
+        """
+        limit = int(args[0]) if args else 10
+        matches = self.database.get_matches(limit=limit)
+        embeds = []
+        for match in matches:
+            started_by = message.guild.get_member(
+                int(match["started_by"])
+            )
+            played_at = match["played_at"]
+            pot = match["deal_cost"] * len(match['participants'])
+            parts = "\n".join(
+                str(message.guild.get_member(plyr))
+                for plyr in match["participants"]
+            )
+            parts = f"```py\n{parts}\n```"
+            winner = message.guild.get_member(int(match["winner"]))
+            emb = get_embed(
+                f"Match started by: **{started_by}**\n"
+                f"Played on: **{played_at}**\n"
+                f"Amount in pot: **{pot}** <:pokechip:840469159242760203>",
+                title="Recent Matches"
+            )
+            emb.add_field(
+                name="Participants",
+                value=parts,
+                inline=True
+            )
+            emb.add_field(
+                name="Winner",
+                value=f"**```{winner}```**",
+                inline=True
+            )
+            emb.add_field(
+                name="\u200B",
+                value="\u200B",
+                inline=True
+            )
+            if kwargs.get("verbose", False):
+                emb.add_field(
+                    name="Mode",
+                    value=f"```py\n{match['lower_wins']}\n```",
+                    inline=True
+                )
+                emb.add_field(
+                    name="Joker Spawned",
+                    value=f"```py\n{match['by_joker']}\n```",
+                    inline=True
+                )
+                emb.add_field(
+                    name="\u200B",
+                    value="\u200B",
+                    inline=True
+                )
+            emb.set_image(url=winner.avatar_url_as(size=256))
+            embeds.append(emb)
+        await self.paginate(message, embeds)

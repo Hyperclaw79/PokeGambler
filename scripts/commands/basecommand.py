@@ -13,6 +13,7 @@ import discord
 
 from ..base.items import Item
 from ..base.models import Model, Profile
+from ..helpers.paginator import Paginator
 from ..helpers.utils import (
     get_embed, is_admin,
     is_dealer, is_owner
@@ -317,6 +318,20 @@ class Commands(ABC):
         '''
         self.enabled = False
         return self.enabled
+
+    async def paginate(self, message, embeds):
+        """
+        Convenience method for conditional pagination.
+        """
+        base = await message.channel.send(embed=embeds[0])
+        if len(embeds) > 1:
+            if not embeds[0].footer:
+                for idx, emb in enumerate(embeds):
+                    emb.set_footer(
+                        text=f"{idx + 1} / {len(embeds)}"
+                    )
+            pager = Paginator(message, base, embeds, self.ctx)
+            await pager.run()
 
 async def get_profile(database, message, user):
     """

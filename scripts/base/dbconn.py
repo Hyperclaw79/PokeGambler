@@ -793,6 +793,31 @@ class DBConnector:
             for res in self.cursor.fetchall()
         ]
 
+    def get_matches(self, limit: int = 10) -> List:
+        """
+        SQL endpoint for getting a list of Consumables.
+        A limit can be provided, defaults to 10.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM matches
+            ORDER BY played_at DESC
+            LIMIT ?;
+            ''',
+            (limit, )
+        )
+        results = self.cursor.fetchall()
+        if results:
+            names = [
+                col[0]
+                for col in self.cursor.description
+            ]
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
+        return []
+
 # Flips
 
     def get_flips(self, user_id: str, wins: bool = False) -> List:
