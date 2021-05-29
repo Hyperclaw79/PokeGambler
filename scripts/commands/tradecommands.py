@@ -340,7 +340,17 @@ class TradeCommands(Commands):
         itemid = args[0].lower()
         quantity = int(kwargs.get('quantity', 1))
         Shop.refresh_tradables(self.database)
-        item = Shop.get_item(self.database, itemid)
+        try:
+            item = Shop.get_item(self.database, itemid)
+        except (ValueError, ZeroDivisionError):
+            await message.channel.send(
+                embed=get_embed(
+                    "The provided ID seems to be of wrong format.\n",
+                    embed_type="error",
+                    title="Invalid Item ID"
+                )
+            )
+            return
         if not item:
             await message.channel.send(
                 embed=get_embed(

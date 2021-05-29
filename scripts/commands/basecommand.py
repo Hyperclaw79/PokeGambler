@@ -63,11 +63,6 @@ def admin_only(func):
         ]):
             return func(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", self.ctx.prefix)
-        self.logger.pprint(
-            f'Command {func_name} can only be used by admins.',
-            color="red",
-            wrapped_func=func.__name__
-        )
         return message.channel.send(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by admins.',
@@ -87,11 +82,6 @@ def dealer_only(func):
         if is_dealer(message.author):
             return func(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", self.ctx.prefix)
-        self.logger.pprint(
-            f'Command {func_name} can only be used by dealers.',
-            color="red",
-            wrapped_func=func.__name__
-        )
         return message.channel.send(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by dealers.',
