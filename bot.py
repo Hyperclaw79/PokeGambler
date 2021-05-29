@@ -99,7 +99,6 @@ class PokeGambler(discord.Client):
     def __get_method(self, message):
         cleaned_content = message.clean_content
         for user in message.mentions:
-            # print(fr"\s?@{user.name}", '\n', fr"\s?@{user.nick}")
             cleaned_content = cleaned_content.replace(
                 f" @{user.name}", ""
             )
