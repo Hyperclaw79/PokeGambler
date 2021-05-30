@@ -340,15 +340,15 @@ async def get_profile(database, message, user):
                     )
                 )
                 return None
-            if user.bot:
-                await message.channel.send(
-                    embed=get_embed(
-                        "Bot accounts cannot have profiles.",
-                        embed_type="error",
-                        title="Bot Account found"
-                    )
+        if user.bot:
+            await message.channel.send(
+                embed=get_embed(
+                    "Bot accounts cannot have profiles.",
+                    embed_type="error",
+                    title="Bot Account found"
                 )
-                return None
+            )
+            return None
         return Profile(database, user)
     except discord.HTTPException:
         await message.channel.send(
