@@ -396,7 +396,8 @@ class ProfileCommands(Commands):
                 f"Woah! You got lucky and found a **{chest}**.\n"
                 "It's been added to your inventory.",
                 title="**FOUND A TREASURE CHEST**",
-                thumbnail=chest.asset_url
+                thumbnail=chest.asset_url,
+                footer=f"Chest ID: {chest.itemid}"
             )
         profile.credit(loot)
         loot_model.update(earned=earned + loot)
