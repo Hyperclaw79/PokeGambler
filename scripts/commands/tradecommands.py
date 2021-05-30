@@ -284,13 +284,15 @@ class TradeCommands(Commands):
             return
         embeds = []
         if not args:
-            categories = dict(
-                sorted(
-                    categories.items(),
+            categories = {
+                key: catog
+                for key, catog in sorted(
+                    Shop.categories.items(),
                     key=lambda x: len(x[1].items),
                     reverse=True
                 )
-            )
+                if catog.items
+            }
             catogs = list(categories.values())
             for i in range(0, len(catogs), 3):
                 emb = get_embed(
