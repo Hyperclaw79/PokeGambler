@@ -275,6 +275,15 @@ class Shop:
             """,
             "🛒",
             []
+        ),
+        "Gladiators": ShopCategory(
+            "Gladiators",
+            """
+            These champions of the old have been cloned for you.
+            You can buy them to make them fight in brutal gladiator fights.
+            """,
+            "💀",
+            []
         )
     }
     alias_map: Dict[str, str] = {
@@ -289,7 +298,15 @@ class Shop:
         "Consumable": "Consumables",
         "Consumables": "Consumables",
         "Consume": "Consumables",
-        "Consumes": "Consumables"
+        "Consumes": "Consumables",
+        "Gladiator": "Gladiators",
+        "Gladiators": "Gladiators",
+        "Glad": "Gladiators",
+        "Glads": "Gladiators",
+        "Minion": "Gladiators",
+        "Minions": "Gladiators",
+        "Pet": "Gladiators",
+        "Pets": "Gladiators",
     }
 
     ids_dict: Dict[str, ShopItem] = {}
@@ -353,7 +370,7 @@ class Shop:
         """
         Similar to Shop.update_category, but exclusive for Tradables.
         """
-        item_types = ["Tradables", "Consumables"]
+        item_types = ["Tradables", "Consumables", "Gladiators"]
         for item_type in item_types:
             items = [
                 TradebleItem(

@@ -1115,6 +1115,37 @@ class DBConnector:
             ]
         return []
 
+    def get_gladiators(
+        self, limit: int = 10,
+        premium:bool = False
+    ) -> List:
+        """
+        SQL endpoint for getting a list of Gladiators.
+        A limit can be provided, defaults to 10.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM items
+            WHERE category IS "Gladiator"
+                AND premium is ?
+            GROUP BY name
+            ORDER BY itemid DESC
+            LIMIT ?;
+            ''',
+            (premium, limit)
+        )
+        results = self.cursor.fetchall()
+        if results:
+            names = [
+                col[0]
+                for col in self.cursor.description
+            ]
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
+        return []
+
 # Inventory
 
     def get_inventory_items(self, user_id: str, display_mode=False) -> List:

@@ -453,3 +453,12 @@ class LegendaryChest(Chest):
         )
 
 #endregion
+
+@dataclass
+class Gladiator(Consumable):
+    """
+    Minions that can be bought and used in Gladiator match minigames.
+    They can be considered as a [Consumable] but do not stack.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(category="Gladiator", **kwargs)
