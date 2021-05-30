@@ -158,7 +158,9 @@ class Profile(UnlockedModel):
 
     def __init__(self, database, user):
         super().__init__(database, user)
-        names = [self.user.name, self.user.nick, self.name]
+        names = [self.user.name, self.name]
+        if self.user.nick:
+            names.append(self.user.nick)
         self.name = min(
             names,
             key=lambda x: (
