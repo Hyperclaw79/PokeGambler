@@ -158,6 +158,14 @@ class Profile(UnlockedModel):
 
     def __init__(self, database, user):
         super().__init__(database, user)
+        names = [self.user.name, self.user.nick, self.name]
+        self.name = min(
+            names,
+            key=lambda x: (
+                sum(ord(ch) for ch in x),
+                len(x)
+            )
+        )
         if all([
             "dealers" in [
                 role.name.lower()
