@@ -199,7 +199,8 @@ class GambleCommands(Commands):
                         rctn.message.id == register_msg.id,
                         rctn.emoji == "➕",
                         usr.id != self.ctx.user.id,
-                        usr not in self.registered
+                        usr not in self.registered,
+                        not usr.bot
                     ]),
                     timeout=(30 - (datetime.now() - now).total_seconds())
                 )

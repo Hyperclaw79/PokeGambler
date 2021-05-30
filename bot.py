@@ -5,7 +5,6 @@ The Main Module which serves as the brain of the code.
 import importlib
 import json
 import os
-import re
 import sys
 import traceback
 from datetime import datetime
@@ -208,7 +207,7 @@ class PokeGambler(discord.Client):
                 return
             if self.database.is_blacklisted(
                 str(message.author.id)
-            ):
+            ) or message.author.bot:
                 await message.add_reaction("🚫")
                 return
             if self.owner_mode and not is_owner(self, message.author):

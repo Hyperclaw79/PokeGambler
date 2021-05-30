@@ -154,7 +154,7 @@ class Profile(UnlockedModel):
     Wrapper for Profile based DB actions.
     """
 
-    # pylint: disable=no-member
+    # pylint: disable=no-member, access-member-before-definition
 
     def __init__(self, database, user):
         super().__init__(database, user)
