@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Dict, List, Union
 
 from discord import Member, Message
-from discord.errors import Forbidden
+from discord.errors import Forbidden, HTTPException
 
 from ..base.items import Item
 from ..base.models import Inventory, Profile
@@ -99,9 +99,16 @@ class Title(ShopItem):
         role = roles[0]
         try:
             await message.author.add_roles(role)
-            await message.author.edit(
-                nick=f"『{role.name}』 {message.author.nick or message.author.name}"
-            )
+            new_nick = message.author.nick or message.author.name
+            for title in Shop.categories["Titles"].items:
+                if title.name in new_nick:
+                    new_nick = new_nick.replace(f"『{title.name}』", '')
+            try:
+                await message.author.edit(
+                    nick=f"『{role.name}』{new_nick}"
+                )
+            except HTTPException:
+                pass
             self.debit_player(database, message.author)
             return "success"
         except Forbidden:

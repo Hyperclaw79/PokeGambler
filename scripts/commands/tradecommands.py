@@ -9,7 +9,7 @@ from datetime import datetime
 
 from ..base.items import Item, Chest
 from ..base.models import Inventory, Loots, Profile
-from ..base.shop import Shop, TradebleItem
+from ..base.shop import Shop, Title, TradebleItem
 
 from ..helpers.utils import (
     dedent, get_embed, get_formatted_time
@@ -397,7 +397,13 @@ class TradeCommands(Commands):
                 f"Successfully purchased **{item}**{quant_str}.\n"
                 "Your account has been debited: "
                 f"**{item.price * quantity}** <:pokechip:840469159242760203>",
-                title="Success"
+                title="Success",
+                footer=(
+                    "Your nickname might've not changed if it's too long.\n"
+                    "But the role has been assigned succesfully."
+                    if isinstance(item, Title)
+                    else None
+                )
             )
         )
 
