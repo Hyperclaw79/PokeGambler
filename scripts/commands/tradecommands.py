@@ -16,8 +16,8 @@ from ..helpers.utils import (
 )
 
 from .basecommand import (
-    Commands, alias, model,
-    ensure_item, no_thumb
+    Commands, alias, dealer_only,
+    model, ensure_item, no_thumb
 )
 
 
@@ -401,6 +401,7 @@ class TradeCommands(Commands):
             )
         )
 
+    @model([Profile, Item])
     async def cmd_sell(self, message, args=None, **kwargs):
         """Sells item from inventory.
         $```scss
@@ -513,3 +514,97 @@ class TradeCommands(Commands):
                 inline=False
             )
         await message.channel.send(embed=emb)
+
+    @dealer_only
+    @model(Profile)
+    @alias(["transfer", "pay"])
+    async def cmd_give(
+        self, message, args=None,
+        mentions=None, **kwargs
+    ):
+        """Transfer credits.
+        $```scss
+        {command_prefix}give quantity @mention
+        ```$
+
+        @`🎲 Dealer Command`
+        Transfer some of your own <:pokechip:840469159242760203> to another user.
+        If you're being generous, we respect you.
+        But if found abusing it, you will be blacklisted.@
+
+        ~To give user ABCD#1234 500 chips:
+            ```
+            {command_prefix}give @ABCD#1234 500
+            ```~
+        """
+        if not mentions:
+            await message.channel.send(
+                embed=get_embed(
+                    "Please mention whom you want to give it to.",
+                    embed_type="error",
+                    title="No user mentioned."
+                )
+            )
+            return
+        if not args or (
+            args and (
+                not args[0].isdigit()
+                or int(args[0]) <= 0
+            )
+        ):
+            await message.channel.send(
+                embed=get_embed(
+                    "You need to provide a valid amount.",
+                    embed_type="error",
+                    title="Invalid Amount."
+                )
+            )
+            return
+        if message.author.id == mentions[0].id:
+            await message.channel.send(
+                embed=get_embed(
+                    "Nice try mate, but it wouldn't have made a difference.",
+                    embed_type="error",
+                    title="Invalid User."
+                )
+            )
+            return
+        if mentions[0].bot:
+            await message.channel.send(
+                embed=get_embed(
+                    "We don't allow shady deals with bots.",
+                    embed_type="error",
+                    title="Bot account found."
+                )
+            )
+            return
+        if self.database.is_blacklisted(str(mentions[0].id)):
+            await message.channel.send(
+                embed=get_embed(
+                    "That user is blacklisted and cannot receive any chips.",
+                    embed_type="error",
+                    title="Blacklisted User."
+                )
+            )
+            return
+        author_prof = Profile(self.database, message.author)
+        mention_prof = Profile(self.database, mentions[0])
+        amount = int(args[0])
+        if author_prof.get()["balance"] < amount:
+            await message.channel.send(
+                embed=get_embed(
+                    "You don't have enough <:pokechip:840469159242760203>.",
+                    embed_type="error",
+                    title="Low Balance"
+                )
+            )
+            return
+        author_prof.debit(amount)
+        mention_prof.credit(amount)
+        await message.channel.send(
+            embed=get_embed(
+                f"Amount transferred: **{amount}** <:pokechip:840469159242760203>"
+                f"\nRecipient: **{mentions[0]}**",
+                title="Transaction Successful"
+            )
+        )
