@@ -15,7 +15,7 @@ from ..helpers.utils import (
     get_embed, get_enum_embed, get_modules
 )
 from .basecommand import (
-    owner_only, maintenance, no_log, alias,
+    owner_only, no_log, alias,
     Commands
 )
 
@@ -26,7 +26,6 @@ class ControlCommands(Commands):
     Examples: Togglers, Command Lister, Restart, Channel
     '''
     @owner_only
-    @maintenance
     @no_log
     async def cmd_restart(self, **kwargs):
         """Closes session and spawns a new process.
@@ -39,8 +38,11 @@ class ControlCommands(Commands):
         """
         await self.ctx.sess.close()
         await self.ctx.close()
-        # Need to implement a way to kill the current process first.
-        subprocess.run("python launcher.py", check=True)
+        subprocess.run(
+            "systemctl --user restart pokegambler",
+            shell=True,
+            check=True
+        )
 
     @owner_only
     @no_log
