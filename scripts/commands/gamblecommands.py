@@ -282,9 +282,9 @@ class GambleCommands(Commands):
         )
         bal += incr
         num_wins += 1
-        if num_wins in [10, 100]:
+        if num_wins in [25, 100]:
             loot_table = Loots(self.database, winner)
-            if num_wins == 10:
+            if num_wins == 25:
                 loot_table.update(tier=2)
             else:
                 loot_table.update(tier=3)
