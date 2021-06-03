@@ -651,11 +651,11 @@ class DBConnector:
             '''
             SELECT RowNum FROM (
                 SELECT user_id, ROW_NUMBER () OVER (
-                        ORDER BY CAST(
+                        ORDER BY num_wins DESC, CAST(
                             num_wins AS FLOAT
                         ) / CAST(
                             num_matches AS FLOAT
-                        ) DESC, num_wins DESC
+                        ) DESC
                     ) RowNum
                 FROM profile
                 WHERE num_matches > 0
