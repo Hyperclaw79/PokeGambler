@@ -8,7 +8,7 @@ import os
 from abc import ABC, abstractmethod
 from io import BytesIO
 import random
-from typing import Tuple
+from typing import Dict, List, Optional, Tuple
 
 from PIL import (
     Image, ImageDraw,
@@ -33,7 +33,7 @@ class AssetGenerator(ABC):
         """
 
     @staticmethod
-    def get_font(font, txt, bbox):
+    def get_font(font, txt: str, bbox: List) -> ImageFont:
         """
         Shrinks the font size until the text fits in bbox.
         """
@@ -45,8 +45,8 @@ class AssetGenerator(ABC):
 
     def imprint_text(
         self, canvas,
-        txt: str, start_pos: tuple,
-        bbox: tuple, fontsize=40
+        txt: str, start_pos: Tuple,
+        bbox: Tuple, fontsize: int = 40
     ):
         """
         Pastes Center aligned, font corrected text on the canvas.
@@ -90,8 +90,9 @@ class ProfileCardGenerator(AssetGenerator):
     def get(
         self, name: str, avatar: Image,
         balance: str, num_played: str, num_won: str,
-        badges: None, blacklisted: bool = False
-    ) -> Image:
+        badges: Optional[List[Image.Image]] = None,
+        blacklisted: bool = False
+    ) -> Image.Image:
 
         # pylint: disable=too-many-locals
 
@@ -150,7 +151,7 @@ class ProfileCardGenerator(AssetGenerator):
             profilecard = self.add_bl_effect(profilecard)
         return profilecard
 
-    def add_bl_effect(self, profilecard):
+    def add_bl_effect(self, profilecard: Image.Image) -> Image.Image:
         """
         Adds a Blacklisted label on profilecard.
         Also desaturates and darkens the image.
@@ -189,7 +190,7 @@ class WalletGenerator(AssetGenerator):
             os.path.join(asset_path, "basecards", "wallet.png")
         )
 
-    def get(self, data: dict)->Image:
+    def get(self, data: Dict) -> Image.Image:
         wallet = self.wallet.copy()
         canvas = ImageDraw.Draw(wallet)
         params = [
@@ -243,7 +244,7 @@ class LeaderBoardGenerator(AssetGenerator):
         )
 
     # pylint: disable=invalid-overridden-method
-    async def get(self, ctx, data)->Image:
+    async def get(self, ctx, data: Dict) -> Image.Image:
         poslist = [
             (41, 435), (1371, 435),
             (41, 950), (1371, 950)
@@ -257,7 +258,10 @@ class LeaderBoardGenerator(AssetGenerator):
         )
         return leaderboard
 
-    async def get_rankcard(self, ctx, data: dict, heading=False) -> Image:
+    async def get_rankcard(
+        self, ctx,
+        data: Dict, heading: bool = False
+    ) -> Image.Image:
         """
         Generates a Rank Card for a user.
         """
@@ -283,14 +287,25 @@ class LeaderBoardGenerator(AssetGenerator):
                 "bbox": (320, 144)
             }
         }
-        base = self.rankcard.copy() if heading else self.rankcard_no_head.copy()
+        base = (
+            self.rankcard.copy()
+            if heading else self.rankcard_no_head.copy()
+        )
         canvas = ImageDraw.Draw(base)
         for key, pos in pos_dict.items():
             txt = str(data[key])
-            self.imprint_text(canvas, txt, pos["start_pos"], pos["bbox"], 60)
+            self.imprint_text(
+                canvas, txt,
+                pos["start_pos"],
+                pos["bbox"], 60
+            )
         avatar_byio = BytesIO()
-        await ctx.get_user(int(data["user_id"])).avatar_url_as(size=512).save(avatar_byio)
-        avatar = Image.open(avatar_byio).resize((402, 402)).convert('RGBA')
+        await ctx.get_user(
+            int(data["user_id"])
+        ).avatar_url_as(size=512).save(avatar_byio)
+        avatar = Image.open(avatar_byio).resize(
+            (402, 402)
+        ).convert('RGBA')
         base.paste(avatar, (131, 196), avatar)
         if any([
             int(data["rank"]) >= 4,
@@ -309,7 +324,9 @@ class LeaderBoardGenerator(AssetGenerator):
         if not heading:
             rankcard = rankcard.crop(
                 (0, 70, 1920, 725)
-            ).resize((1280, 437), Image.ANTIALIAS).convert("RGB")
+            ).resize(
+                (1280, 437), Image.ANTIALIAS
+            ).convert("RGB")
         else:
             rankcard = rankcard.resize((1280, 530), Image.ANTIALIAS)
         return rankcard
@@ -337,7 +354,7 @@ class BadgeGenerator(AssetGenerator):
             )
         )
 
-    def get(self, badges: list = None)->Image:
+    def get(self, badges: List = None) -> Image.Image:
         badgestrip = self.badgestrip.copy()
         if not badges:
             return badgestrip
@@ -383,7 +400,7 @@ class BoardGenerator(AssetGenerator):
             )
 
     @staticmethod
-    def get_valids(level: int = 0) -> list:
+    def get_valids(level: int = 0) -> List:
         """
         Returns a list of possible tile names for given difficulty level.
         """
