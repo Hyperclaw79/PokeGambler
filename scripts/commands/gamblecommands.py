@@ -606,7 +606,7 @@ class GambleCommands(Commands):
     @model([Moles, Profile])
     @alias(["mole", "whack"])
     @no_thumb
-    async def cmd_whackamole(self, message, args=None, **kwargs):
+    async def cmd_whackamole(self, message, **kwargs):
         """Find the chip minigame.
         $```scss
         {command_prefix}whackamole [--difficulty number]
