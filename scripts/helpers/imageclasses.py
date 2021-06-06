@@ -5,15 +5,17 @@ This module is a compilation of Image Generation Classes.
 # pylint: disable=arguments-differ, too-many-arguments
 
 import os
+import random
 from abc import ABC, abstractmethod
 from io import BytesIO
-import random
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 from PIL import (
     Image, ImageDraw,
-    ImageFont, ImageEnhance
+    ImageEnhance, ImageFont
 )
+from ..base.items import Gladiator
 
 
 class AssetGenerator(ABC):
@@ -437,3 +439,168 @@ class BoardGenerator(AssetGenerator):
         num = pos[1] + 1
         rolled = f"{letter}{num}"
         return (rolled, board_img)
+
+
+class GladitorMatchHandler(AssetGenerator):
+    """
+    Gladiator Match handler class
+    """
+    def __init__(self, asset_path: str="assets"):
+        super().__init__(asset_path)
+        self.font = ImageFont.truetype(
+            os.path.join(asset_path, "Exo-ExtraBold.ttf"),
+            140
+        )
+        self.arena = Image.open(
+            os.path.join(asset_path, "duel", "arena.jpg")
+        )
+        self.bloods = [
+            Image.open(
+                os.path.join(asset_path, 'duel', 'bloods', fname)
+            ).convert('RGBA')
+            for fname in os.listdir(
+                os.path.join(asset_path, 'duel', 'bloods')
+            )
+        ]
+        self.glad_x_offset = 270
+        self.hp_bar = Image.open(
+            os.path.join(asset_path, "duel", "hp_bar.png")
+        )
+        self.color_bars = [
+            Image.new(
+                'RGBA',
+                (134, 728),
+                color=(254, 0, 0, 255)   # RED_BAR
+            ),
+            Image.new(
+                'RGBA',
+                (134, 728),
+                color=(254, 240, 0, 255)   # YELLOW_BAR
+            ),
+            Image.new(
+                'RGBA',
+                (134, 728),
+                color=(60, 254, 0, 255)   # GREEN_BAR
+            )
+        ]
+
+    @staticmethod
+    def __get_damage():
+        """
+        Returns a random amount of damage.
+        """
+        return int(
+            np.clip(
+                random.gauss(50, 100), 25, 300
+            )
+        )
+
+    def __get_blood(self, damage: int) -> Image.Image:
+        """
+        Returns corresponding blood image for the damage done.
+        """
+        return self.bloods[int(damage / 50)]
+
+    def __add_blood(
+        self, gladiator_sprite: Image.Image,
+        damage: int
+    ):
+        """
+        Applies bleeding effect to Gladiator sprite.
+        """
+        blood = self.__get_blood(damage=damage)
+        bld_w, bld_h = blood.size
+        bbox = gladiator_sprite.getbbox()
+        glad_w = bbox[2] - bbox[0]
+        glad_h = bbox[3] - bbox[1]
+        pos = (
+                random.randint(self.glad_x_offset, glad_w - bld_w),
+                random.randint(0, glad_h - bld_h)
+            )
+        gladiator_sprite.paste(blood, pos, blood)
+
+    def __update_hitpoints(self, gladiator: Image.Image, hitpoints: int):
+        """
+        Update the HP Bar of the gladiator sprite.
+        """
+        bar_ht = int((728 / 300) * hitpoints)
+        final_glad = gladiator
+        if bar_ht > 0:
+            clrbar = self.color_bars[int((hitpoints / 300) * 3)].resize(
+                    (134, bar_ht)
+                )
+            final_glad = gladiator.copy()
+            final_glad.paste(clrbar, (833, 187 + (728 - bar_ht)), clrbar)
+        return final_glad
+
+    def __prepare_arena(self, players: List[str]) -> Image.Image:
+        """
+        Sets up the initial arena.
+        """
+        canvas = self.arena.copy()
+        board = ImageDraw.Draw(canvas)
+        gn_pad1, gn_pad2 = [
+            int((1000 - self.font.getsize(plyr)[0]) / 2)
+            for plyr in players
+        ]
+        board.text(
+            (500 + gn_pad1, 463),
+            players[0],
+            font=self.font,
+            fill=(255, 255, 255)
+        )
+        board.text(
+            (2340 + gn_pad2, 463),
+            players[1],
+            font=self.font,
+            fill=(255, 255, 255)
+        )
+        return canvas
+
+    def fight(self, gladiator: Gladiator) -> Tuple[Image.Image, int]:
+        """
+        Makes the provider gladiator take damage and returns
+        a tuple of damaged gladiator image and remaining hitpoint.
+        """
+        fresh = True
+        if fresh:
+            fresh = False
+            glad = gladiator.image
+            glad.paste(self.hp_bar, (0, 0), self.hp_bar)
+            hitpoints = 300
+            fresh_glad = glad.copy()
+            green_bar = self.color_bars[-1]
+            fresh_glad.paste(green_bar, (833, 187), green_bar)
+            yield fresh_glad, 300
+        while hitpoints >= 0:
+            dmg = self.__get_damage()
+            hitpoints -= dmg
+            self.__add_blood(glad, dmg)
+            final_glad = self.__update_hitpoints(glad, hitpoints)
+            yield final_glad, hitpoints
+
+    def get(
+        self, gladiators: List[Gladiator]
+    ) -> Tuple[Image.Image, int, int]:
+        """
+        Handles a duel match between Gladiators.
+        Returns a tuple containing an image, and damages dealt by each gladiator
+        - one per match stage.
+        """
+        canvas = self.__prepare_arena([
+            glad.owner.name
+            for glad in gladiators
+        ])
+        old_hp1 = old_hp2 = 300
+        for (glad1, hp1), (glad2, hp2) in zip(
+            self.fight(gladiators[0]), self.fight(gladiators[1])
+        ):
+            canvas.paste(glad1, (500, 675), glad1)
+            canvas.paste(glad2, (2340, 675), glad2)
+            dmg1 = old_hp2 - hp2
+            dmg2 = old_hp1 - hp1
+            old_hp1 = hp1
+            old_hp2 = hp2
+            yield canvas.copy(), dmg1, dmg2
+            if max(0, hp1) * max(0, hp2) == 0:
+                break

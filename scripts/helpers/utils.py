@@ -367,3 +367,22 @@ async def online_now(ctx: PokeGambler):
         ])
     }
     await ctx.sess.post(url=url, data=body)
+
+
+async def dm_send(
+    message: Message, user:Member,
+    content: Optional[str] = None,
+    embed: Optional[Embed] = None
+) -> Message:
+    """
+    Attempts to send message to the User's DM.
+    In case of fallback, sends in the original channel.
+    """
+    try:
+        msg = await user.send(content=content, embed=embed)
+    except discord.Forbidden:
+        msg = await message.channel.send(
+            content=f"Hey {user.mention},\n{content if content else ''}",
+            embed=embed
+        )
+    return msg

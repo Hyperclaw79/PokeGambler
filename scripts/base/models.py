@@ -189,6 +189,9 @@ class Profile(UnlockedModel):
         ]):
             self.update(is_dealer=False)
 
+    def __eq__(self, other: Profile) -> bool:
+        return self.user.id == other.user.id
+
     def _default(self):
         init_dict = {
             "user_id": str(self.user.id),
@@ -206,7 +209,7 @@ class Profile(UnlockedModel):
         for key, val in init_dict.items():
             setattr(self, key, val)
 
-    def get_badges(self):
+    def get_badges(self) -> List[str]:
         """
         Computes the Badges unlocked by the user.
         """
@@ -250,7 +253,7 @@ class Profile(UnlockedModel):
         return database.get_all_profiles(ids_only)
 
     @property
-    def full_info(self):
+    def full_info(self) -> Dict:
         """
         Wrapper for Get Full Profile DB call.
         """
@@ -386,13 +389,15 @@ class Inventory(Model):
 
     # pylint: disable=arguments-differ
     def get(
-        self, counts_only: bool = False
+        self, counts_only: bool = False,
+        category: Optional[str] = None
     ) -> Tuple[Dict[str, List], int]:
         """
         Returns a list of items in user's Inventory.
         """
         items = self.database.get_inventory_items(
-            self.user_id, counts_only
+            self.user_id, counts_only,
+            category=category
         )
         if not items:
             return ({}, 0)
@@ -538,4 +543,31 @@ class Moles(Minigame):
         self.played_by = str(user.id)
         self.cost = cost
         self.level = level
+        self.won = won
+
+
+class Duels(Minigame):
+    """
+    Wrapper for duels based DB actions
+    """
+
+    # pylint: disable=no-member
+
+    def __init__(
+        self, database: DBConnector, user: discord.Member,
+        gladiator: Optional[str] = None,
+        opponent: Optional[str] = None,
+        opponent_gladiator: Optional[str] = None,
+        won: Optional[str] = None,
+        cost: int = 50
+    ):
+        super().__init__(database, user, "duels")
+        self.played_at = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        self.played_by = str(user.id)
+        self.gladiator = gladiator
+        self.opponent = opponent
+        self.opponent_gladiator = opponent_gladiator
+        self.cost = cost
         self.won = won

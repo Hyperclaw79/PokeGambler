@@ -14,8 +14,8 @@ from PIL import Image
 
 from ..base.items import Chest
 from ..base.models import (
-    Flips, Inventory, Loots, Matches,
-    Minigame, Moles, Profile
+    Inventory, Loots, Matches,
+    Minigame, Profile
 )
 from ..helpers.imageclasses import (
     BadgeGenerator, LeaderBoardGenerator,
@@ -315,17 +315,14 @@ class ProfileCommands(Commands):
         match_stats = Matches(
             self.database, message.author
         ).get_stats()
-        flips = Flips(
-            self.database, message.author
-        )
-        moles = Moles(
-            self.database, message.author
-        )
         stat_dict = {
-            "Gamble Matches": f"Played: {match_stats[0]}\nWon: {match_stats[1]}",
-            "Flips": f"Played: {flips.num_plays}\nWon: {flips.num_wins}",
-            "Moles": f"Played: {moles.num_plays}\nWon: {moles.num_wins}"
+            "Gamble Matches": f"Played: {match_stats[0]}\n" + \
+                f"Won: {match_stats[1]}"
         }
+        for minigame_cls in Minigame.__subclasses__():
+            minigame = minigame_cls(self.database, message.author)
+            stat_dict[minigame_cls.__name__] = f"Played: {minigame.num_plays}\n" + \
+                f"Won: {minigame.num_wins}"
         emb = get_embed(
             "Here's how you've performed till now.",
             title=f"Statistics for **{message.author.name}**"

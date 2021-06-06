@@ -305,6 +305,7 @@ class TradeCommands(Commands):
             return
         embeds = []
         if not args:
+            Shop.refresh_tradables(self.database)
             categories = {
                 key: catog
                 for key, catog in sorted(

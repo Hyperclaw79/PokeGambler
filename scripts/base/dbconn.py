@@ -270,6 +270,36 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def create_duels_table(self):
+        """
+        SQL endpoint for Duels table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            duels(
+                played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                played_by TEXT,
+                gladiator TEXT,
+                opponent TEXT,
+                opponent_gladiator TEXT,
+                cost INT NOT NULL,
+                won TEXT,
+                FOREIGN KEY (played_by)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+                FOREIGN KEY (opponent)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+                FOREIGN KEY (won)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
     def create_loots_table(self):
         """
         SQL endpoint for Loots table creation.
@@ -416,6 +446,17 @@ class DBConnector:
         self.cursor.execute(
             '''
             DELETE FROM moles;
+            '''
+        )
+        self.conn.commit()
+
+    def purge_duels(self):
+        """
+        SQL endpoint for purging Duels table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM duels;
             '''
         )
         self.conn.commit()
@@ -920,6 +961,74 @@ class DBConnector:
             return []
         return res
 
+# Duels
+
+    def get_duels(self, user_id: str, wins: bool = False) -> List:
+        """
+        Gets the Duels data of a particular player.
+        """
+        query = f'''
+        SELECT * FROM duels
+        WHERE (
+            played_by IS "{user_id}"
+            OR opponent IS "{user_id}"
+        )
+        '''
+        if wins:
+            query += f' AND won IS "{user_id}"'
+        self.cursor.execute(query)
+        res = self.cursor.fetchall()
+        if res:
+            return res
+        return []
+
+    def get_duels_lb(self) -> List[Union[str, int]]:
+        """
+        Returns player_id, total_played, total_wins for Duels.
+        Sorted according to total wins.
+        """
+        self.cursor.execute(
+            """
+            WITH aggr_tbl AS (
+                SELECT
+                    played_by,
+                    cost,
+                    won
+                FROM duels
+                UNION ALL
+                SELECT
+                    dl.opponent AS played_by,
+                    cost,
+                    won
+                FROM duels dl
+            )
+            SELECT
+                played_by,
+                COUNT(*) AS total_played,
+                COUNT(
+                    CASE won
+                        WHEN played_by THEN played_by
+                        ELSE NULL
+                    END
+                ) AS total_wins,
+                SUM(
+                    CASE won
+                        WHEN played_by THEN cost
+                        ELSE NULL
+                    END
+                ) AS total_earned
+            FROM aggr_tbl
+            GROUP BY played_by
+            ORDER BY
+                total_wins DESC,
+                total_earned DESC;
+            """
+        )
+        res = self.cursor.fetchall()
+        if not res:
+            return []
+        return res
+
 # Items
 
     def save_item(self, **kwargs) -> int:
@@ -1152,14 +1261,18 @@ class DBConnector:
 
     def get_inventory_items(
         self, user_id: str,
-        display_mode: bool = False
+        display_mode: bool = False,
+        category: Optional[str] = None
     ) -> List:
         """
         SQL endpoint for getting a list of items in a user's Inventory.
         If counts_only is True, it will return a list of item names and their counts.
         """
+        where_clause = 'WHERE user_id IS ?'
+        if category:
+            where_clause += f'\nAND category IS "{category}"'
         if display_mode:
-            statement = '''SELECT
+            statement = f'''SELECT
                 items.name,
                 Count(items.name) AS count,
                 items.category,
@@ -1168,7 +1281,7 @@ class DBConnector:
             FROM inventory
             JOIN items
             USING(itemid)
-            WHERE user_id IS ?
+            {where_clause}
             GROUP BY items.name
             ORDER BY
                 CASE category
@@ -1179,12 +1292,12 @@ class DBConnector:
                 END, (count * items.price) DESC;
             '''
         else:
-            statement = '''
+            statement = f'''
             SELECT items.*
             FROM inventory
             JOIN items
             USING(itemid)
-            WHERE user_id IS ?
+            {where_clause}
             ORDER BY
                 CASE category
                     WHEN 'Teasure' THEN 1

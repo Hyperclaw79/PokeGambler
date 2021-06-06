@@ -6,22 +6,26 @@ This module contains all the items in the Pokegambler world.
 # pylint: disable=too-many-instance-attributes
 
 from __future__ import annotations
-
 import random
 import re
 from abc import ABC
 from dataclasses import dataclass
 from functools import total_ordering
 from inspect import ismethod
+from io import BytesIO
 from typing import (
     Dict, List, Optional,
-    Tuple, Type, Union
+    Tuple, Type, TYPE_CHECKING, Union
 )
 
-import discord
+from PIL import Image
 
 from ..base.dbconn import DBConnector
 from ..helpers.utils import dedent, get_embed
+
+if TYPE_CHECKING:
+    from aiohttp import ClientSession
+    from discord import Embed
 
 # region BaseClasses
 
@@ -94,7 +98,7 @@ class Item(ABC):
         return str(self)
 
     @property
-    def details(self) -> discord.Embed:
+    def details(self) -> Embed:
         """
         Returns a rich embed containing full details of an item.
         """
@@ -114,6 +118,17 @@ class Item(ABC):
                 inline=True
             )
         return emb
+
+    async def get_image(self, sess: ClientSession) -> Image.Image:
+        """
+        Downloads and returns the image of the item.
+        """
+        byio = BytesIO()
+        async with sess.get(self.asset_url) as resp:
+            data = await resp.read()
+        byio.write(data)
+        byio.seek(0)
+        return Image.open(byio)
 
     @classmethod
     def get(
@@ -468,4 +483,5 @@ class Gladiator(Consumable):
     They can be considered as a [Consumable] but do not stack.
     """
     def __init__(self, **kwargs):
+        kwargs.pop('category', None)
         super().__init__(category="Gladiator", **kwargs)
