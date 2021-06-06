@@ -4,10 +4,12 @@ Gambling Commands Module
 
 # pylint: disable=too-many-arguments, too-many-locals, unused-argument
 
+from __future__ import annotations
 import asyncio
 import math
 import random
 from datetime import datetime
+from typing import List, Optional, TYPE_CHECKING
 
 import discord
 
@@ -24,6 +26,9 @@ from .basecommand import (
     Commands, alias, dealer_only,
     model, no_thumb
 )
+
+if TYPE_CHECKING:
+    from discord import Message
 
 
 class GambleCommands(Commands):
@@ -428,7 +433,11 @@ class GambleCommands(Commands):
     @dealer_only
     @model([Profile, Matches, Loots])
     @alias(["deal", "roll"])
-    async def cmd_gamble(self, message, args=None, **kwargs):
+    async def cmd_gamble(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """The core command of the bot - Gamble.
         $```scss
         {command_prefix}gamble [50 < fee] [--lower_wins]
@@ -516,7 +525,11 @@ class GambleCommands(Commands):
 
     @model([Flips, Profile])
     @alias(["flip", "chipflip"])
-    async def cmd_quickflip(self, message, args=None, **kwargs):
+    async def cmd_quickflip(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Head/Tails flip for Pokechips.
         $```scss
         {command_prefix}quickflip [50 < amount < 9999]
@@ -606,7 +619,7 @@ class GambleCommands(Commands):
     @model([Moles, Profile])
     @alias(["mole", "whack"])
     @no_thumb
-    async def cmd_whackamole(self, message, **kwargs):
+    async def cmd_whackamole(self, message: Message, **kwargs):
         """Find the chip minigame.
         $```scss
         {command_prefix}whackamole [--difficulty number]
@@ -710,7 +723,11 @@ class GambleCommands(Commands):
             file=img2file(board_img, f"{rolled}.jpg")
         )
 
-    async def cmd_matches(self, message, args=None, **kwargs):
+    async def cmd_matches(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """List latest gamble matches.
         $```scss
         {command_prefix}matches [quantity] [--verbose]

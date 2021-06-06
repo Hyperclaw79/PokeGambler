@@ -4,9 +4,17 @@ Custom Pagination Module for Discord Embeds.
 
 # pylint: disable=inconsistent-return-statements
 
+
+from __future__ import annotations
 import asyncio
 
+from typing import List, TYPE_CHECKING
+
 import discord
+from discord import Message, Embed
+
+if TYPE_CHECKING:
+    from bot import PokeGambler
 
 
 class Paginator:
@@ -34,7 +42,10 @@ class Paginator:
 
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, message, base, embeds, ctx):
+    def __init__(
+        self, message: Message, base: Message,
+        embeds: List[Embed], ctx: PokeGambler
+    ):
         self.message = message
         self.base = base
         self.pointers = ['👈', '👉', '❌']
@@ -89,7 +100,7 @@ class Paginator:
             else:
                 pass
 
-    async def run(self, content=""):
+    async def run(self, content: str = ""):
         """
         Creates the pagination task and runs in the background.
         """

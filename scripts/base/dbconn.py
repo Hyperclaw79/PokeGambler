@@ -5,10 +5,12 @@ The Database Wrapper Module.
 # pylint: disable=too-many-public-methods, too-many-lines
 
 import sqlite3
-from typing import Dict, List, Union
+from typing import (
+    Dict, List,
+    Optional, Union
+)
 
-
-def encode_type(val):
+def encode_type(val: Union[str, int, float, bool]) -> str:
     """
     SQLize numbers and strings.
     """
@@ -19,7 +21,7 @@ def encode_type(val):
     return f'"{val}"'
 
 
-def resolve_type(val):
+def resolve_type(val: str) -> Union[str, int, float, bool]:
     """
     Resolve SQLized strings and numbers.
     """
@@ -987,7 +989,7 @@ class DBConnector:
 
     def get_tradables(
         self, limit: int = 10,
-        premium:bool = False
+        premium: bool = False
     ) -> List:
         """
         SQL endpoint for getting a list of Tradables.
@@ -1023,7 +1025,7 @@ class DBConnector:
 
     def get_collectibles(
         self, limit: int = 10,
-        premium:bool = False
+        premium: bool = False
     ) -> List:
         """
         SQL endpoint for getting a list of Collectibles.
@@ -1054,7 +1056,7 @@ class DBConnector:
 
     def get_treasures(
         self, limit: int = 10,
-        premium:bool = False
+        premium: bool = False
     ) -> List:
         """
         SQL endpoint for getting a list of Treasures.
@@ -1086,7 +1088,7 @@ class DBConnector:
 
     def get_consumables(
         self, limit: int = 10,
-        premium:bool = False
+        premium: bool = False
     ) -> List:
         """
         SQL endpoint for getting a list of Consumables.
@@ -1117,7 +1119,7 @@ class DBConnector:
 
     def get_gladiators(
         self, limit: int = 10,
-        premium:bool = False
+        premium: bool = False
     ) -> List:
         """
         SQL endpoint for getting a list of Gladiators.
@@ -1148,7 +1150,10 @@ class DBConnector:
 
 # Inventory
 
-    def get_inventory_items(self, user_id: str, display_mode=False) -> List:
+    def get_inventory_items(
+        self, user_id: str,
+        display_mode: bool = False
+    ) -> List:
         """
         SQL endpoint for getting a list of items in a user's Inventory.
         If counts_only is True, it will return a list of item names and their counts.
@@ -1253,7 +1258,7 @@ class DBConnector:
             ]
         return []
 
-    def item_in_inv(self, itemid: int, user_id: str = None) -> Dict:
+    def item_in_inv(self, itemid: int, user_id: Optional[str] = None) -> Dict:
         """
         Checks if an Item is already in the Inventory Table.
         If item exists, it is returned.
@@ -1280,7 +1285,7 @@ class DBConnector:
     def remove_from_inv(
         self, item_inp: Union[List[int], str],
         quantity: int = -1,
-        user_id: str = None
+        user_id: Optional[str] = None
     ) -> int:
         """
         SQL endpoint to delete an item from the Inventory.

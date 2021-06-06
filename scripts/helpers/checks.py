@@ -3,7 +3,16 @@ A couple of wait_for checks.
 """
 # pylint: skip-file
 
-def user_check(msg, message, chan=None):
+from typing import Optional, Union
+from discord import (
+    Message, TextChannel,
+    Member, Reaction, Emoji
+)
+
+def user_check(
+    msg: Message, message: Message,
+    chan: Optional[TextChannel] = None
+):
     """ User message check. """
     if not chan:
         chan = message.channel
@@ -16,9 +25,10 @@ def user_check(msg, message, chan=None):
 
 
 def user_rctn(
-    message, user,
-    rctn, usr,
-    chan=None, emoji=None
+    message: Message, user: Member,
+    rctn: Reaction, usr: Member,
+    chan: Optional[TextChannel] = None,
+    emoji: Optional[Union[Emoji, str]] = None
 ):
     """ User reaction check. """
     if not chan:

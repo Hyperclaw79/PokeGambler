@@ -4,8 +4,10 @@ Normal Commands Module
 
 # pylint: disable=unused-argument
 
+from __future__ import annotations
 import os
 import re
+from typing import Callable, List, Optional, TYPE_CHECKING
 
 import discord
 
@@ -16,12 +18,18 @@ from ..helpers.utils import (
 )
 from .basecommand import alias, Commands
 
+if TYPE_CHECKING:
+    from discord import Message, Member
+
 
 class NormalCommands(Commands):
     """
     Public/Normal commands for PokeGambler.
     """
-    def __generate_help_embed(self, cmd, keep_footer=False):
+    def __generate_help_embed(
+        self, cmd: Callable,
+        keep_footer: bool = False
+    ):
         got_doc = False
         meta = {}
         if cmd.__doc__:
@@ -88,7 +96,7 @@ class NormalCommands(Commands):
             )
         return emb
 
-    def __showable_command(self, cmd, user):
+    def __showable_command(self, cmd: Callable, user: Member):
         def has_access(cmd, user):
             if is_owner(self.ctx, user):
                 return True
@@ -111,7 +119,11 @@ class NormalCommands(Commands):
         ])
 
     @alias("cmds")
-    async def cmd_commands(self, message, args=None, **kwargs):
+    async def cmd_commands(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """List all usable commands for the user.
         $```scss
         {command_prefix}commands [admin/owner/dealer] [--module name]
@@ -202,7 +214,11 @@ class NormalCommands(Commands):
         await message.channel.send(embed=embed)
 
     @alias("?")
-    async def cmd_help(self, message, args=None, **kwargs):
+    async def cmd_help(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """What did you expect? This is just the Help command.
         $```scss
         {command_prefix}help [command]
@@ -274,7 +290,11 @@ class NormalCommands(Commands):
             await pager.run(content='**PokeGambler Commands List:**\n')
 
     @alias('$')
-    async def cmd_donate(self, message, args=None, **kwargs):
+    async def cmd_donate(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Feel free to buy me a cup of coffee, thanks!
         $```scss
         {command_prefix}donate [amount in USD]
@@ -300,7 +320,7 @@ class NormalCommands(Commands):
         )
 
     # pylint: disable=missing-function-docstring
-    async def cmd_invite(self, message, **kwargs):
+    async def cmd_invite(self, message: Message, **kwargs):
         await message.channel.send(
             embed=get_embed(
                 "I am a private bot and cannot be invited to other servers.\n"
@@ -310,7 +330,7 @@ class NormalCommands(Commands):
             )
         )
 
-    async def cmd_info(self, message, **kwargs):
+    async def cmd_info(self, message: Message, **kwargs):
         """Gives info about PokeGambler
         $```scss
         {command_prefix}info
@@ -374,7 +394,7 @@ class NormalCommands(Commands):
         await message.channel.send(embed=emb)
 
     @alias('latency')
-    async def cmd_ping(self, message, **kwargs):
+    async def cmd_ping(self, message: Message, **kwargs):
         """PokeGambler Latency
         $```scss
         {command_prefix}ping

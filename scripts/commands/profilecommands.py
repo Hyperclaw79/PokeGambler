@@ -4,9 +4,11 @@ Profile Commands Module
 
 # pylint: disable=unused-argument, too-many-locals
 
+from __future__ import annotations
 import random
 from datetime import datetime
 from io import BytesIO
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 from PIL import Image
 
@@ -28,6 +30,9 @@ from .basecommand import (
     model, get_profile
 )
 
+if TYPE_CHECKING:
+    from discord import Message, Member
+
 
 class ProfileCommands(Commands):
     """
@@ -41,7 +46,7 @@ class ProfileCommands(Commands):
         self.lbg = LeaderBoardGenerator(self.ctx.assets_path)
         self.bdgen = BadgeGenerator(self.ctx.assets_path)
 
-    def __get_minigame_lb(self, mg_name, user):
+    def __get_minigame_lb(self, mg_name: str, user: Member) -> List[Dict]:
         def _commands(module):
             return [
                 attr.replace("cmd_", "")
@@ -75,7 +80,11 @@ class ProfileCommands(Commands):
         return _get_lb(modules, mg_name, user)
 
     @alias("pr")
-    async def cmd_profile(self, message, args=None, **kwargs):
+    async def cmd_profile(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """The profile command.
         $```scss
         {command_prefix}profile [id/mention]
@@ -122,7 +131,7 @@ class ProfileCommands(Commands):
         await message.channel.send(file=discord_file)
 
     @alias(["bal", "chips"])
-    async def cmd_balance(self, message, **kwargs):
+    async def cmd_balance(self, message: Message, **kwargs):
         """Check balance pokechips.
         $```scss
         {command_prefix}balance
@@ -154,7 +163,11 @@ class ProfileCommands(Commands):
         )
 
     @alias("lb")
-    async def cmd_leaderboard(self, message, args=None, **kwargs):
+    async def cmd_leaderboard(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
 
         # pylint: disable=too-many-locals
 
@@ -243,7 +256,7 @@ class ProfileCommands(Commands):
             )
 
     @alias("#")
-    async def cmd_rank(self, message, **kwargs):
+    async def cmd_rank(self, message: Message, **kwargs):
         """Check user rank.
         $```scss
         {command_prefix}rank
@@ -267,7 +280,7 @@ class ProfileCommands(Commands):
         await message.channel.send(file=discord_file)
 
     @alias("bdg")
-    async def cmd_badges(self, message, **kwargs):
+    async def cmd_badges(self, message: Message, **kwargs):
         """Check Badge progress.
         $```scss
         {command_prefix}badges
@@ -286,7 +299,7 @@ class ProfileCommands(Commands):
         discord_file = img2file(badgestrip, "badges.png", ext="PNG")
         await message.channel.send(file=discord_file)
 
-    async def cmd_stats(self, message, **kwargs):
+    async def cmd_stats(self, message: Message, **kwargs):
         """Check match and minigame stats.
         $```scss
         {command_prefix}stats
@@ -327,7 +340,7 @@ class ProfileCommands(Commands):
 
     @model([Loots, Profile, Chest, Inventory])
     @alias('lt')
-    async def cmd_loot(self, message, **kwargs):
+    async def cmd_loot(self, message: Message, **kwargs):
         """Stable source of Pokechips.
         $```scss
         {command_prefix}loot
@@ -409,7 +422,7 @@ class ProfileCommands(Commands):
 
     @model([Loots, Profile, Chest])
     @alias('dl')
-    async def cmd_daily(self, message, **kwargs):
+    async def cmd_daily(self, message: Message, **kwargs):
         """Daily source of Pokechips.
         $```scss
         {command_prefix}daily

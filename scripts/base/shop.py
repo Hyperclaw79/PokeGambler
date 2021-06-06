@@ -6,11 +6,12 @@ This module is a compilation of all shop related classed.
 # pylint: disable=invalid-overridden-method, arguments-differ
 # pylint: disable=too-many-instance-attributes
 
+from __future__ import annotations
 from abc import abstractmethod
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Union
+from typing import Dict, List, TYPE_CHECKING, Type, Union
 
 from discord import Member, Message
 from discord.errors import Forbidden, HTTPException
@@ -19,6 +20,8 @@ from ..base.items import Item
 from ..base.models import Inventory, Profile
 from .dbconn import DBConnector
 
+if TYPE_CHECKING:
+    from bot import PokeGambler
 
 @dataclass
 class ShopItem:
@@ -123,7 +126,7 @@ class BoostItem(ShopItem):
     This class represents a purchasable temporary boost.
     """
     async def buy(
-        self, ctx, database: DBConnector,
+        self, ctx: PokeGambler, database: DBConnector,
         message: Message, quantity: int = 1,
         **kwargs
     ):
@@ -322,7 +325,7 @@ class Shop:
             ids_dict[item.itemid] = item
 
     @classmethod
-    def get_item(cls, database: DBConnector, itemid: str) -> ShopItem:
+    def get_item(cls: Type[Shop], database: DBConnector, itemid: str) -> ShopItem:
         """
         Returns the item registered in Shop based on itemID.
         """
@@ -336,7 +339,7 @@ class Shop:
         )
 
     @classmethod
-    def add_category(cls, category: ShopCategory):
+    def add_category(cls: Type[Shop], category: ShopCategory):
         """
         Adds a new category to the Shop.
         """
@@ -344,7 +347,7 @@ class Shop:
 
     @classmethod
     def update_category(
-        cls, category: str,
+        cls: Type[Shop], category: str,
         items: List[ShopItem]
     ):
         """
@@ -373,7 +376,7 @@ class Shop:
         )
 
     @classmethod
-    def refresh_tradables(cls, database: DBConnector):
+    def refresh_tradables(cls: Type[Shop], database: DBConnector):
         """
         Similar to Shop.update_category, but exclusive for Tradables.
         """
@@ -392,7 +395,7 @@ class Shop:
 
     @classmethod
     def validate(
-        cls, database: DBConnector,
+        cls: Type[Shop], database: DBConnector,
         user: Member, item: ShopItem
     ) -> str:
         """

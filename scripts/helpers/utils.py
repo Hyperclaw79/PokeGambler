@@ -2,13 +2,27 @@
 Compilation of Utility Functions
 """
 
+from __future__ import annotations
 import asyncio
 import random
 import re
 from io import BytesIO
-from typing import Iterable
+from typing import (
+    Callable, Dict, Iterable, List,
+    Optional, TYPE_CHECKING, Union
+)
 
 import discord
+
+
+if TYPE_CHECKING:
+    from discord import (
+        Embed, File, Message,
+        TextChannel, Member
+    )
+    from PIL.Image import Image
+    from bot import PokeGambler
+    from ..commands.basecommand import Commands # pylint: disable=cyclic-import
 
 __all__ = [
     'get_formatted_time', 'get_ascii',
@@ -62,7 +76,11 @@ def get_ascii(msg: str) -> str:
     return art
 
 
-def prettify_discord(ctx, iterable: list, mode="guild") -> str:
+def prettify_discord(
+    ctx: PokeGambler,
+    iterable: List,
+    mode: str = "guild"
+) -> str:
     """ Prettification for iterables like guilds and channels. """
     func = getattr(ctx, f"get_{mode}")
     return '\n\t'.join(
@@ -77,10 +95,13 @@ def prettify_discord(ctx, iterable: list, mode="guild") -> str:
 # pylint: disable=too-many-arguments
 def get_embed(
     content: str, embed_type: str = "info",
-    title: str = None, footer: str = None,
-    image: str = None, thumbnail: str = None,
-    color: int = None, no_icon: bool = False
-) -> discord.Embed:
+    title: Optional[str] = None,
+    footer: Optional[str] = None,
+    image: Optional[str] = None,
+    thumbnail: Optional[str] = None,
+    color: Optional[int] = None,
+    no_icon: bool = False
+) -> Embed:
     """
     Creates a Discord Embed with appropriate color, title and description.
     """
@@ -123,9 +144,11 @@ def get_embed(
 
 
 def get_enum_embed(
-    iterable: Iterable, embed_type: str = "info",
-    title: str = None, custom_ext=False
-) -> discord.Embed:
+    iterable: Iterable,
+    embed_type: str = "info",
+    title: Optional[str] = None,
+    custom_ext: bool = False
+) -> Embed:
     """ Creates a Discord Embed with prettified iterable as description. """
     enum_str = '\n'.join(
         f"{i + 1}. {name}"
@@ -205,9 +228,12 @@ def parse_command(prefix: str, msg: str) -> dict:
 
 # pylint: disable=too-many-arguments
 async def wait_for(
-    chan, ctx, event="message",
-    init_msg=None, check=None, timeout=None
-):
+    chan: TextChannel, ctx: PokeGambler,
+    event: str = "message",
+    init_msg: Optional[Message] = None,
+    check: Optional[Callable] = None,
+    timeout: Optional[Union[float, str]] = None
+) -> Message:
     """
     Modified version of discord.Client.wait_for.
     Checks the history once upon timeout.
@@ -229,7 +255,7 @@ async def wait_for(
         return reply
 
 
-def get_rand_headers():
+def get_rand_headers() -> Dict:
     """
     Generates a random header for the aiohttp session.
     """
@@ -256,7 +282,10 @@ def get_rand_headers():
     }
 
 
-def img2file(img, fname, ext="JPEG"):
+def img2file(
+    img: Image, fname: str,
+    ext: str = "JPEG"
+) -> File:
     """
     Convert a PIL Image into a discord File.
     """
@@ -266,7 +295,7 @@ def img2file(img, fname, ext="JPEG"):
     return discord.File(byio, fname)
 
 
-def is_owner(ctx, user):
+def is_owner(ctx: PokeGambler, user: Member) -> bool:
     """
     Checks if user is bot owner.
     """
@@ -276,7 +305,7 @@ def is_owner(ctx, user):
     ]
 
 
-def is_admin(user):
+def is_admin(user: Member) -> bool:
     """
     Checks if user is a server admin.
     """
@@ -287,7 +316,7 @@ def is_admin(user):
     return "admins" in roles
 
 
-def is_dealer(user):
+def is_dealer(user: Member) -> bool:
     """
     Checks if user is a PokeGambler Dealer.
     """
@@ -298,21 +327,21 @@ def is_dealer(user):
     return "dealers" in roles
 
 
-def get_modules(ctx):
+def get_modules(ctx: PokeGambler) -> List[Commands]:
     """
     Returns a list of all the commands.
     """
-    return ([
+    return [
         getattr(ctx, comtype)
         for comtype in dir(ctx)
         if all([
             comtype.endswith('commands'),
             comtype != "load_commands"
         ])
-    ])
+    ]
 
 
-def dedent(message):
+def dedent(message: str) -> str:
     """
     Strips whitespaces from the left of every line.
     """
@@ -322,7 +351,7 @@ def dedent(message):
     )
 
 
-async def online_now(ctx):
+async def online_now(ctx: PokeGambler):
     """
     Notifies on Discord, that PokeGambler is ready.
     """

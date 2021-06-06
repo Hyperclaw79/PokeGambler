@@ -4,11 +4,15 @@ This module contains a compilation of data models.
 
 # pylint: disable=too-many-instance-attributes,too-many-arguments
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from inspect import ismethod
-from typing import Dict, List, Tuple, Union
+from typing import (
+    Dict, List, Optional, Tuple,
+    Type, Union
+)
 
 import discord
 
@@ -23,7 +27,7 @@ class Model(ABC):
     """
     def __init__(
         self, database: DBConnector,
-        user: discord.User, model_name: str
+        user: discord.Member, model_name: str
     ) -> None:
         super().__init__()
         self.database = database
@@ -66,7 +70,7 @@ class UnlockedModel(Model, ABC):
 
     # pylint: disable=no-member
 
-    def __init__(self, database, user):
+    def __init__(self, database: DBConnector, user: discord.Member):
         super().__init__(database, user, self.__class__.__name__.lower())
         existing = self.database.get_existing(
             self.model_name, str(self.user.id)
@@ -108,7 +112,7 @@ class Minigame(Model, ABC):
     """
     Base class for Minigames.
     """
-    def get_plays(self, wins=False):
+    def get_plays(self, wins: bool = False):
         """
         Returns list of minigames (of specified type) played.
         """
@@ -156,7 +160,7 @@ class Profile(UnlockedModel):
 
     # pylint: disable=no-member, access-member-before-definition
 
-    def __init__(self, database, user):
+    def __init__(self, database: DBConnector, user: discord.Member):
         super().__init__(database, user)
         names = [self.user.name, self.name]
         if self.user.nick:
@@ -237,7 +241,7 @@ class Profile(UnlockedModel):
 
     @classmethod
     def get_all(
-        cls, database: DBConnector,
+        cls: Type[Profile], database: DBConnector,
         ids_only: bool = False
     ) -> List[Dict]:
         """
@@ -261,8 +265,10 @@ class CommandData(Model):
     # pylint: disable=no-member
 
     def __init__(
-        self, database, user, message,
-        command, args, kwargs
+        self, database: DBConnector,
+        user: discord.Member,
+        message: discord.Message,
+        command: str, args: List, kwargs: Dict
     ):
         super().__init__(database, user, "commands")
         self.user_id = str(user.id)
@@ -288,7 +294,9 @@ class Blacklist(Model):
     # pylint: disable=no-member
 
     def __init__(
-        self, database, user, mod, reason: str = ""
+        self, database: DBConnector,
+        user: discord.Member, mod: discord.Member,
+        reason: Optional[str] = ""
     ):
         super().__init__(database, user, "blacklists")
         self.user_id = str(user.id)
@@ -321,7 +329,8 @@ class Matches(Model):
     # pylint: disable=no-member
 
     def __init__(
-        self, database, user,
+        self, database: DBConnector,
+        user: discord.Member,
         started_by: str = "",
         participants: List[str] = None,
         winner: str = "", deal_cost: int = 50,
@@ -370,13 +379,15 @@ class Inventory(Model):
     Wrapper for Inventory based DB operations.
     """
     def __init__(
-        self, database: DBConnector, user: discord.User
+        self, database: DBConnector, user: discord.Member
     ) -> None:
         super().__init__(database, user, "inventory")
         self.user_id = str(self.user.id)
 
     # pylint: disable=arguments-differ
-    def get(self, counts_only=False) -> Tuple[Dict[str, List], int]:
+    def get(
+        self, counts_only: bool = False
+    ) -> Tuple[Dict[str, List], int]:
         """
         Returns a list of items in user's Inventory.
         """
@@ -409,7 +420,7 @@ class Inventory(Model):
             for itemid in itemids
         ]
 
-    def from_id(self, itemid) -> Item:
+    def from_id(self, itemid: int) -> Item:
         """
         Gets an item using ItemID if it exists in user's inventory.
         """
@@ -496,7 +507,7 @@ class Flips(Minigame):
     # pylint: disable=no-member
 
     def __init__(
-        self, database, user,
+        self, database: DBConnector, user: discord.Member,
         cost: int = 50, won: bool = False
     ):
         super().__init__(database, user, "flips")
@@ -516,7 +527,7 @@ class Moles(Minigame):
     # pylint: disable=no-member
 
     def __init__(
-        self, database, user,
+        self, database: DBConnector, user: discord.Member,
         cost: int = 50, level: int = 1,
         won: bool = False
     ):

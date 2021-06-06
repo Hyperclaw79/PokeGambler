@@ -4,11 +4,15 @@ Administration Commands
 
 # pylint: disable=unused-argument
 
+from __future__ import annotations
 import asyncio
 from dataclasses import MISSING, fields
 import os
 import json
-from typing import Dict, Type
+from typing import (
+    Dict, List, Optional,
+    Type, TYPE_CHECKING
+)
 
 import discord
 from ..helpers.checks import user_check
@@ -23,6 +27,8 @@ from .basecommand import (
     ensure_user, get_profile, ensure_item
 )
 
+if TYPE_CHECKING:
+    from discord import Message
 
 class AdminCommands(Commands):
     """
@@ -54,7 +60,11 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_user
     @alias("upd_bal")
-    async def cmd_update_balance(self, message, args=None, **kwargs):
+    async def cmd_update_balance(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Updates user's balance.
         $```scss
         {command_prefix}update_balance user_id balance
@@ -98,7 +108,11 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_user
     @alias("chips+")
-    async def cmd_add_chips(self, message, args=None, **kwargs):
+    async def cmd_add_chips(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Adds chips to user's balance.
         $```scss
         {command_prefix}add_chips user_id amount [--purchased]
@@ -160,7 +174,11 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_user
     @alias("usr_pr")
-    async def cmd_get_user_profile(self, message, args=None, **kwargs):
+    async def cmd_get_user_profile(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Get Complete User Profile.
         $```scss
         {command_prefix}get_user_profile user_id
@@ -187,7 +205,11 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_user
     @alias("rst_usr")
-    async def cmd_reset_user(self, message, args=None, **kwargs):
+    async def cmd_reset_user(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Completely resets a user's profile.
         $```scss
         {command_prefix}reset_user user_id
@@ -209,7 +231,11 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_user
     @alias("upd_usr")
-    async def cmd_update_user(self, message, args=None, **kwargs):
+    async def cmd_update_user(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Updates a user's profile.
         $```scss
         {command_prefix}update_user user_id --param value
@@ -250,7 +276,11 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_user
     @alias("bl")
-    async def cmd_blacklist_user(self, message, args=None, **kwargs):
+    async def cmd_blacklist_user(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Blacklists a user from using PokeGambler.
         $```scss
         {command_prefix}blacklist_user user_id [--reason text]
@@ -294,7 +324,11 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_user
     @alias("pardon")
-    async def cmd_pardon_user(self, message, args=None, **kwargs):
+    async def cmd_pardon_user(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Pardons a blacklisted user.
         $```scss
         {command_prefix}pardon_user user_id
@@ -335,7 +369,7 @@ class AdminCommands(Commands):
         await message.add_reaction("👍")
 
     @admin_only
-    async def cmd_announce(self, message, **kwargs):
+    async def cmd_announce(self, message: Message, **kwargs):
         """Send an announcement.
         $```scss
         {command_prefix}announce
@@ -367,7 +401,7 @@ class AdminCommands(Commands):
         await reply.add_reaction("👍")
 
     @admin_only
-    async def cmd_autogambler(self, message, **kwargs):
+    async def cmd_autogambler(self, message: Message, **kwargs):
         """Self-assign Gambler Role.
         $```scss
         {command_prefix}autogambler
@@ -429,7 +463,7 @@ class AdminCommands(Commands):
 
     @admin_only
     @alias("item+")
-    async def cmd_create_item(self, message, **kwargs):
+    async def cmd_create_item(self, message: Message, **kwargs):
         """Self-assign Gambler Role.
         $```scss
         {command_prefix}create_item
@@ -516,7 +550,11 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_user
     @alias("usr_itm")
-    async def cmd_give_item(self, message, args=None, **kwargs):
+    async def cmd_give_item(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Adds item to User's inventory.
         $```scss
         {command_prefix}give_item itemid
@@ -559,7 +597,11 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_item
     @alias("item_all")
-    async def cmd_distribute_item(self, message, args=None, **kwargs):
+    async def cmd_distribute_item(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Adds item to User's inventory.
         $```scss
         {command_prefix}distribute_item itemid

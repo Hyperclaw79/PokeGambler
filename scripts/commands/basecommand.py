@@ -5,9 +5,10 @@ It also has some useful decorators for the commands.
 
 # pylint: disable=unused-argument
 
+from __future__ import annotations
 from abc import ABC
 from functools import wraps
-from typing import List, Union
+from typing import Callable, List, TYPE_CHECKING, Union
 
 import discord
 
@@ -19,6 +20,11 @@ from ..helpers.utils import (
     is_dealer, is_owner
 )
 
+if TYPE_CHECKING:
+    from discord import Embed, Message, Member
+    from bot import PokeGambler
+    from ..base.dbconn import DBConnector
+
 __all__ = [
     'owner_only', 'admin_only', 'dealer_only',
     'get_chan', 'maintenance', 'no_log', 'alias',
@@ -26,7 +32,7 @@ __all__ = [
 ]
 
 
-def owner_only(func):
+def owner_only(func: Callable):
     '''
     Only the owners can access these commands.
     '''
@@ -50,7 +56,7 @@ def owner_only(func):
     return wrapped
 
 
-def admin_only(func):
+def admin_only(func: Callable):
     '''
     Only the admins can access these commands.
     '''
@@ -72,7 +78,7 @@ def admin_only(func):
     return wrapped
 
 
-def dealer_only(func):
+def dealer_only(func: Callable):
     '''
     Only the dealers can access these commands.
     '''
@@ -91,7 +97,7 @@ def dealer_only(func):
     return wrapped
 
 
-def get_chan(func):
+def get_chan(func: Callable):
     '''
     Gets the active channel if there's one present.
     Else returns the message channel.
@@ -111,7 +117,7 @@ def get_chan(func):
     return wrapped
 
 
-def maintenance(func):
+def maintenance(func: Callable):
     '''
     Disable a broken/wip function to prevent it from affecting rest of the bot.
     '''
@@ -136,7 +142,7 @@ def maintenance(func):
     return wrapped
 
 
-def no_log(func):
+def no_log(func: Callable):
     '''
     Pevents a command from being logged in the DB.
     Useful for debug related commands.
@@ -156,7 +162,7 @@ def alias(alt_names: Union[List[str], str]):
     if isinstance(alt_names, str):
         alt_names = [alt_names]
 
-    def decorator(func):
+    def decorator(func: Callable):
         func.__dict__["alias"] = alt_names
 
         @wraps(func)
@@ -179,7 +185,7 @@ def model(models: Union[List[Model], Model]):
     if isinstance(models, Model):
         models = [models]
 
-    def decorator(func):
+    def decorator(func: Callable):
         func.__dict__["models"] = models
 
         @wraps(func)
@@ -189,7 +195,7 @@ def model(models: Union[List[Model], Model]):
     return decorator
 
 
-def ensure_user(func):
+def ensure_user(func: Callable):
     '''
     Make sure user ID is given in the command.
     '''
@@ -215,7 +221,7 @@ def ensure_user(func):
     return wrapped
 
 
-def ensure_item(func):
+def ensure_item(func: Callable):
     '''
     Make sure that the Item with the given ID exists already.
     '''
@@ -256,7 +262,7 @@ def ensure_item(func):
     return wrapped
 
 
-def no_thumb(func):
+def no_thumb(func: Callable):
     '''
     Mark a command to prevent thumbnail in it's help.
     Useful for commands with Ascii tables in their docs.
@@ -274,10 +280,13 @@ class Commands(ABC):
     The Base command class which serves as the starting point for all commands.
     Can also be used to enable or disable entire categories.
     '''
-    def __init__(self, ctx, database, logger, *args, **kwargs):
+    def __init__(
+        self, ctx: PokeGambler,
+        *args, **kwargs
+    ):
         self.ctx = ctx
-        self.database = database
-        self.logger = logger
+        self.database = ctx.database
+        self.logger = ctx.logger
         self.enabled = kwargs.get('enabled', True)
         self.alias = []
         cmds = [
@@ -309,7 +318,7 @@ class Commands(ABC):
         self.enabled = False
         return self.enabled
 
-    async def paginate(self, message, embeds):
+    async def paginate(self, message: Message, embeds: List[Embed]):
         """
         Convenience method for conditional pagination.
         """
@@ -323,7 +332,10 @@ class Commands(ABC):
             pager = Paginator(message, base, embeds, self.ctx)
             await pager.run()
 
-async def get_profile(database, message, user):
+async def get_profile(
+    database: DBConnector,
+    message: Message, user: Member
+):
     """
     Retrieves the Profile for a user (creates for new users).
     If the user is not found in the guild, returns None.

@@ -4,8 +4,10 @@ Trade Commands Module
 
 # pylint: disable=unused-argument, too-many-locals
 
+from __future__ import annotations
 import asyncio
 from datetime import datetime
+from typing import List, Optional, TYPE_CHECKING
 
 from ..base.items import Item, Chest
 from ..base.models import Inventory, Loots, Profile
@@ -20,6 +22,9 @@ from .basecommand import (
     model, ensure_item, no_thumb
 )
 
+if TYPE_CHECKING:
+    from discord import Embed, Message, Member
+
 
 class TradeCommands(Commands):
     """
@@ -27,7 +32,7 @@ class TradeCommands(Commands):
     Shop related commands fall under this category as well.
     """
 
-    def __get_shop_page(self, args, categories):
+    def __get_shop_page(self, args: List, categories: List) -> Embed:
         catog = categories[Shop.alias_map[args[0].title()]]
         if Shop.alias_map[args[0].title()] in [
                 "Tradables", "Consumables", "Gladiators"
@@ -65,7 +70,11 @@ class TradeCommands(Commands):
     @model([Loots, Profile, Chest, Inventory])
     @alias("chest")
     @no_thumb
-    async def cmd_open(self, message, args=None, **kwargs):
+    async def cmd_open(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Opens a PokeGambler treasure chest.
         $```scss
         {command_prefix}open chest_id
@@ -143,7 +152,11 @@ class TradeCommands(Commands):
     @model(Item)
     @ensure_item
     @alias(['item', 'detail'])
-    async def cmd_details(self, message, args=None, **kwargs):
+    async def cmd_details(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Check the details of a PokeGambler Item.
         $```scss
         {command_prefix}details chest_id
@@ -162,7 +175,7 @@ class TradeCommands(Commands):
 
     @model(Inventory)
     @alias('inv')
-    async def cmd_inventory(self, message, **kwargs):
+    async def cmd_inventory(self, message: Message, **kwargs):
         """Check personal inventory.
         $```scss
         {command_prefix}inventory
@@ -198,7 +211,11 @@ class TradeCommands(Commands):
         await message.channel.send(embed=emb)
 
     @model(Inventory)
-    async def cmd_ids(self, message, args=None, **kwargs):
+    async def cmd_ids(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Check IDs of possessed items.
         $```scss
         {command_prefix}ids item_name
@@ -243,7 +260,11 @@ class TradeCommands(Commands):
         await self.paginate(message, embeds)
 
     @no_thumb
-    async def cmd_shop(self, message, args=None, **kwargs):
+    async def cmd_shop(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Access PokeGambler Shop.
         $```scss
         {command_prefix}shop [category]
@@ -315,7 +336,11 @@ class TradeCommands(Commands):
             embeds.append(emb)
         await self.paginate(message, embeds)
 
-    async def cmd_buy(self, message, args=None, **kwargs):
+    async def cmd_buy(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Buy item from Shop.
         $```scss
         {command_prefix}buy itemid [--quantity]
@@ -408,7 +433,11 @@ class TradeCommands(Commands):
         )
 
     @model([Profile, Item])
-    async def cmd_sell(self, message, args=None, **kwargs):
+    async def cmd_sell(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Sells item from inventory.
         $```scss
         {command_prefix}sell itemid/name [--quantity]
@@ -481,7 +510,7 @@ class TradeCommands(Commands):
             )
         )
 
-    async def cmd_boosts(self, message, **kwargs):
+    async def cmd_boosts(self, message: Message, **kwargs):
         """Check active boosts.
         $```scss
         {command_prefix}boosts
@@ -525,8 +554,10 @@ class TradeCommands(Commands):
     @model(Profile)
     @alias(["transfer", "pay"])
     async def cmd_give(
-        self, message, args=None,
-        mentions=None, **kwargs
+        self, message: Message,
+        args: Optional[List] = None,
+        mentions: Optional[List[Member]] = None,
+        **kwargs
     ):
         """Transfer credits.
         $```scss

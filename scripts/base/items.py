@@ -117,7 +117,8 @@ class Item(ABC):
 
     @classmethod
     def get(
-        cls, database: DBConnector, itemid: int
+        cls: Type[Item], database: DBConnector,
+        itemid: int
     ) -> Union[Dict, None]:
         """
         Get an Item with an ID as a dictionary.
@@ -126,7 +127,7 @@ class Item(ABC):
         return database.get_item(itemid)
 
     @classmethod
-    def _new_item(cls, item) -> Item:
+    def _new_item(cls: Type[Item], item: Dict) -> Item:
         category = cls.get_category(item)
         item.pop('category', None)
         itemid = item.pop('itemid', None)
@@ -142,7 +143,10 @@ class Item(ABC):
         return new_item
 
     @classmethod
-    def from_id(cls, database: DBConnector, itemid: int) -> Item:
+    def from_id(
+        cls: Type[Item], database: DBConnector,
+        itemid: int
+    ) -> Item:
         """
         Returns a item of specified ID or None.
         """
@@ -152,7 +156,10 @@ class Item(ABC):
         return cls._new_item(item)
 
     @classmethod
-    def from_name(cls, database: DBConnector, name: str) -> Item:
+    def from_name(
+        cls: Type[Item], database: DBConnector,
+        name: str
+    ) -> Item:
         """
         Returns a item of specified ID or None.
         """
@@ -162,7 +169,7 @@ class Item(ABC):
         return cls._new_item(item)
 
     @classmethod
-    def get_category(cls, item: Dict) -> Type[Item]:
+    def get_category(cls: Type[Item], item: Dict) -> Type[Item]:
         """
         Resolves category to handle chests differently.
         Returns the base Category of the Item.
@@ -202,8 +209,8 @@ class Item(ABC):
 
     @classmethod
     def list_items(
-        cls,
-        database:DBConnector,
+        cls: Type[Item],
+        database: DBConnector,
         category: str = "Tradable",
         limit: int = 5
     ) -> List:
@@ -309,10 +316,10 @@ class Chest(Treasure):
         self.category = "Chest"
         self.tier: int = tier
 
-    def __eq__(self, other):
+    def __eq__(self, other: Chest):
         return self.chips == other.chips
 
-    def __ge__(self, other):
+    def __ge__(self, other: Chest):
         return self.chips >= other.chips
 
     @property
@@ -328,7 +335,7 @@ class Chest(Treasure):
         return rand_val
 
     @classmethod
-    def get_chest(cls, tier: int):
+    def get_chest(cls: Type[Chest], tier: int):
         """
         Get a specified tier Chest.
         """
@@ -336,7 +343,7 @@ class Chest(Treasure):
         return chests[tier - 1]()
 
     @classmethod
-    def from_id(cls, database: DBConnector, itemid: int):
+    def from_id(cls: Type[Chest], database: DBConnector, itemid: int):
         """
         Returns a chest of specified ID or None.
         """
@@ -355,7 +362,7 @@ class Chest(Treasure):
         return chest
 
     @classmethod
-    def get_random_chest(cls):
+    def get_random_chest(cls: Type[Chest]):
         """
         Get a random tier Chest with weight of (90, 35, 12)
         for common, gold and legendary resp.

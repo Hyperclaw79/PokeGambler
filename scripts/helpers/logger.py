@@ -7,6 +7,7 @@ Custom Logger Module.
 import re
 import sys
 from datetime import datetime
+from typing import Optional
 
 import chalk
 from colorama import init
@@ -19,7 +20,7 @@ class CustomLogger:
     A simple Logger which has the main purpose of colorifying outputs.
     Barebones implementation without importing from the Logging module.
     '''
-    def __init__(self, error_log_path):
+    def __init__(self, error_log_path: str):
         formats = [
             "white", "green",
             "yellow", "red",
@@ -35,7 +36,11 @@ class CustomLogger:
             r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
         )
 
-    def wrap(self, text, *args, color=None, **kwargs):
+    def wrap(
+        self, text: str, *args,
+        color: Optional[str] = None,
+        **kwargs
+    ):
         '''
         Wraps the text based on the color and returns it.
         Can handle a list of colors as well.
@@ -48,7 +53,11 @@ class CustomLogger:
         func = self.color_codings.get(color, chalk.white)
         return func(text)
 
-    def pprint(self, text, *args, timestamp=True, **kwargs):
+    def pprint(
+        self, text: str, *args,
+        timestamp: bool = True,
+        **kwargs
+    ):
         '''
         Wraps the text and prints it to Stdout.
         In case of an error (red), logs it to error.log

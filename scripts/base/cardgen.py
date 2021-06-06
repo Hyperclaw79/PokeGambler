@@ -3,6 +3,7 @@ The Base Card Generation Module
 """
 import os
 import random
+from typing import List
 
 from PIL import Image
 
@@ -43,7 +44,10 @@ class CardGambler:
         ).convert('RGBA')
         return Image.alpha_composite(facecard, self.watermark).convert('RGB')
 
-    def get_random_cards(self, num_cards=4, joker_chance=0.05):
+    def get_random_cards(
+        self, num_cards: int = 4,
+        joker_chance: float = 0.05
+    ):
         """
         Gets a list of random cards.
         """
@@ -84,7 +88,11 @@ class CardGambler:
         return self.get_random_cards(num_cards=1)[0]
 
     @staticmethod
-    def get_deck(cards: list, sep="auto", reverse=False):
+    def get_deck(
+        cards: List,
+        sep: str = "auto",
+        reverse: bool = False
+    ):
         """
         Gets a deck generated from list of cards.
         """
@@ -107,14 +115,14 @@ class CardGambler:
                 )
         return deck
 
-    def get_random_deck(self, sep="auto", num_cards=12):
+    def get_random_deck(self, sep: str = "auto", num_cards: int = 12):
         """
         Gets a deck generated from a list of random cards.
         """
         cards = [self.get_random_card()[1] for i in range(num_cards)]
         return self.get_deck(cards, sep=sep)
 
-    def get_closed_deck(self, sep=5, num_cards=12):
+    def get_closed_deck(self, sep: int = 5, num_cards: int = 12):
         """
         Gets a deck of closed cards.
         """

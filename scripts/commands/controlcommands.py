@@ -4,9 +4,11 @@ Control Commands Module
 
 # pylint: disable=unused-argument
 
+from __future__ import annotations
 import json
 import subprocess
 import time
+from typing import List, Optional, TYPE_CHECKING
 
 import discord
 
@@ -19,6 +21,9 @@ from .basecommand import (
     Commands
 )
 
+if TYPE_CHECKING:
+    from discord import Message
+
 
 class ControlCommands(Commands):
     '''
@@ -27,7 +32,7 @@ class ControlCommands(Commands):
     '''
     @owner_only
     @no_log
-    async def cmd_restart(self, **kwargs):
+    async def cmd_restart(self, message, **kwargs):
         """Closes session and spawns a new process.
         $```scss
         {command_prefix}restart
@@ -46,7 +51,11 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
-    async def cmd_toggle(self, message, args=None, **kwargs):
+    async def cmd_toggle(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Toggle a boolean property of the PokeGambler class.
         $```scss
         {command_prefix}toggle property [on/enable/whitelist]
@@ -136,7 +145,11 @@ class ControlCommands(Commands):
     @owner_only
     @no_log
     @alias('tgl_mod_st')
-    async def cmd_toggle_module_state(self, message, args=None, **kwargs):
+    async def cmd_toggle_module_state(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Enable or Disable different command modules.
         $```scss
         {command_prefix}toggle_module_state module_name [on/off]
@@ -192,7 +205,11 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
-    async def cmd_reload(self, message, args=None, **kwargs):
+    async def cmd_reload(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Hot reload commands or configs.
         $```scss
         {command_prefix}reload module_name
@@ -235,7 +252,11 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
-    async def cmd_channel(self, message, args=None, **kwargs):
+    async def cmd_channel(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Set the active channel for the commands.
         $```scss
         {command_prefix}channel [+/add/append] channel_id
@@ -310,7 +331,11 @@ class ControlCommands(Commands):
     @owner_only
     @no_log
     @alias('cmd_hist')
-    async def cmd_command_history(self, message, args=None, **kwargs):
+    async def cmd_command_history(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Retrieves the latest command history based on provided kwargs.
         $```scss
         {command_prefix}command_history [limit]
@@ -403,7 +428,11 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
-    async def cmd_timeit(self, message, args=None, **kwargs):
+    async def cmd_timeit(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Executes a command and displays time taken to run it.
         $```scss
         {command_prefix}timeit cmd_name
@@ -444,7 +473,11 @@ class ControlCommands(Commands):
     @owner_only
     @no_log
     @alias('prg_tbl')
-    async def cmd_purge_tables(self, message, args=None, **kwargs):
+    async def cmd_purge_tables(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
         """Purges the tables in the database.
          $```scss
         {command_prefix}purge_tables [table_name]
@@ -483,7 +516,7 @@ class ControlCommands(Commands):
     @owner_only
     @no_log
     @alias('logs')
-    async def cmd_get_logs(self, message, **kwargs):
+    async def cmd_get_logs(self, message: Message, **kwargs):
         # pylint: disable=anomalous-backslash-in-string
         """Gets the remote logs.
          $```scss
@@ -545,7 +578,7 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
-    async def cmd_clean_logs(self, message, **kwargs):
+    async def cmd_clean_logs(self, message: Message, **kwargs):
         """Cleans the Error Logs.
          $```scss
         {command_prefix}clean_logs

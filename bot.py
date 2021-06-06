@@ -11,6 +11,7 @@ from datetime import datetime
 
 import aiohttp
 import discord
+from discord import Message
 from dotenv import load_dotenv
 
 from scripts.base.models import CommandData
@@ -70,7 +71,7 @@ class PokeGambler(discord.Client):
                 module_type = module.split("commands.py")[0]
                 self.load_commands(module_type)
 
-    def __bl_wl_check(self, message):
+    def __bl_wl_check(self, message: Message):
         blacklist_checks = [
             self.channel_mode == "blacklist",
             message.channel.id in self.configs["blacklist_channels"]
@@ -95,7 +96,7 @@ class PokeGambler(discord.Client):
         ]
         return any(return_checks)
 
-    def __get_method(self, message):
+    def __get_method(self, message: Message):
         cleaned_content = message.clean_content
         for user in message.mentions:
             cleaned_content = cleaned_content.replace(
@@ -130,7 +131,7 @@ class PokeGambler(discord.Client):
                     return method, cmd, args, option_dict
         return method, cmd, args, option_dict
 
-    async def __no_dm_cmds(self, message):
+    async def __no_dm_cmds(self, message: Message):
         if message.content.lower().startswith(
             self.prefix.lower()
         ):
@@ -146,7 +147,7 @@ class PokeGambler(discord.Client):
             except discord.Forbidden:
                 pass
 
-    async def __handle_cd(self, message):
+    async def __handle_cd(self, message: Message):
         if is_owner(self, message.author):
             return False
         on_cooldown = self.cooldown_users.get(message.author, None)
@@ -157,7 +158,10 @@ class PokeGambler(discord.Client):
             return True
         self.cooldown_users[message.author] = datetime.now()
 
-    def load_commands(self, module_type, reload_module=False):
+    def load_commands(
+        self, module_type: str,
+        reload_module: bool = False
+    ):
         """
         Hot Module Import for Commands.
         """
@@ -170,7 +174,7 @@ class PokeGambler(discord.Client):
                 f"scripts.commands.{module_type}commands"
             )
         cmd_class = getattr(module, f"{module_type.title()}Commands")
-        cmd_obj = cmd_class(ctx=self, database=self.database, logger=self.logger)
+        cmd_obj = cmd_class(ctx=self)
         setattr(self, f"{module_type}commands", cmd_obj)
         return cmd_obj
 
@@ -188,7 +192,7 @@ class PokeGambler(discord.Client):
 
 # Bot Base
 
-    async def on_message(self, message):
+    async def on_message(self, message: Message):
         """
         On_message event from Discord API.
         """
