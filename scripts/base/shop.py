@@ -331,11 +331,12 @@ class Shop:
         """
         if itemid in cls.ids_dict:
             return cls.ids_dict[itemid]
+        item = Item.from_id(database, int(itemid, 16))
+        if item.premium:  # pylint: disable=no-member
+            return None
         return TradebleItem(
             itemid=int(itemid, 16),
-            **dict(
-                Item.from_id(database, int(itemid, 16))
-            )
+            **dict(item)
         )
 
     @classmethod

@@ -466,12 +466,13 @@ class AdminCommands(Commands):
     async def cmd_create_item(self, message: Message, **kwargs):
         """Self-assign Gambler Role.
         $```scss
-        {command_prefix}create_item
+        {command_prefix}create_item [--premium]
         ```$
 
         @`🛡️ Admin Command`
         Creates a PokeGambler world [Item] and saves it in the database.
-        :information_source: Chests cannot be created using this.@
+        :information_source: Chests cannot be created using this.
+        Owner(s) can create Premium items using the --premium kwarg.@
         """
 
         # pylint: disable=no-member
@@ -541,6 +542,8 @@ class AdminCommands(Commands):
             else:
                 details[col] = reply.content
             await inp_msg.delete()
+        if kwargs.get("premium", False) and is_owner(self.ctx, message.author):
+            details["premium"] = True
         item = self.__item_factory(
             category=catogclass, **details
         )
@@ -557,7 +560,7 @@ class AdminCommands(Commands):
     ):
         """Adds item to User's inventory.
         $```scss
-        {command_prefix}give_item itemid
+        {command_prefix}give_item user_id itemid
         ```$
 
         @`🛡️ Admin Command`
