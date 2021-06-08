@@ -1054,6 +1054,35 @@ class DBConnector:
         self.conn.commit()
         return self.cursor.lastrowid
 
+    def bulk_save_items(self, data: List[Dict]):
+        """
+        Save a batch of items in a single transaction.
+        Useful when importing data from a JSON.
+        """
+        cols = '(' + ', '.join(data[0].keys()) + ')'
+        vals = [
+            tuple(item.values())
+            for item in data
+        ]
+        val_str = ",\n".join(
+            f"({', '.join(['?'] * len(row))})"
+            for row in vals
+        )
+        self.cursor.execute(
+            f'''
+            INSERT OR IGNORE INTO items
+            {cols}
+            VALUES
+            {val_str};
+            ''',
+            tuple(
+                val
+                for row in vals
+                for val in row
+            )
+        )
+        self.conn.commit()
+
     def get_item(self, itemid: int) -> Dict:
         """
         SQL endpoint for getting an Item with id.
@@ -1102,10 +1131,35 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def get_all_items(self) -> List[Dict]:
+        """
+        SQL endpoint for getting all the items.
+        Useful for exporting the items for DB migrations.
+        """
+        self.cursor.execute(
+            '''
+            SELECT * FROM items
+            WHERE category <> 'Chest'
+            GROUP BY name
+            ORDER BY category, name;
+            '''
+        )
+        results = self.cursor.fetchall()
+        if results:
+            names = [
+                col[0]
+                for col in self.cursor.description
+            ]
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
+        return []
+
     def get_tradables(
         self, limit: int = 10,
         premium: bool = False
-    ) -> List:
+    ) -> List[Dict]:
         """
         SQL endpoint for getting a list of Tradables.
         Useful for displaying them in a shop.
@@ -1141,7 +1195,7 @@ class DBConnector:
     def get_collectibles(
         self, limit: int = 10,
         premium: bool = False
-    ) -> List:
+    ) -> List[Dict]:
         """
         SQL endpoint for getting a list of Collectibles.
         Useful for trading with other players.
@@ -1172,7 +1226,7 @@ class DBConnector:
     def get_treasures(
         self, limit: int = 10,
         premium: bool = False
-    ) -> List:
+    ) -> List[Dict]:
         """
         SQL endpoint for getting a list of Treasures.
         Useful for flexing in the inventory.
@@ -1204,7 +1258,7 @@ class DBConnector:
     def get_consumables(
         self, limit: int = 10,
         premium: bool = False
-    ) -> List:
+    ) -> List[Dict]:
         """
         SQL endpoint for getting a list of Consumables.
         A limit can be provided, defaults to 10.
@@ -1235,7 +1289,7 @@ class DBConnector:
     def get_gladiators(
         self, limit: int = 10,
         premium: bool = False
-    ) -> List:
+    ) -> List[Dict]:
         """
         SQL endpoint for getting a list of Gladiators.
         A limit can be provided, defaults to 10.

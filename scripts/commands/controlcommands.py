@@ -5,6 +5,7 @@ Control Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
+from io import BytesIO
 import json
 import subprocess
 import time
@@ -12,9 +13,11 @@ from typing import List, Optional, TYPE_CHECKING
 
 import discord
 
+from ..helpers.checks import user_check
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
-    get_embed, get_enum_embed, get_modules
+    get_embed, get_enum_embed,
+    get_modules, wait_for
 )
 from .basecommand import (
     owner_only, no_log, alias,
@@ -594,4 +597,73 @@ class ControlCommands(Commands):
         """
         with open(self.ctx.error_log_path, 'w') as error_log:
             error_log.write('')
+        await message.add_reaction("👍")
+
+    @owner_only
+    @no_log
+    async def cmd_export_items(self, message: Message, **kwargs):
+        """Items Table Exporter.
+         $```scss
+        {command_prefix}export_items [--pretty level]
+        ```$
+
+        @`👑 Owner Command`
+        Exports the dynamically created items from the database as JSON.
+        The JSON is uploaded as a file in the channel.
+        A --pretty kwarg can be used to provide indentation level.@
+
+        ~To export the items as a JSON file:
+            ```
+            {command_prefix}export_items
+            ```
+        To see a pretty version of items JSON file:
+         ```
+            {command_prefix}export_items --pretty 3
+            ```~
+        """
+        items = self.database.get_all_items()
+        for item in items:
+            item.pop("itemid")
+        jsonified = json.dumps(
+            items,
+            indent=kwargs.get("pretty", None),
+            sort_keys=False
+        )
+        byio = BytesIO()
+        byio.write(jsonified.encode())
+        byio.seek(0)
+        export_fl = discord.File(byio, "items.json")
+        await message.channel.send(file=export_fl)
+
+    @owner_only
+    @no_log
+    async def cmd_import_items(self, message: Message, **kwargs):
+        """Items Table Importer.
+         $```scss
+        {command_prefix}import_items
+        ```$
+
+        @`👑 Owner Command`
+        Waits for JSON file attachment and loads the data into Items table.
+        Attachment's name should be `items.json`.
+        """
+        info_msg = await message.channel.send(
+            embed=get_embed(
+                "Send an empty message with a JSON file attachment.",
+                title="Attach items.json"
+            )
+        )
+        user_inp = await wait_for(
+            message.channel, self.ctx,
+            init_msg=info_msg,
+            check=lambda msg: (
+                user_check(msg, message)
+                and len(msg.attachments) > 0
+                and msg.attachments[0].filename == "items.json"
+            ),
+            timeout="inf"
+        )
+        data_bytes = await user_inp.attachments[0].read()
+        data = json.loads(data_bytes.decode())
+        self.database.bulk_save_items(data)
         await message.add_reaction("👍")
