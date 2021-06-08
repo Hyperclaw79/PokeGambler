@@ -16,7 +16,7 @@ from typing import (
 
 import discord
 
-from ..base.items import Item
+from ..base.items import Item  # pylint: disable=cyclic-import
 from .dbconn import DBConnector
 
 

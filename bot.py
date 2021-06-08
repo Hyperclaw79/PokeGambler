@@ -19,6 +19,7 @@ from scripts.base.models import CommandData
 from scripts.base.cardgen import CardGambler
 from scripts.base.dbconn import DBConnector
 from scripts.helpers.logger import CustomLogger
+# pylint: disable=cyclic-import
 from scripts.helpers.utils import (
     get_ascii, prettify_discord, get_embed,
     parse_command, get_rand_headers, is_owner,
