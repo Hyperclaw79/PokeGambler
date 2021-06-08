@@ -35,8 +35,8 @@ class TradeCommands(Commands):
     def __get_shop_page(self, args: List, categories: List) -> Embed:
         catog = categories[Shop.alias_map[args[0].title()]]
         if Shop.alias_map[args[0].title()] in [
-                "Tradables", "Consumables", "Gladiators"
-            ]:
+            "Tradables", "Consumables", "Gladiators"
+        ]:
             Shop.refresh_tradables(self.database)
         if len(catog.items) < 1:
             emb = get_embed(
@@ -59,7 +59,7 @@ class TradeCommands(Commands):
                     ) else item.itemid
                 emb.add_field(
                         name=f"『{itemid}』 _{item}_ "
-                        f"{item.price:,} <:pokechip:840469159242760203>",
+                        f"{item.price:,} {self.chip_emoji}",
                         value=f"```\n{item.description}\n```",
                         inline=False
                     )
@@ -135,11 +135,12 @@ class TradeCommands(Commands):
         loot_model.update(
             earned=(earned + chips)
         )
-        content = f"You have recieved **{chips}** <:pokechip:840469159242760203>."
+        content = f"You have recieved **{chips}** {self.chip_emoji}."
         if chest.name == "Legendary Chest":
             item = chest.get_random_collectible(self.database)
             if item:
-                content += f"\nAnd woah, you also got a **『{item.emoji}』 {item}**!"
+                content += "\nAnd woah, you also got a " + \
+                    f"**『{item.emoji}』 {item}**!"
                 Inventory(self.database, message.author).save(item.itemid)
         chest.delete(self.database)
         await message.channel.send(
@@ -162,7 +163,9 @@ class TradeCommands(Commands):
         {command_prefix}details chest_id
         ```$
 
-        @Check the details, of a PokeGambler item, like Description, Price, etc.@
+        @Check the details, of a PokeGambler item, like:
+            Description, Price, Category
+        @
 
         ~To check the details of an Item with ID 0000FFFF:
             ```
@@ -186,11 +189,11 @@ class TradeCommands(Commands):
         inv = Inventory(self.database, message.author)
         catog_dict, net_worth = inv.get(counts_only=True)
         emb = get_embed(
-            "This is your personal inventory categorized according to item type.\n"
+            "Your personal inventory categorized according to item type.\n"
             "You can get the list of IDs for an item using "
             f"`{self.ctx.prefix}ids item_name`.\n"
             "\n> Your net worth, excluding Chests, is "
-            f"**{net_worth}** <:pokechip:840469159242760203>.",
+            f"**{net_worth}** {self.chip_emoji}.",
             title=f"{message.author.name}'s Inventory"
         )
         for idx, (catog, items) in enumerate(catog_dict.items()):
@@ -248,7 +251,8 @@ class TradeCommands(Commands):
             emb = get_embed(
                 f'**{item_name}**『{cnt_str}』',
                 title=f"{message.author.name}'s Item IDs",
-                footer=f"Use 『{self.ctx.prefix}details itemid』for detailed view."
+                footer=f"Use 『{self.ctx.prefix}details itemid』"
+                "for detailed view."
             )
             for id_ in ids[i:i+10]:
                 emb.add_field(
@@ -383,7 +387,7 @@ class TradeCommands(Commands):
             await message.channel.send(
                 embed=get_embed(
                     "This item was not found in the Shop.\n"
-                    "Given the dynamic nature of the shop, maybe it's too late.",
+                    "Since the Shop is dynamic, maybe it's too late.",
                     embed_type="error",
                     title="Item not in Shop"
                 )
@@ -422,7 +426,7 @@ class TradeCommands(Commands):
             embed=get_embed(
                 f"Successfully purchased **{item}**{quant_str}.\n"
                 "Your account has been debited: "
-                f"**{item.price * quantity}** <:pokechip:840469159242760203>",
+                f"**{item.price * quantity}** {self.chip_emoji}",
                 title="Success",
                 footer=(
                     "Your nickname might've not changed if it's too long.\n"
@@ -484,7 +488,7 @@ class TradeCommands(Commands):
                 )
                 return
             deleted = inventory.delete([itemid], 1)
-        except ValueError: # Item Name
+        except ValueError:  # Item Name
             quantity = int(kwargs.get('quantity', 1))
             name = args[0].title()
             new_item = Item.from_name(self.database, name)
@@ -506,7 +510,7 @@ class TradeCommands(Commands):
             embed=get_embed(
                 f"Succesfully sold `{deleted}` of your listed item(s).\n"
                 "Your account has been credited: "
-                f"**{new_item.price * quantity}** <:pokechip:840469159242760203>",
+                f"**{new_item.price * quantity}** {self.chip_emoji}",
                 title="Item(s) Sold"
             )
         )
@@ -521,7 +525,9 @@ class TradeCommands(Commands):
         """
         def __get_desc(boost):
             desc_str = f"{boost['description']}\nStack: {boost['stack']}"
-            expires_in = (30 * 60) - (datetime.now() - boost["added_on"]).total_seconds()
+            expires_in = (30 * 60) - (
+                datetime.now() - boost["added_on"]
+            ).total_seconds()
             if expires_in > 0 and boost['stack'] > 0:
                 expires_in = get_formatted_time(
                     expires_in, show_hours=False
@@ -566,7 +572,7 @@ class TradeCommands(Commands):
         ```$
 
         @`🎲 Dealer Command`
-        Transfer some of your own <:pokechip:840469159242760203> to another user.
+        Transfer some of your own {pokechip_emoji} to another user.
         If you're being generous, we respect you.
         But if found abusing it, you will be blacklisted.@
 
@@ -631,7 +637,7 @@ class TradeCommands(Commands):
         if author_prof.get()["balance"] < amount:
             await message.channel.send(
                 embed=get_embed(
-                    "You don't have enough <:pokechip:840469159242760203>.",
+                    f"You don't have enough {self.chip_emoji}.",
                     embed_type="error",
                     title="Low Balance"
                 )
@@ -641,7 +647,7 @@ class TradeCommands(Commands):
         mention_prof.credit(amount)
         await message.channel.send(
             embed=get_embed(
-                f"Amount transferred: **{amount}** <:pokechip:840469159242760203>"
+                f"Amount transferred: **{amount}** {self.chip_emoji}"
                 f"\nRecipient: **{mentions[0]}**",
                 title="Transaction Successful"
             )

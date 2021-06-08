@@ -56,11 +56,13 @@ class ProfileCommands(Commands):
                     attr not in getattr(module, "alias", [])
                 ])
             ]
+
         def _aliases(module):
             return [
                 alias.replace("cmd_", "")
                 for alias in getattr(module, "alias", [])
             ]
+
         def _get_lb(modules, mg_name, user):
             leaderboard = None
             for module in modules:
@@ -137,7 +139,7 @@ class ProfileCommands(Commands):
         {command_prefix}balance
         ```$
 
-        @Quickly check how many <:pokechip:840469159242760203> you have.@
+        @Quickly check how many {pokechip_emoji} you have.@
 
         ~To check your balance:
             ```
@@ -145,7 +147,9 @@ class ProfileCommands(Commands):
             ```~
         """
         user = message.author
-        profile = (await get_profile(self.database, message,  message.author)).get()
+        profile = (
+            await get_profile(self.database, message,  message.author)
+        ).get()
         data = {
             key: (
                 f"{val:,}" if key in [
@@ -305,7 +309,7 @@ class ProfileCommands(Commands):
         {command_prefix}stats
         ```$
 
-        @Check the number of gamble matches and minigames you've played and won.@
+        @Check the number of gamble matches & minigames you've played and won.@
 
         ~To check your rank:
             ```
@@ -316,12 +320,14 @@ class ProfileCommands(Commands):
             self.database, message.author
         ).get_stats()
         stat_dict = {
-            "Gamble Matches": f"Played: {match_stats[0]}\n" + \
-                f"Won: {match_stats[1]}"
+            "Gamble Matches": f"Played: {match_stats[0]}\n"
+            f"Won: {match_stats[1]}"
         }
         for minigame_cls in Minigame.__subclasses__():
             minigame = minigame_cls(self.database, message.author)
-            stat_dict[minigame_cls.__name__] = f"Played: {minigame.num_plays}\n" + \
+            stat_dict[
+                minigame_cls.__name__
+            ] = f"Played: {minigame.num_plays}\n" + \
                 f"Won: {minigame.num_wins}"
         emb = get_embed(
             "Here's how you've performed till now.",
@@ -343,7 +349,7 @@ class ProfileCommands(Commands):
         {command_prefix}loot
         ```$
 
-        @Search the void for free <:pokechip:840469159242760203>.
+        @Search the void for free {pokechip_emoji}.
         The number of chips is randomly choosen from 5 to 10.
         `Chip Amount Boost incoming soon`
         `BETA boost is current active: x2 chips`
@@ -393,7 +399,7 @@ class ProfileCommands(Commands):
             ) * loot_mult
         )
         loot *= 2  # x2 BETA Bonus
-        treasure_chance *= 2 # x2 BETA Bonus
+        treasure_chance *= 2  # x2 BETA Bonus
         embed = None
         proc = random.uniform(0, 1.0)
         if proc <= treasure_chance:
@@ -425,7 +431,7 @@ class ProfileCommands(Commands):
         {command_prefix}daily
         ```$
 
-        @Claim free <:pokechip:840469159242760203> and a chest everyday.
+        @Claim free {pokechip_emoji} and a chest everyday.
         The chips and the chest both scale with Tier.
         There are 3 tiers:
             1 - Everyone starts here.

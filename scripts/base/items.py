@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 # region BaseClasses
 
+
 @dataclass
 class Item(ABC):
     """
@@ -308,14 +309,15 @@ class Consumable(Tradable):
         )
         self.sellable: bool = False
 
-#endregion
+# endregion
 
 # region Chests
+
 
 @total_ordering
 class Chest(Treasure):
     """
-    Chests are spawnable [Treasure] which usually contain Pokechips based on tiers.
+    Chests are spawnable [Treasure] which contain Pokechips based on tiers.
     """
     def __init__(
         self, description: str,
@@ -414,7 +416,7 @@ class CommonChest(Chest):
     """
     def __init__(self, **kwargs):
         description: str = dedent(
-            """This is a Tier 1 chest which contains gold in the range of a few hundreds.
+            """A Tier 1 chest which hs chips in the range of a few hundreds.
             Does not contain any other items."""
         )
         asset_url: str = "https://cdn.discordapp.com/attachments/" + \
@@ -436,7 +438,7 @@ class GoldChest(Chest):
     """
     def __init__(self, **kwargs):
         description: str = dedent(
-            """This is a Tier 2 chest which contains gold in the range of
+            """A Tier 2 chest which has chips in the range of
             high-hundreds to low-thousands.
             Does not contain any other items."""
         )
@@ -460,7 +462,7 @@ class LegendaryChest(Chest):
     """
     def __init__(self, **kwargs):
         description: str = dedent(
-            """This is a Tier 3 chest which contains gold in the range of thousands.
+            """A Tier 3 chest which has chips in the range of thousands.
             Has a small chance of containing [Collectible]s."""
         )
         asset_url: str = "https://cdn.discordapp.com/attachments/" + \
@@ -474,7 +476,8 @@ class LegendaryChest(Chest):
             tier=tier
         )
 
-#endregion
+# endregion
+
 
 @dataclass
 class Gladiator(Consumable):

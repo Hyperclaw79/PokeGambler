@@ -9,6 +9,7 @@ from discord import (
     Member, Reaction, Emoji
 )
 
+
 def user_check(
     msg: Message, message: Message,
     chan: Optional[TextChannel] = None

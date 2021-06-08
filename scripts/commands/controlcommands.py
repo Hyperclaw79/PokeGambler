@@ -525,7 +525,7 @@ class ControlCommands(Commands):
 
         @`👑 Owner Command`
         Get the logs since a specified time. Defaults to 10 hours ago.
-        If --errors_only kwarg is used, displays only the logs from error log file.@
+        If --errors_only is used, displays only the logs from error log file.@
 
         ~To get the logs from 2 hours ago:
             ```
@@ -542,7 +542,7 @@ class ControlCommands(Commands):
         else:
             base_query = "journalctl --user-unit pokegambler"
             since = kwargs.get("since", "10 hours ago")
-            options = f'-S "{since}" --no-pager -g "\[.+\]"'
+            options = f'-S "{since}" --no-pager -g "\[.+\]"'  # noqa
             pipes = [
                 " ".join([base_query, options]),
                 'cut -d " " -f 6-',

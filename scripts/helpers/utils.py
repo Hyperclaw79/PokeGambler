@@ -22,7 +22,8 @@ if TYPE_CHECKING:
     )
     from PIL.Image import Image
     from bot import PokeGambler
-    from ..commands.basecommand import Commands # pylint: disable=cyclic-import
+    # pylint: disable=cyclic-import
+    from ..commands.basecommand import Commands
 
 __all__ = [
     'get_formatted_time', 'get_ascii',
@@ -63,7 +64,7 @@ def get_ascii(msg: str) -> str:
         "7": "███████╗\n╚════██║\n....██╔╝\n...██╔╝.\n..██╔╝..\n..╚═╝...",
         "8": ".█████╗.\n██╔══██╗\n╚█████╔╝\n██╔══██╗\n╚█████╔╝\n.╚════╝.",
         "9": ".█████╗.\n██╔══██╗\n╚██████║\n.╚═══██║\n.█████╔╝\n.╚════╝.",
-        "v": "██╗...██╗\n██║...██║\n╚██╗.██╔╝\n.╚████╔╝.\n..╚██╔╝..\n...╚═╝...",
+        "v": "██╗...██╗\n██║...██║\n╚██╗.██╔╝\n.╚████╔╝.\n..╚██╔╝..\n...╚═╝...",  # noqa
         ".": "...\n...\n...\n...\n██╗\n╚═╝"
     }
     mapping = [artmap[ch] for ch in msg]
@@ -86,7 +87,7 @@ def prettify_discord(
     return '\n\t'.join(
         ', '.join(
             f"{func(id=elem)} ({str(elem)})"
-            for elem in iterable[i : i + 2]
+            for elem in iterable[i: i + 2]
         )
         for i in range(0, len(iterable), 2)
     )
@@ -370,7 +371,7 @@ async def online_now(ctx: PokeGambler):
 
 
 async def dm_send(
-    message: Message, user:Member,
+    message: Message, user: Member,
     content: Optional[str] = None,
     embed: Optional[Embed] = None
 ) -> Message:

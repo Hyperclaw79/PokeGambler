@@ -167,7 +167,7 @@ class GambleCommands(Commands):
             if key in self.rules.keys()
         ) or 'None'
         desc = (
-            f"**Entry Fee**: {fee} <:pokechip:840469159242760203> "
+            f"**Entry Fee**: {fee} {self.chip_emoji} "
             "(Non-refundable unless match fails)\n"
             f"**Custom Rules**: {rules}\n"
             "**Transaction Rate**: `<tr>%` "
@@ -397,7 +397,7 @@ class GambleCommands(Commands):
         embed.add_field(
             name="Pokechips in the pot",
             value=f"{fee * len(self.registered)} "
-            "<:pokechip:840469159242760203>",
+            f"{self.chip_emoji}",
             inline=False
         )
         return embed
@@ -424,7 +424,8 @@ class GambleCommands(Commands):
         ]):
             await message.channel.send(
                 embed=get_embed(
-                    f"Amount should be more than {min_chips} and less than {max_chips} chips.",
+                    f"Amount should be more than {min_chips} and "
+                    f"less than {max_chips} chips.",
                     embed_type="error",
                     title="Invalid Input"
                 )
@@ -448,7 +449,8 @@ class GambleCommands(Commands):
             if user_profile.get()['balance'] >= 50:
                 await message.channel.send(
                     embed=get_embed(
-                        "Amount of chips not specified, will be set to **50**.",
+                        "Amount of chips not specified, "
+                        "will be set to **50**.",
                         embed_type="warning",
                         title="No Pokechips count"
                     )
@@ -457,7 +459,7 @@ class GambleCommands(Commands):
             await dm_send(
                 message, message.author,
                 embed=get_embed(
-                    "You do not have enough <:pokechip:840469159242760203>\n"
+                    f"You do not have enough {self.chip_emoji}\n"
                     "Contact an admin for details on how to get more.",
                     embed_type="error",
                     title="Insufficient Balance"
@@ -533,7 +535,8 @@ class GambleCommands(Commands):
         await dm_send(
             message, user,
             embed=get_embed(
-                f"Successfully chosen 『**{gladiator}**』as Gladiator for this match.",
+                f"Successfully chosen 『**{gladiator}**』"
+                "as Gladiator for this match.",
                 title="Gladiator Confirmed"
             )
         )
@@ -550,7 +553,7 @@ class GambleCommands(Commands):
             f"to a Gladiator match by **{message.author.name}**",
             embed=get_embed(
                 "React to this message with ☑️ to accept the duel.\n"
-                f"Bet Amount: **{amount}** <:pokechip:840469159242760203>",
+                f"Bet Amount: **{amount}** {self.chip_emoji}",
                 title="Do you accept?"
             )
         )
@@ -708,7 +711,7 @@ class GambleCommands(Commands):
 
         @`🎲 Dealer Command`
         Roll random pokemon themed cards for a fee and winner takes it all.
-        If a fee is not specified, defaults to 50 <:pokechip:840469159242760203>.
+        If a fee is not specified, defaults to 50 {pokechip_emoji}.
         To make the lower card win, use the kwarg `lower_wins`.
         *A small transaction fees will be levyed before crediting the winner.
         This fee scales with number of players, if above 15.*@
@@ -717,7 +720,7 @@ class GambleCommands(Commands):
             ```
             {command_prefix}gamble
             ```
-        To gamble for 1000 <:pokechip:840469159242760203>:
+        To gamble for 1000 {pokechip_emoji}:
             ```
             {command_prefix}gamble 1000
             ```
@@ -798,15 +801,15 @@ class GambleCommands(Commands):
         {command_prefix}quickflip [50 < amount < 9999]
         ```$
 
-        @A quick way to double your pokechips ||(or halve it)|| using a chip flip.
+        @A quick way to x2 your pokechips ||(or halve it)|| using a chip flip.
         If no amount is specified, 50 chips will be used by default.
         Minimum 50 chips and maximim 9999 chips can be used.@
 
-        ~To flip for 50 <:pokechip:840469159242760203>:
+        ~To flip for 50 {pokechip_emoji}:
             ```
             {command_prefix}flip
             ```
-        To flip for 1000 <:pokechip:840469159242760203>:
+        To flip for 1000 {pokechip_emoji}:
             ```
             {command_prefix}flip 1000
             ```~
@@ -821,19 +824,19 @@ class GambleCommands(Commands):
         opt_msg = await message.channel.send(
             embed=get_embed(
                 "```md\n# Options\n1. Heads\n2. Tails\n```",
-                title=f"**Place your bet for {amount}** <:pokechip:840469159242760203>",
+                title=f"**Place your bet for {amount}** {self.chip_emoji}",
                 footer=f"⚠️ You'll either get {amount * 2} or "
                 f"lose {amount} pokechips",
-                image="https://cdn.discordapp.com/attachments/840469669332516904"
-                "/843077878816178186/blinker.gif"
+                image="https://cdn.discordapp.com/attachments/"
+                "840469669332516904/843077878816178186/blinker.gif"
             )
         )
         idx = random.randint(0, 1)
         img = [
-            "https://cdn.discordapp.com/attachments/840469669332516904/" + \
-                "843079658274422814/logochip.png",
-            "https://cdn.discordapp.com/attachments/840469669332516904/" + \
-                "843079660375638046/pokechip.png"
+            "https://cdn.discordapp.com/attachments/840469669332516904/"
+            "843079658274422814/logochip.png",
+            "https://cdn.discordapp.com/attachments/840469669332516904/"
+            "843079660375638046/pokechip.png"
         ][idx]
         reply = await wait_for(
             message.channel, self.ctx, init_msg=opt_msg,
@@ -854,20 +857,24 @@ class GambleCommands(Commands):
                 )
             )
             return
-        choice = int(reply) - 1 if reply in valids[:2] else valids[2:].index(reply)
+        choice = (
+            int(reply) - 1 if reply in valids[:2]
+            else valids[2:]
+        ).index(reply)
         msg = f"PokeGambler choose {valids[2:][idx].title()}.\n"
         if choice == idx:
             amt_mult = 1
             boosts = self.ctx.boost_dict.get(message.author.id, None)
             if boosts:
                 amt_mult += boosts['boost_flip']['stack'] * 0.1
-            msg += f"You have won {amount + int(amount * amt_mult)} <:pokechip:840469159242760203>"
+            tot_amt = amount + int(amount * amt_mult)
+            msg += f"You have won {tot_amt} {self.chip_emoji}"
             title = "Congratulations!"
             color = 5023308
             profile.credit(int(amount * amt_mult))
             won = True
         else:
-            msg += f"You have lost {amount} <:pokechip:840469159242760203>"
+            msg += f"You have lost {amount} {self.chip_emoji}"
             title = "You Lost!"
             color = 14155786
             profile.debit(amount)
@@ -938,7 +945,7 @@ class GambleCommands(Commands):
         board, board_img = self.boardgen.get_board(level)
         opt_msg = await message.channel.send(
             content=f"**Difficulty: {level + 1} ({board})**\n"
-            f"**Cost: {cost} <:pokechip:840469159242760203>** \n"
+            f"**Cost: {cost} {self.chip_emoji}** \n"
             "> Choose a tile:",
             file=img2file(board_img, f"{board}.jpg")
         )
@@ -961,14 +968,14 @@ class GambleCommands(Commands):
         await opt_msg.delete()
         if choice == rolled:
             content = "**Congratulations! You guessed it correctly.**\n" + \
-                f"{cost * multiplier} <:pokechip:840469159242760203> " + \
+                f"{cost * multiplier} {self.chip_emoji} " + \
                 "have been added in your account."
             color = 5023308
             profile.credit(cost * multiplier)
             won = True
         else:
             content = "**Uhoh! You couldn't guess it right this time.**\n" + \
-                f"{cost} <:pokechip:840469159242760203> " + \
+                f"{cost} {self.chip_emoji} " + \
                 "have been taken from your account."
             color = 14155786
             profile.debit(cost)
@@ -1031,7 +1038,7 @@ class GambleCommands(Commands):
             emb = get_embed(
                 f"Match started by: **{started_by}**\n"
                 f"Played on: **{played_at}**\n"
-                f"Amount in pot: **{pot}** <:pokechip:840469159242760203>",
+                f"Amount in pot: **{pot}** {self.chip_emoji}",
                 title="Recent Matches"
             )
             emb.add_field(
@@ -1083,8 +1090,8 @@ class GambleCommands(Commands):
         ```$
 
         @Have a 1v1 Gladiator match against any valid player.
-        Cost defaults to 50 <:pokechip:840469159242760203> (minimum) if not provided.
-        Both the players must own at least one Gladiator and have enough balance.
+        Cost defaults to 50 {pokechip_emoji} (minimum) if not provided.
+        Both the players must own at least 1 Gladiator & have enough balance.
         You can purchase Gladiators from the shop.@
 
         ~To battle user ABCD#1234 for 50 chips:

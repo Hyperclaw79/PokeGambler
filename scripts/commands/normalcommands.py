@@ -46,6 +46,9 @@ class NormalCommands(Commands):
             doc_str = cmd.__doc__.replace(
                 "{command_prefix}",
                 self.ctx.prefix
+            ).replace(
+                "{pokechip_emoji}",
+                self.chip_emoji
             )
             patt = r"\$(?P<Syntax>[^\$]+)\$\s+" + \
                 r"\@(?P<Description>[^\@]+)" + \
@@ -58,8 +61,9 @@ class NormalCommands(Commands):
             )
             if "no_thumb" not in dir(cmd):
                 emb.set_thumbnail(
-                    url="https://cdn.discordapp.com/attachments/840469669332516904/"
-                    "840469820180529202/pokegambler_logo.png"
+                    url="https://cdn.discordapp.com/attachments/"
+                    "840469669332516904/840469820180529202/"
+                    "pokegambler_logo.png"
                 )
         else:
             emb = get_embed(
@@ -342,9 +346,10 @@ class NormalCommands(Commands):
             dedent(
                 """
                 > Welcome to the first `BETA` test of PokeGambler.
-                **PokeGambler** uses pokemon themed playing cards for entertaining gambling matches.
+                **PokeGambler** uses pokemon themed playing cards
+                for entertaining gambling matches.
                 It has a dedicated currency and profile system.
-                Earned Pokechips can be cashed out for Poketwo credits from the admin.
+                Earned Pokechips may be cashed out for Poketwo credits.
                 """
             ),
             title="**Welcome to PokeGambler**"

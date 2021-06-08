@@ -212,7 +212,8 @@ def ensure_user(func: Callable):
         if not message.guild.get_member(int(kwargs["args"][0])):
             return message.channel.send(
                 embed=get_embed(
-                    "Unable to fetch this user.\nMake sure they're still in the server.",
+                    "Unable to fetch this user.\n"
+                    "Make sure they're still in the server.",
                     embed_type="error",
                     title="Invalid User"
                 )
@@ -289,6 +290,7 @@ class Commands(ABC):
         self.logger = ctx.logger
         self.enabled = kwargs.get('enabled', True)
         self.alias = []
+        self.chip_emoji = "{pokechip_emoji}"
         cmds = [
             getattr(self, attr)
             for attr in dir(self)
@@ -331,6 +333,7 @@ class Commands(ABC):
                     )
             pager = Paginator(message, base, embeds, self.ctx)
             await pager.run()
+
 
 async def get_profile(
     database: DBConnector,

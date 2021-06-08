@@ -70,7 +70,7 @@ class ProfileCardGenerator(AssetGenerator):
     """
     ProfileCard Image Generation Class
     """
-    def __init__(self, asset_path: str="assets"):
+    def __init__(self, asset_path: str = "assets"):
         super().__init__(asset_path)
         self.font = ImageFont.truetype(
             os.path.join(asset_path, "Exo-ExtraBold.ttf"),
@@ -181,7 +181,7 @@ class WalletGenerator(AssetGenerator):
     """
     BalanceCard Image Generation Class
     """
-    def __init__(self, asset_path: str="assets"):
+    def __init__(self, asset_path: str = "assets"):
         super().__init__(asset_path)
         self.asset_path = asset_path
         self.font = ImageFont.truetype(
@@ -445,7 +445,7 @@ class GladitorMatchHandler(AssetGenerator):
     """
     Gladiator Match handler class
     """
-    def __init__(self, asset_path: str="assets"):
+    def __init__(self, asset_path: str = "assets"):
         super().__init__(asset_path)
         self.font = ImageFont.truetype(
             os.path.join(asset_path, "Exo-ExtraBold.ttf"),
@@ -584,8 +584,7 @@ class GladitorMatchHandler(AssetGenerator):
     ) -> Tuple[Image.Image, int, int]:
         """
         Handles a duel match between Gladiators.
-        Returns a tuple containing an image, and damages dealt by each gladiator
-        - one per match stage.
+        Returns an image and damages dealt by each gladiator per round.
         """
         canvas = self.__prepare_arena([
             glad.owner.name

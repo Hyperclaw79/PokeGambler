@@ -10,6 +10,7 @@ from typing import (
     Optional, Union
 )
 
+
 def encode_type(val: Union[str, int, float, bool]) -> str:
     """
     SQLize numbers and strings.
@@ -509,7 +510,7 @@ class DBConnector:
 
     def get_existing(self, model: str, user_id: str) -> Dict:
         """
-        SQL endpoint for getting existing results from UnlockedModel type table.
+        SQL endpoint for getting existing results from UnlockedModel tables.
         """
         self.cursor.execute(
             f'''
@@ -573,8 +574,13 @@ class DBConnector:
         where_clause = ""
         if kwargs:
             if "user_is_admin" in kwargs.keys():
-                kwargs["user_is_admin"] = "1" if kwargs["user_is_admin"] else "0"
-            kwarg_str = ' AND '.join(f'{key} IS "{val}"' for key, val in kwargs.items())
+                kwargs["user_is_admin"] = (
+                    "1" if kwargs["user_is_admin"] else "0"
+                )
+            kwarg_str = ' AND '.join(
+                f'{key} IS "{val}"'
+                for key, val in kwargs.items()
+            )
             where_clause = f"WHERE {kwarg_str}"
         self.cursor.execute(
             f'''
@@ -821,7 +827,7 @@ class DBConnector:
 
 # Matches
 
-    def get_match_stats(self, user_id:str) -> List:
+    def get_match_stats(self, user_id: str) -> List:
         """
         Gets the Wins and Losses for every participated match.
         """
@@ -1266,7 +1272,7 @@ class DBConnector:
     ) -> List:
         """
         SQL endpoint for getting a list of items in a user's Inventory.
-        If counts_only is True, it will return a list of item names and their counts.
+        If counts_only is True, returns a list of item names and their counts.
         """
         where_clause = 'WHERE user_id IS ?'
         if category:
@@ -1438,6 +1444,7 @@ class DBConnector:
             (user_id, )
         )
         self.conn.commit()
+
 
 if __name__ == "__main__":
     dbconn = DBConnector(db_path='data/pokegambler.db')

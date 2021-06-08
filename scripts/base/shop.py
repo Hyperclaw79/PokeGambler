@@ -23,6 +23,7 @@ from .dbconn import DBConnector
 if TYPE_CHECKING:
     from bot import PokeGambler
 
+
 @dataclass
 class ShopItem:
     """
@@ -200,7 +201,7 @@ class Shop:
                 Title(
                     "title_dlr",
                     "Dealers",
-                    "You're one of the dealers and have access to the gamble command.",
+                    "Get access to the gamble command and other perks.",
                     20_000
                 ),
                 Title(
@@ -325,7 +326,11 @@ class Shop:
             ids_dict[item.itemid] = item
 
     @classmethod
-    def get_item(cls: Type[Shop], database: DBConnector, itemid: str) -> ShopItem:
+    def get_item(
+        cls: Type[Shop],
+        database: DBConnector,
+        itemid: str
+    ) -> ShopItem:
         """
         Returns the item registered in Shop based on itemID.
         """
@@ -390,7 +395,10 @@ class Shop:
                     item["emoji"],
                     pinned="permanent" in item["description"].lower()
                 )
-                for item in getattr(database, f"get_{item_type.lower()}")(limit=5)
+                for item in getattr(
+                    database,
+                    f"get_{item_type.lower()}"
+                )(limit=5)
             ]
             cls.update_category(item_type, items)
 
@@ -401,7 +409,6 @@ class Shop:
     ) -> str:
         """
         Validates if an item is purchasable and affordable by the user.
-        In sell mode, validates if it's sellable and exists in user's inventory.
         """
         if (
             isinstance(item, TradebleItem)

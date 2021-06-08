@@ -30,6 +30,7 @@ from .basecommand import (
 if TYPE_CHECKING:
     from discord import Message
 
+
 class AdminCommands(Commands):
     """
     Commands that deal with the moderation tasks.
@@ -119,14 +120,14 @@ class AdminCommands(Commands):
         ```$
 
         @`🛡️ Admin Command`
-        Adds <:pokechip:840469159242760203> to a user's account.
+        Adds {pokechip_emoji} to a user's account.
         Use the `--purchased` kwarg if the chips were bought.@
 
-        ~To give 50 <:pokechip:840469159242760203> to user with ID 12345:
+        ~To give 50 {pokechip_emoji} to user with ID 12345:
             ```
             {command_prefix}add_chips 12345 50
             ```
-        To add 500 bought/exchanged <:pokechip:840469159242760203> to user 67890:
+        To add 500 exchanged {pokechip_emoji} to user 67890:
             ```
             {command_prefix}add_chips 67890 500 --purchased
             ```~
@@ -256,7 +257,7 @@ class AdminCommands(Commands):
             return
         try:
             profile.update(**kwargs)
-        except Exception as excp: # pylint: disable=broad-except
+        except Exception as excp:  # pylint: disable=broad-except
             await message.channel.send(
                 embed=get_embed(
                     "Good try but bad luck.",
@@ -408,7 +409,8 @@ class AdminCommands(Commands):
         ```$
 
         @`🛡️ Admin Command`
-        Creates a self-assign message, for Gamblers role, in the announcement channel.@
+        Creates a self-assign message for Gamblers role,
+        in the announcement channel.@
         """
         async def role_assign(self, gamb_msg, chan):
             # pylint: disable=inconsistent-return-statements
@@ -438,8 +440,9 @@ class AdminCommands(Commands):
         chan = message.guild.get_channel(
             int(os.getenv("ANNOUNCEMENT_CHANNEL"))
         )
-        content = """React with <:pokechip:840469159242760203> to be assigned the `Gamblers` role.
-        With this role you'll be able to participate in the special gamble matches.
+        content = f"""
+        React with {self.chip_emoji} to get the `Gamblers` role.
+        With this role, you can participate in the special gamble matches.
         You'll also be pinged for random Treasure drops (TBI).
         """
         gamb_msg = await message.guild.get_channel(
@@ -451,7 +454,7 @@ class AdminCommands(Commands):
                 title="React for Gamblers Role"
             )
         )
-        await gamb_msg.add_reaction("<:pokechip:840469159242760203>")
+        await gamb_msg.add_reaction(self.chip_emoji)
         await asyncio.sleep(2.0)
         gamb_msg = discord.utils.find(
             lambda msg: msg.id == gamb_msg.id,

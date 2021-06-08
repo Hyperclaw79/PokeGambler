@@ -105,7 +105,11 @@ class UnlockedModel(Model, ABC):
         self._default()
         kwargs = dict(self)
         kwargs.pop("user_id")
-        self.database.update_model(self.model_name, str(self.user_id), **kwargs)
+        self.database.update_model(
+            self.model_name,
+            str(self.user_id),
+            **kwargs
+        )
 
 
 class Minigame(Model, ABC):
@@ -476,7 +480,6 @@ class Inventory(Model):
         return self.database.remove_from_inv(
             item_inp, quantity, self.user_id
         )
-
 
     def destroy(self):
         """
