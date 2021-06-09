@@ -423,7 +423,7 @@ class ProfileCommands(Commands):
             embed=embed
         )
 
-    @model([Loots, Profile, Chest])
+    @model([Loots, Profile, Chest, Inventory])
     @alias('dl')
     async def cmd_daily(self, message: Message, **kwargs):
         """Daily source of Pokechips.
@@ -486,10 +486,12 @@ class ProfileCommands(Commands):
         chest = Chest.get_chest(tier=tier)
         chest.description += f"\n[Daily for {message.author.id}]"
         chest.save(self.database)
+        Inventory(self.database, message.author).save(
+            int(chest.itemid, 16)
+        )
         embed = get_embed(
             f"Here's your daily **{chest}**.\n"
-            f"Claim the chest with `{self.ctx.prefix}open {chest.itemid}`.\n"
-            "(Daily Chests are not stored in the inventory.)",
+            f"Claim the chest with `{self.ctx.prefix}open {chest.itemid}`.",
             title="**Daily Chest**",
             thumbnail=chest.asset_url,
             footer=f"Current Streak: {daily_streak}"
