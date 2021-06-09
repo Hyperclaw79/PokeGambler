@@ -859,8 +859,8 @@ class GambleCommands(Commands):
             return
         choice = (
             int(reply) - 1 if reply in valids[:2]
-            else valids[2:]
-        ).index(reply)
+            else valids[2:].index(reply)
+        )
         msg = f"PokeGambler choose {valids[2:][idx].title()}.\n"
         if choice == idx:
             amt_mult = 1
