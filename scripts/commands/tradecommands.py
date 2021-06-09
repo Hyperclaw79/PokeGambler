@@ -68,19 +68,21 @@ class TradeCommands(Commands):
         return emb
 
     @model([Loots, Profile, Chest, Inventory])
-    @alias("chest")
     @no_thumb
     async def cmd_open(
         self, message: Message,
         args: Optional[List] = None,
         **kwargs
     ):
-        """Opens a PokeGambler treasure chest.
+
+        # pylint: disable=no-member
+
+        """Opens a PokeGambler treasure chest or a Lootbag.
         $```scss
-        {command_prefix}open chest_id
+        {command_prefix}open itemid
         ```$
 
-        @Opens a treasure chest that you own.
+        @Opens a treasure chest or a Lootbag that you own.
         There are 3 different chests and scale with your tier.
         Here's a drop table:
         ```py
@@ -91,44 +93,49 @@ class TradeCommands(Commands):
         ║   2  ║   Gold    ║    25%    ║  192 - 1110  ║
         ║   3  ║ Legendary ║     9%    ║ 1111 - 10000 ║
         ╚══════╩═══════════╩═══════════╩══════════════╝
-        ```@
+        ```
+        Lootbags are similar to Chests but they will contain items for sure.
+        They can either be Normal or Premium.
+        Premium Lootbag will contain a guaranteed Premium Item.
+        All the items will be of a separate category.@
 
         ~To open a chest with ID 0000FFFF:
             ```
             {command_prefix}open 0000FFFF
+            ```
+        To open a lootbag with ID 0000AAAA:
+            ```
+            {command_prefix}open 0000AAAA
             ```~
         """
         if not args:
             return
         try:
             itemid = int(args[0], 16)
-            chest = Chest.from_id(self.database, itemid)
+            openable = Item.from_id(self.database, itemid)
         except (ValueError, ZeroDivisionError):
-            chest = None
-        if not chest:
+            openable = None
+        if not openable:
             await message.channel.send(
                 embed=get_embed(
-                    "Make sure you actually own this chest.",
+                    "Make sure you actually own this Item.",
                     embed_type="error",
-                    title="Invalid Chest ID"
+                    title="Invalid Chest/Lootbag ID"
                 )
             )
             return
-        if not (
-            str(message.author.id) in chest.description
-            or Inventory(
-                self.database, message.author
-            ).from_id(itemid)
-        ):
+        if not Inventory(
+            self.database, message.author
+        ).from_id(itemid):
             await message.channel.send(
                 embed=get_embed(
-                    "That's not your own chest.",
+                    f"That's not your own {openable.category}.",
                     embed_type="error",
-                    title="Invalid Chest ID"
+                    title="Invalid Chest/Lootbag ID"
                 )
             )
             return
-        chips = chest.chips
+        chips = openable.chips
         Profile(self.database, message.author).credit(chips)
         loot_model = Loots(self.database, message.author)
         earned = loot_model.get()["earned"]
@@ -136,17 +143,30 @@ class TradeCommands(Commands):
             earned=(earned + chips)
         )
         content = f"You have recieved **{chips}** {self.chip_emoji}."
-        if chest.name == "Legendary Chest":
-            item = chest.get_random_collectible(self.database)
+        items = []
+        if openable.name == "Legendary Chest":
+            item = openable.get_random_collectible(self.database)
             if item:
                 content += "\nAnd woah, you also got a " + \
                     f"**『{item.emoji}』 {item}**!"
-                Inventory(self.database, message.author).save(item.itemid)
-        chest.delete(self.database)
+                items = [item]
+        elif openable.category == 'Lootbag':
+            items = openable.get_random_items(self.database)
+            item_str = ', '.join(
+                f"**『{item.emoji}』 {item}**"
+                for item in items
+            )
+            content += "\nAnd you also got these items:\n" + \
+                f"{item_str}"
+        for item in items:
+            Inventory(self.database, message.author).save(
+                int(item.itemid, 16)
+            )
+        openable.delete(self.database)
         await message.channel.send(
             embed=get_embed(
                 content,
-                title=f"Opened a {chest.name}"
+                title=f"Opened a {openable.name}"
             )
         )
 

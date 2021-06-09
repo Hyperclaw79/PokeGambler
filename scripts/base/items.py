@@ -177,7 +177,7 @@ class Item(ABC):
         name: str
     ) -> Item:
         """
-        Returns a item of specified ID or None.
+        Returns a item of specified name or None.
         """
         item = database.get_item_from_name(name)
         if not item:
@@ -340,7 +340,7 @@ class Chest(Treasure):
         return self.chips >= other.chips
 
     @property
-    def chips(self):
+    def chips(self) -> int:
         """
         Get a random amount of tier-scaled pokechips.
         """
@@ -352,7 +352,7 @@ class Chest(Treasure):
         return rand_val
 
     @classmethod
-    def get_chest(cls: Type[Chest], tier: int):
+    def get_chest(cls: Type[Chest], tier: int) -> Chest:
         """
         Get a specified tier Chest.
         """
@@ -360,7 +360,11 @@ class Chest(Treasure):
         return chests[tier - 1]()
 
     @classmethod
-    def from_id(cls: Type[Chest], database: DBConnector, itemid: int):
+    def from_id(
+        cls: Type[Chest],
+        database: DBConnector,
+        itemid: int
+    ) -> Chest:
         """
         Returns a chest of specified ID or None.
         """
@@ -379,7 +383,7 @@ class Chest(Treasure):
         return chest
 
     @classmethod
-    def get_random_chest(cls: Type[Chest]):
+    def get_random_chest(cls: Type[Chest]) -> Chest:
         """
         Get a random tier Chest with weight of (90, 35, 12)
         for common, gold and legendary resp.
@@ -488,3 +492,76 @@ class Gladiator(Consumable):
     def __init__(self, **kwargs):
         kwargs.pop('category', None)
         super().__init__(category="Gladiator", **kwargs)
+
+
+@dataclass
+class Lootbag(Treasure):
+    """
+    Lootbags contain other items inside them.
+    Premium Lootbags can also contain Premium Items.
+    """
+    def __init__(self, items: Optional[List[Item]] = None, **kwargs):
+        super().__init__(
+            category=kwargs.pop(
+                "category",
+                "Lootbag"
+            ),
+            **kwargs
+        )
+
+    def get_random_items(
+        self, database: DBConnector,
+        categories: Optional[List[str]] = None,
+        count: Optional[int] = 3
+    ) -> Item:
+        """
+        Retrieves a random existing item of chosen category.
+        Returns at most 3 items by default.
+        """
+        items = database.get_items(
+            categories=categories,
+            limit=20,
+            include_premium=self.premium
+        )
+        if not items:
+            return None
+        rand_items = []
+        premium_added = False
+        while len(rand_items) <= count and len(items) > 0:
+            if self.premium and not premium_added:
+                itm_dict = random.choices(
+                    items, k=1, weights=[
+                        int(item["premium"])
+                        for item in items
+                    ]
+                )[0]
+                premium_added = True
+            else:
+                itm_dict = random.choices(
+                    items, k=1, weights=[
+                        -int(item["premium"])
+                        for item in items
+                    ]
+                )[0]
+            items.remove(itm_dict)
+            if itm_dict["category"] not in (
+                itm["category"]
+                for itm in rand_items
+            ):
+                rand_items.append(itm_dict)
+        return [
+            Item.from_id(database, itm_dict["itemid"])
+            for itm_dict in rand_items
+        ]
+
+    @property
+    def chips(self) -> int:
+        """
+        Return random amount of Pokechips in following ranges:
+            Normal => [100, 499]
+            Premium => [500, 1000]
+        """
+        limits = [100, 499]
+        if self.premium:
+            limits = [500, 1000]
+        return random.randint(*limits)

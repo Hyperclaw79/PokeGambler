@@ -551,6 +551,13 @@ class AdminCommands(Commands):
             category=catogclass, **details
         )
         item.save(self.database)
+        await message.channel.send(
+            embed=get_embed(
+                f"Item **{item.name}** with ID _{item.itemid}_ has been "
+                "created succesfully.",
+                title="Succesfully Created"
+            )
+        )
         await reply.add_reaction("👍")
 
     @admin_only

@@ -1163,11 +1163,10 @@ class GambleCommands(Commands):
             message, user2, other_profile,
             gladiator2, amount
         )
-        if not proceed:
-            return
-        glads = [gladiator1, gladiator2]
-        profiles = [user_profile, other_profile]
-        await self.__duel_play(
-            message, glads,
-            profiles, amount
-        )
+        if proceed:
+            glads = [gladiator1, gladiator2]
+            profiles = [user_profile, other_profile]
+            await self.__duel_play(
+                message, glads,
+                profiles, amount
+            )

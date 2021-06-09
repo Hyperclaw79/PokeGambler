@@ -15,6 +15,8 @@ def encode_type(val: Union[str, int, float, bool]) -> str:
     """
     SQLize numbers and strings.
     """
+    if val is None:
+        return "null"
     if str(val).replace('.', '').replace(
         '+', ''
     ).replace('-', '').isdigit():
@@ -74,10 +76,10 @@ def str2dict(sql_str: str) -> Dict:
 sqlite3.register_adapter(bool, str)
 sqlite3.register_converter("BOOLEAN", lambda v: v == b'True')
 sqlite3.register_adapter(
-    list, lambda l: ', '.join(
+    list, lambda l: '(' + ', '.join(
         str(encode_type(elem))
         for elem in l
-    )
+    ) + ')'
 )
 
 sqlite3.register_converter(
@@ -126,7 +128,7 @@ class DBConnector:
         return int(user_id == winner)
 
     @staticmethod
-    def format_val(val):
+    def __format_val(val):
         """
         Internal SQLizing function.
         """
@@ -138,6 +140,13 @@ class DBConnector:
         elif val is None:
             ret_val = "null"
         return ret_val
+
+    @staticmethod
+    def __encode_list(iterable: List):
+        list_str = str(tuple(iterable))
+        if len(iterable) == 1:
+            list_str = list_str[::-1].replace(',', '', 1)[::-1]
+        return list_str
 
 # DDL
 
@@ -547,7 +556,7 @@ class DBConnector:
         SQL endpoint for UnlockedModel type table Updation.
         """
         items = ", ".join(
-            f"{key} = {self.format_val(val)}"
+            f"{key} = {self.__format_val(val)}"
             for key, val in kwargs.items()
         )
 
@@ -1130,6 +1139,47 @@ class DBConnector:
             (itemid,)
         )
         self.conn.commit()
+
+    def get_items(
+        self, categories: List[str], limit: int = 20,
+        include_premium: bool = False
+    ) -> List[Dict]:
+        """
+        SQL endpoint for getting all the items.
+        Useful for exporting the items for DB migrations.
+        """
+        if not categories:
+            categories = [
+                "Collectible", "Consumable", "Gladiator",
+                "Tradable", "Treasure"
+            ]
+        premiums = ["False"]
+        if include_premium:
+            premiums.append("True")
+        catog_clause = f"WHERE category IN {self.__encode_list(categories)}"
+        premium_clause = f"AND premium IN {self.__encode_list(premiums)}"
+        self.cursor.execute(
+            f'''
+            SELECT * FROM items
+            {catog_clause}
+            {premium_clause}
+            GROUP BY name
+            ORDER BY RANDOM()
+            LIMIT ?;
+            ''',
+            (limit,)
+        )
+        results = self.cursor.fetchall()
+        if results:
+            names = [
+                col[0]
+                for col in self.cursor.description
+            ]
+            return [
+                dict(zip(names, res))
+                for res in results
+            ]
+        return []
 
     def get_all_items(self) -> List[Dict]:
         """
