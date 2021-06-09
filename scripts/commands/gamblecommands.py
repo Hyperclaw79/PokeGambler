@@ -1122,6 +1122,26 @@ class GambleCommands(Commands):
         if not gladiator1:
             return
         user2 = mentions[0]
+        na_checks = [
+            user2.bot,
+            self.database.is_blacklisted(user2.id)
+        ]
+        if any(na_checks):
+            reasons = [
+                "Bot account",
+                "Blacklisted User"
+            ]
+            reason = reasons[
+                na_checks.index(True)
+            ]
+            await message.channel.send(
+                embed=get_embed(
+                    f"You cannot challenge a **{reason}.**",
+                    embed_type="error",
+                    title="Invalid Opponent"
+                )
+            )
+            return
         confirmed = await self.__duel_confirmation(message, user2, amount)
         if not confirmed:
             return
@@ -1130,6 +1150,14 @@ class GambleCommands(Commands):
             message, user2, notify=False
         )
         if not gladiator2:
+            await message.channel.send(
+                embedg=get_embed(
+                    f"Gladiator Match cancelled cause **{user2.name}**"
+                    " has no gladiator.",
+                    embed_type="warning",
+                    title="Duel cancelled."
+                )
+            )
             return
         proceed = await self.__duel_proceed(
             message, user2, other_profile,
