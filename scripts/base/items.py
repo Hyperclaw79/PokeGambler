@@ -169,6 +169,8 @@ class Item(ABC):
         item = database.get_item(itemid)
         if not item:
             return None
+        if item["category"] == "Chest":
+            return Chest.from_id(database, itemid)
         return cls._new_item(item)
 
     @classmethod
@@ -209,9 +211,6 @@ class Item(ABC):
         category = item["category"]
         if category == "Chest":
             category = Chest
-            item["description"] = item["description"].split(
-                "[Daily"
-            )[0]
         else:
             category = [
                 catog
