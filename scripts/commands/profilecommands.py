@@ -481,7 +481,7 @@ class ProfileCommands(Commands):
             daily_streak += 1
         loot = random.randint(5, 10) * boost * (10 ** tier)
         if daily_streak % 5 == 0 and daily_streak > 0:
-            loot += 1000
+            loot += 100 * (daily_streak / 5)
         loot *= 2  # x2 BETA Bonus
         chest = Chest.get_chest(tier=tier)
         chest.description += f"\n[Daily for {message.author.id}]"
