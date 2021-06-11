@@ -426,8 +426,8 @@ class BoardGenerator(AssetGenerator):
         Returns a Board image with a random time replaced with a pokechip.
         """
         pos = (
-            random.randint(0, level + 1),
-            random.randint(0, level + 1)
+            random.randint(0, level + 2),
+            random.randint(0, level + 2)
         )
         tile_w, tile_h = (250, 250)
         board_img = self.boards[level].copy()
