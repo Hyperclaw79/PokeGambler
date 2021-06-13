@@ -314,22 +314,21 @@ class ControlCommands(Commands):
                         timestamp=True,
                         color="blue"
                     )
-        else:
-            if args and args[0].lower() == "list":
-                await message.channel.send(
-                    "\n".join(
-                        f"{chan}({chan.id})"
-                        for chan in self.ctx.active_channels
-                    ) or "None."
-                )
+        elif args[0].lower() == "list":
+            await message.channel.send(
+                "\n".join(
+                    f"{chan}({chan.id})"
+                    for chan in self.ctx.active_channels
+                ) or "None."
+            )
 
-            elif args and args[0].lower() == "reset":
-                self.ctx.active_channels = []
-                self.logger.pprint(
-                    "All channels have been succesfully reset.",
-                    timestamp=True,
-                    color="green"
-                )
+        elif args[0].lower() == "reset":
+            self.ctx.active_channels = []
+            self.logger.pprint(
+                "All channels have been succesfully reset.",
+                timestamp=True,
+                color="green"
+            )
 
     @owner_only
     @no_log

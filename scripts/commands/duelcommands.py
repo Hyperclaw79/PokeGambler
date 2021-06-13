@@ -6,6 +6,7 @@ Gambling Commands Module
 
 from __future__ import annotations
 import asyncio
+from collections import namedtuple
 import random
 from typing import List, Optional, TYPE_CHECKING
 
@@ -13,53 +14,97 @@ import discord
 
 from ..base.items import Gladiator, Item
 from ..base.models import (
-    Inventory, Profile, Duels
+    DuelActionsModel, Inventory, Profile, Duels
 )
-from ..helpers.imageclasses import GladitorMatchHandler
 
+from ..helpers.checks import user_check
+from ..helpers.imageclasses import GladitorMatchHandler
 from ..helpers.utils import (
     dedent, get_embed, get_enum_embed,
     img2file, wait_for, dm_send
 )
-from .basecommand import Commands
+from .basecommand import (
+    Commands, alias, model, no_thumb
+)
 
 if TYPE_CHECKING:
+    from bot import PokeGambler
     from discord import Message, Member
+    from ..base.dbconn import DBConnector
 
 
 class DuelActions:
     """
     Holder class for different types of duel attacks.
     """
-    normal = [
-        "<g1> kicks <g2> to the ground.",
-        "<g1> pokes <g2> in the eye.",
-        "<g1> punches <g2> in the face.",
-        "<g1> cuts <g2> with a kitchen knife.",
-        "<g1> stikes <g2> from above.",
-        "<g1> trips <g2> with finesse.",
-        "<g1> bashes <g2> with force."
-    ]
-    crit = [
-        "<g1> releases a charged 🅴🅽🅴🆁🅶🆈 🆁🅰🆈.",
-        "<g1> infuses weapon with mana and unleashes\n"
-        "🅴🅻🅴🅼🅴🅽🆃🅰🅻 🆂🆃🆁🅸🅺🅴.",
-        "<g1> carries out a 🅵🅻🆄🆁🆁🆈 of 🆂🆃🆁🅸🅺🅴🆂.",
-        "<g1> cracks <g2>'s armor with\n"
-        "🅰🆁🅼🅾🆁 🅿🅴🅽🅴🆃🆁🅰🆃🅸🅾🅽.",
-        "<g1> aims for vitals and makes <g2> 🅱🅻🅴🅴🅳."
-    ]
+    def __init__(
+        self, ctx: PokeGambler,
+        database: DBConnector
+    ) -> None:
+        self.ctx = ctx
+        self.database = database
+        actions = database.get_actions()
+        if not actions:
+            self.normal = [
+                "<g1> kicks <g2> to the ground.",
+                "<g1> pokes <g2> in the eye.",
+                "<g1> punches <g2> in the face.",
+                "<g1> cuts <g2> with a kitchen knife.",
+                "<g1> stikes <g2> from above.",
+                "<g1> trips <g2> with finesse.",
+                "<g1> bashes <g2> with force."
+            ]
+            self.crit = [
+                "<g1> releases a charged 🅴🅽🅴🆁🅶🆈 🆁🅰🆈.",
+                "<g1> infuses weapon with mana and unleashes\n"
+                "🅴🅻🅴🅼🅴🅽🆃🅰🅻 🆂🆃🆁🅸🅺🅴.",
+                "<g1> carries out a 🅵🅻🆄🆁🆁🆈 of 🆂🆃🆁🅸🅺🅴🆂.",
+                "<g1> cracks <g2>'s armor with\n"
+                "🅰🆁🅼🅾🆁 🅿🅴🅽🅴🆃🆁🅰🆃🅸🅾🅽.",
+                "<g1> aims for vitals and makes <g2> 🅱🅻🅴🅴🅳."
+            ]
+            User = namedtuple("User", ['id'])
+            owner = User(id=ctx.owner_id)
+            for key, val in {
+                "Normal": self.normal,
+                "Critical": self.crit
+            }.items():
+                for action in val:
+                    DuelActionsModel(
+                        self.database, owner,
+                        action, key
+                    ).save()
+        else:
+            self.normal = []
+            self.crit = []
+            for action in actions:
+                if action["level"] == "Normal":
+                    self.normal.append(action["action"])
+                else:
+                    self.crit.append(action["action"])
 
-    @classmethod
-    def get(cls: DuelActions, damage: int) -> str:
+    def refresh(self):
+        """
+        Populates DuelActions class with all actions in DB.
+        """
+        self.normal = []
+        self.crit = []
+        actions = self.database.get_actions()
+        for action in actions:
+            if action["level"] == "Normal":
+                self.normal.append(action["action"])
+            else:
+                self.crit.append(action["action"])
+
+    def get(self, damage: int) -> str:
         """
         Returns a random attack based on damage.
         """
         if damage >= 300:
             return "<g1> uses 🅳🅸🆅🅸🅽🅴 🆆🆁🅰🆃🅷 and finishes off <g2>."
         if damage > 150:
-            return random.choice(cls.crit)
-        return random.choice(cls.normal)
+            return random.choice(self.crit)
+        return random.choice(self.normal)
 
 
 class DuelCommands(Commands):
@@ -67,14 +112,202 @@ class DuelCommands(Commands):
     Gamble Commands are the core commands for PokeGambler.
     Currently, the only available command is the Gamble command itself.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.duelactions = DuelActions(self.ctx, self.database)
 
-    @staticmethod
+    @model([Duels, Profile, Inventory, Item])
+    @alias(["fight", "gladiator", "battle"])
+    async def cmd_duel(
+        self, message: Message,
+        args: Optional[List] = None,
+        mentions: List[Member] = None,
+        **kwargs
+    ):
+        """Gladiator Battler 1v1.
+        $```scss
+        {command_prefix}duel [chips] @player
+        ```$
+
+        @Have a 1v1 Gladiator match against any valid player.
+        Cost defaults to 50 {pokechip_emoji} (minimum) if not provided.
+        Both the players must own at least 1 Gladiator & have enough balance.
+        You can purchase Gladiators from the shop.@
+
+        ~To battle user ABCD#1234 for 50 chips:
+            ```
+            {command_prefix}duel @ABCD#1234
+            ```
+        To battle user EFGH#5678 for 50,000 chips:
+            ```
+            {command_prefix}duel @EFGH#5678 50000
+            ```~
+        """
+        if not mentions or mentions[0].id == message.author.id:
+            await dm_send(
+                message, message.author,
+                embed=get_embed(
+                    "You need to mention whom you want to duel.",
+                    embed_type="error",
+                    title="No Player 2"
+                )
+            )
+            return
+        user_profile = Profile(self.database, message.author)
+        amount = await self.__duel_get_cost(message, user_profile, args)
+        if not amount:
+            return
+        gladiator1 = await self.__duel_get_gladiator(message, message.author)
+        if not gladiator1:
+            return
+        user2 = mentions[0]
+        na_checks = [
+            user2.bot,
+            self.database.is_blacklisted(user2.id)
+        ]
+        if any(na_checks):
+            reasons = [
+                "Bot account",
+                "Blacklisted User"
+            ]
+            reason = reasons[
+                na_checks.index(True)
+            ]
+            await message.channel.send(
+                embed=get_embed(
+                    f"You cannot challenge a **{reason}.**",
+                    embed_type="error",
+                    title="Invalid Opponent"
+                )
+            )
+            return
+        confirmed = await self.__duel_confirmation(message, user2, amount)
+        if not confirmed:
+            return
+        other_profile = Profile(self.database, user2)
+        gladiator2 = await self.__duel_get_gladiator(
+            message, user2, notify=False
+        )
+        if not gladiator2:
+            await message.channel.send(
+                embed=get_embed(
+                    f"Gladiator Match cancelled cause **{user2.name}**"
+                    " has no gladiator.",
+                    embed_type="warning",
+                    title="Duel cancelled."
+                )
+            )
+            return
+        proceed = await self.__duel_proceed(
+            message, user2, other_profile,
+            gladiator2, amount
+        )
+        if proceed:
+            glads = [gladiator1, gladiator2]
+            profiles = [user_profile, other_profile]
+            await self.__duel_play(
+                message, glads,
+                profiles, amount
+            )
+
+    @alias("action+")
+    @no_thumb
+    async def cmd_create_action(self, message: Message, **kwargs):
+        """Create a custom Duel Action.
+        $```scss
+        {command_prefix}create_action
+        ```$
+
+        @Create your own attack action in the Duels.
+        > *Note: Actions created will be added to the global action list.*
+        > *Other will also get this action for their gladiator.*
+        > *Actions are generated using RNG, so it might take a while for yours*
+        > *to show up.*@
+        """
+        levels = ["Normal", "Critical"]
+        dmg_info = ["(dmg < 150)", "(dmg >= 150)"]
+        lvl_msg = await message.channel.send(
+            embed=get_enum_embed(
+                [
+                    f"{lvl} {dmg}"
+                    for lvl, dmg in zip(levels, dmg_info)
+                ],
+                title="Choose the action level"
+            )
+        )
+        reply = await wait_for(
+            message.channel, self.ctx, init_msg=lvl_msg,
+            check=lambda msg: user_check(msg, message),
+            timeout="inf"
+        )
+        if (
+            reply.content.isdigit()
+            and 0 < int(reply.content) <= len(levels)
+        ):
+            choice = levels[int(reply.content) - 1]
+        elif reply.content.title() in levels:
+            choice = reply.content.title()
+        else:
+            await message.channel.send(
+                embed=get_embed(
+                    "Please reuse the command.",
+                    embed_type="error",
+                    title="Invalid Choice"
+                )
+            )
+            return
+        action_inp_msg = await message.channel.send(
+            embed=get_embed(
+                dedent(
+                    """
+                    Use `<g1>` and `<g2>` as placeholders for gladiator names.
+                    Default formatting won't work, so use unicode characters
+                    for emphasising any word.
+
+                    For example:
+                        ```
+                        <g1> slams <g2> to the ground.
+                        <g1> activates 🆅🅴🅽🅶🅴🅰🅽🅲🅴.
+                        ```
+                    """
+                ),
+                title="Enter the action message"
+            )
+        )
+        reply = await wait_for(
+            message.channel, self.ctx, init_msg=action_inp_msg,
+            check=lambda msg: user_check(msg, message),
+            timeout="inf"
+        )
+        if "<g1>" not in reply.content:
+            await message.channel.send(
+                embed=get_embed(
+                    "You need to include at least <g1> in the action.\n"
+                    "Please reuse the command.",
+                    embed_type="error",
+                    title="No Gladiator 1 Placeholder"
+                )
+            )
+            return
+        action = reply.content
+        DuelActionsModel(
+            self.database, message.author,
+            action, choice
+        ).save()
+        await message.channel.send(
+            embed=get_embed(
+                "Successfully saved your duel action.\n"
+                "Let's hope it shows up soon.",
+                title="Duel Action saved"
+            )
+        )
+
     def __duel_get_action(
-        glads: List[Gladiator],
+        self, glads: List[Gladiator],
         damages: List[int]
     ) -> str:
         return "\n".join(
-            DuelActions.get(damages[idx]).replace(
+            self.duelactions.get(damages[idx]).replace(
                 '<g1>', glads[idx].name
             ).replace(
                 '<g2>', glads[1 - idx].name
@@ -288,6 +521,8 @@ class DuelCommands(Commands):
             prof.user
             for prof in profiles
         ]
+        if not self.duelactions.normal:
+            self.duelactions.refresh()
         gladhandler = GladitorMatchHandler(self.ctx.assets_path)
         base = await self.__duel_start(message, gladhandler, glads)
         emb = discord.Embed()
@@ -337,77 +572,3 @@ class DuelCommands(Commands):
             str(players[1].id), glads[1].name, str(winner.user.id),
             amount
         ).save()
-
-    async def duel(
-        self, message: Message,
-        args: Optional[List] = None,
-        mentions: List[Member] = None,
-        **kwargs
-    ):
-        """ Carries out Duel between two players. """
-        if not mentions or mentions[0].id == message.author.id:
-            await dm_send(
-                message, message.author,
-                embed=get_embed(
-                    "You need to mention whom you want to duel.",
-                    embed_type="error",
-                    title="No Player 2"
-                )
-            )
-            return
-        user_profile = Profile(self.database, message.author)
-        amount = await self.__duel_get_cost(message, user_profile, args)
-        if not amount:
-            return
-        gladiator1 = await self.__duel_get_gladiator(message, message.author)
-        if not gladiator1:
-            return
-        user2 = mentions[0]
-        na_checks = [
-            user2.bot,
-            self.database.is_blacklisted(user2.id)
-        ]
-        if any(na_checks):
-            reasons = [
-                "Bot account",
-                "Blacklisted User"
-            ]
-            reason = reasons[
-                na_checks.index(True)
-            ]
-            await message.channel.send(
-                embed=get_embed(
-                    f"You cannot challenge a **{reason}.**",
-                    embed_type="error",
-                    title="Invalid Opponent"
-                )
-            )
-            return
-        confirmed = await self.__duel_confirmation(message, user2, amount)
-        if not confirmed:
-            return
-        other_profile = Profile(self.database, user2)
-        gladiator2 = await self.__duel_get_gladiator(
-            message, user2, notify=False
-        )
-        if not gladiator2:
-            await message.channel.send(
-                embed=get_embed(
-                    f"Gladiator Match cancelled cause **{user2.name}**"
-                    " has no gladiator.",
-                    embed_type="warning",
-                    title="Duel cancelled."
-                )
-            )
-            return
-        proceed = await self.__duel_proceed(
-            message, user2, other_profile,
-            gladiator2, amount
-        )
-        if proceed:
-            glads = [gladiator1, gladiator2]
-            profiles = [user_profile, other_profile]
-            await self.__duel_play(
-                message, glads,
-                profiles, amount
-            )

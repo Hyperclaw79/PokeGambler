@@ -14,11 +14,9 @@ from typing import List, Optional, TYPE_CHECKING
 
 import discord
 
-from ..base.items import Item
 from ..base.models import (
-    Flips, Inventory, Loots,
-    Matches, Moles, Profile,
-    Duels
+    Flips, Loots, Matches,
+    Moles, Profile
 )
 from ..helpers.checks import user_check, user_rctn
 from ..helpers.imageclasses import BoardGenerator
@@ -30,10 +28,9 @@ from .basecommand import (
     Commands, alias, dealer_only,
     model, no_thumb
 )
-from .duels import DuelCommands
 
 if TYPE_CHECKING:
-    from discord import Message, Member
+    from discord import Message
 
 
 class GambleCommands(Commands):
@@ -65,377 +62,6 @@ class GambleCommands(Commands):
             "lower_wins": "Lower number card wins"
         }
         self.boardgen = BoardGenerator(self.ctx.assets_path)
-        self.duels = DuelCommands(self.ctx)
-
-    def __charge_player(self, dealed_deck, fee):
-        profiles = {}
-        for player, _ in dealed_deck.items():
-            profiles[str(player.id)] = profile = Profile(self.database, player)
-            data = profile.get()
-            bal = data["balance"]
-            num_matches = data["num_matches"]
-            won_chips = data["won_chips"]
-            bal -= fee
-            won_chips -= fee
-            num_matches += 1
-            profile.update(
-                balance=bal,
-                num_matches=num_matches,
-                won_chips=won_chips
-            )
-            self.registered.remove(player)
-        return profiles
-
-    async def __create_gamble_channel(self, message):
-        if not self.catog_channel:
-            self.catog_channel = [
-                chan
-                for chan in message.guild.categories
-                if chan.name.lower() in (
-                    "pokegambler", "text channels",
-                    "pokégambler", "gamble"
-                )
-            ][0]
-        gamblers = [
-            role
-            for role in message.guild.roles
-            if role.name.lower() == "gamblers"
-        ][0]
-        dealers = [
-            role
-            for role in message.guild.roles
-            if role.name.lower() == "dealers"
-        ][0]
-        overwrites = {
-            gamblers: discord.PermissionOverwrite(send_messages=False),
-            message.guild.me: discord.PermissionOverwrite(send_messages=True),
-            dealers: discord.PermissionOverwrite(send_messages=True)
-        }
-        gamble_channel = await message.guild.create_text_channel(
-            name="gamble-here",
-            overwrites=overwrites,
-            category=self.catog_channel
-        )
-        return gamble_channel, gamblers
-
-    async def __cleanup(self, gamble_channel, delay=30.0):
-        await asyncio.sleep(delay)
-        if gamble_channel:
-            await gamble_channel.delete()
-        self.registered = []
-        self.match_status = 0
-
-    def __get_decks(self, num_cards, joker_chance):
-        dealed_deck = {
-            self.registered[i]: card
-            for i, card in enumerate(
-                self.ctx.dealer.get_random_cards(
-                    num_cards=num_cards,
-                    joker_chance=joker_chance
-                )
-            )
-        }
-        closed_decks = [
-            self.ctx.dealer.get_closed_deck(num_cards=i)
-            for i in range(num_cards, 0, -1)
-        ]
-        return dealed_deck, closed_decks
-
-    async def __handle_low_bal(self, usr, gamble_channel):
-        low_bal_embed = get_embed(
-            "Every user gets 100 chips as a starting bonus.\n"
-            "You can buy more or exchange for Poketwo credits.",
-            embed_type="error",
-            title="Not enough Pokechips!",
-            footer="Contact an admin for details."
-        )
-        try:
-            await usr.send(embed=low_bal_embed)
-        except discord.Forbidden:
-            await gamble_channel.send(
-                content=usr.mention,
-                embed=low_bal_embed
-            )
-
-    async def __handle_registration(self, message, **kwargs):
-        fee = kwargs["fee"]
-        max_players = max(2, int(kwargs.pop("max_players", 12)))
-        gamble_channel, gamblers = await self.__create_gamble_channel(message)
-        rules = ', '.join(
-            self.rules[key]
-            for key in kwargs
-            if key in self.rules.keys()
-        ) or 'None'
-        desc = (
-            f"**Entry Fee**: {fee} {self.chip_emoji} "
-            "(Non-refundable unless match fails)\n"
-            f"**Custom Rules**: {rules}\n"
-            "**Transaction Rate**: `<tr>%` "
-            "(will increase by 5% per 3 players if more than 12)\n"
-        )
-        admins = [
-            role
-            for role in message.guild.roles
-            if role.name.lower() == "admins"
-        ][0]
-        hot_time = False
-        if admins in message.author.roles:
-            hot_time = True
-            desc += "**:fire: Hot Time is active! " + \
-                "The chance to get Joker is increased to `20%`!**\n"
-        else:
-            desc += "Chance to get Joker: 5%"
-        register_embed = get_embed(
-            desc,
-            title="A new match is about to start!",
-            footer="React with ➕ (within 30 secs) "
-            "to be included in the match."
-        )
-        first_embed = register_embed.copy()
-        first_embed.description = first_embed.description.replace("<tr>", "10")
-        register_msg = await gamble_channel.send(
-            content=f"Hey {gamblers.mention}",
-            embed=first_embed,
-        )
-        await register_msg.add_reaction("➕")
-        now = datetime.now()
-        while all([
-            (datetime.now() - now).total_seconds() < 30,
-            len(self.registered) < max_players
-        ]):
-            try:
-                _, usr = await self.ctx.wait_for(
-                    "reaction_add",
-                    check=lambda rctn, usr: all([
-                        rctn.message.id == register_msg.id,
-                        rctn.emoji == "➕",
-                        usr.id != self.ctx.user.id,
-                        usr not in self.registered,
-                        not usr.bot
-                    ]),
-                    timeout=(30 - (datetime.now() - now).total_seconds())
-                )
-                bal = Profile(self.database, usr).get()["balance"]
-                if bal < fee:
-                    await self.__handle_low_bal(usr, gamble_channel)
-                    continue
-                self.registered.append(usr)
-                players = ', '.join(player.name for player in self.registered)
-                embed = self.__prep_reg_embed(
-                    register_embed, players,
-                    fee, now, max_players
-                )
-                await register_msg.edit(embed=embed)
-            except asyncio.TimeoutError:
-                continue
-        return gamble_channel, hot_time
-
-    async def __handle_roll(
-        self, message, deck, player,
-        card, gamble_channel, dealed_deck
-    ):
-        closed_fl = img2file(deck, "closed.png")
-        card_fl = img2file(
-            card["card_img"],
-            f"{card['card_num']}{card['suit']}.jpeg"
-        )
-        closed_msg = await gamble_channel.send(
-            content=f"{player.mention}, react with 👀 within 10 seconds.",
-            file=closed_fl
-        )
-        await closed_msg.add_reaction("👀")
-        try:
-            await self.ctx.wait_for(
-                "reaction_add",
-                check=lambda rctn, usr: user_rctn(
-                    message, player, rctn, usr,
-                    chan=gamble_channel, emoji="👀"
-                ),
-                timeout=10
-            )
-        except asyncio.TimeoutError:
-            await gamble_channel.send(
-                embed=get_embed(
-                    f"{player.mention}, you didn't react in time."
-                )
-            )
-            await closed_msg.delete()
-            dealed_deck[player].update({
-                "card_num": "0",
-                "card_img": self.ctx.dealer.closed_card.copy()
-            })
-            return
-        await closed_msg.delete()
-        await gamble_channel.send(
-            content=f"{player.mention}, here's your card:",
-            file=card_fl
-        )
-        if card["card_num"] == "Joker":
-            return "Joker"
-
-    async def __announce_winner(
-        self, gamble_channel, dealed_deck,
-        winner, fee, profiles
-    ):
-        profile = profiles[str(winner.id)]
-        data = profile.get()
-        bal = data["balance"]
-        num_wins = data["num_wins"]
-        won_chips = data["won_chips"]
-        transaction_rate = 0.1 + 0.05 * math.floor(
-            max(
-                0,
-                len(self.registered) - 12
-            ) / 3
-        )
-        incr = int(
-            (fee * len(dealed_deck.items())) * (1 - transaction_rate)
-        )
-        bal += incr
-        num_wins += 1
-        if num_wins in [25, 100]:
-            loot_table = Loots(self.database, winner)
-            if num_wins == 25:
-                loot_table.update(tier=2)
-            else:
-                loot_table.update(tier=3)
-        won_chips += incr
-        profile.update(
-            balance=bal,
-            num_wins=num_wins,
-            won_chips=won_chips
-        )
-        title = f"The winner is {winner}!"
-        is_joker = [
-            player
-            for player, card in dealed_deck.items()
-            if card["card_num"] == "Joker"
-        ]
-        if is_joker:
-            title += " (by rolling a Joker)"
-        winner_embed = get_embed(
-            f"{incr} pokechips have been added to their balance.",
-            title=title,
-            footer="10% pokechips from the pot deducted as transaction fee."
-        )
-        await gamble_channel.send(embed=winner_embed)
-        return bool(is_joker)
-
-    async def __handle_winner(
-        self, dealed_deck,
-        gamble_channel, profiles,
-        lower_wins, fee
-    ):
-        embed = get_enum_embed(
-            [
-                f"{player} rolled a 『{card['card_num']} {card['suit']}』."
-                for player, card in dealed_deck.items()
-            ],
-            title="Roll Table"
-        )
-        players = sorted(
-            dealed_deck.items(),
-            key=lambda x: (
-                self.conv_table[
-                    x[1]["card_num"]
-                ],
-                -self.suits.index(
-                    x[1]["suit"]
-                )
-            ),
-            reverse=True
-        )
-        if lower_wins:
-            players = players[::-1]
-            if self.conv_table[players[0][1]['card_num']] == 0:
-                players.append(players.pop(0))
-        winner = players[0][0]
-        rolled = [
-            dealed_deck[player]["card_img"]
-            for player in [
-                pl[0]
-                for pl in players
-            ]
-        ]
-        rolled_deck = self.ctx.dealer.get_deck(rolled, reverse=True)
-        rolled_fl = img2file(rolled_deck, "rolled.jpg")
-        embed.set_image(url="attachment://rolled.jpg")
-        await gamble_channel.send(embed=embed, file=rolled_fl)
-        # Return is_joker for saving into DB
-        return (
-            winner,
-            await self.__announce_winner(
-                gamble_channel, dealed_deck,
-                winner, fee, profiles
-            )
-        )
-
-    def __prep_reg_embed(
-        self, register_embed, players,
-        fee, now, max_players
-    ):
-        embed = register_embed.copy()
-        embed.description = register_embed.description.replace(
-            "<tr>",
-            str(
-                10 + 5 * math.floor(
-                    max(0, len(self.registered) - 12) / 3
-                )
-            )
-        )
-        rem_secs = int(30 - (datetime.now() - now).total_seconds())
-        embed.set_footer(
-            text=f"React with ➕ (within {rem_secs} secs)"
-            " to be included in the match."
-        )
-        embed.add_field(
-            name=f"Current Participants "
-            f"『{len(self.registered)}/{max_players}』",
-            value=players,
-            inline=False
-        )
-        embed.add_field(
-            name="Pokechips in the pot",
-            value=f"{fee * len(self.registered)} "
-            f"{self.chip_emoji}",
-            inline=False
-        )
-        return embed
-
-    async def __input_handler(
-        self, message, args, profile,
-        default, min_chips, max_chips
-    ):
-        amount = default
-        if args:
-            try:
-                amount = int(args[0])
-            except (ZeroDivisionError, ValueError):
-                await message.channel.send(
-                    embed=get_embed(
-                        f"Amount will be defaulted to {default} chips.",
-                        embed_type="warning",
-                        title="Invalid Input"
-                    )
-                )
-        if any([
-            amount < min_chips,
-            amount > max_chips
-        ]):
-            await message.channel.send(
-                embed=get_embed(
-                    f"Amount should be more than {min_chips} and "
-                    f"less than {max_chips} chips.",
-                    embed_type="error",
-                    title="Invalid Input"
-                )
-            )
-            return None
-        if profile.get()["balance"] < amount:
-            await self.__handle_low_bal(message.author, message.channel)
-            await message.add_reaction("❌")
-            return None
-        return amount
 
     @dealer_only
     @model([Profile, Matches, Loots])
@@ -817,31 +443,372 @@ class GambleCommands(Commands):
             embeds.append(emb)
         await self.paginate(message, embeds)
 
-    @model([Duels, Profile, Inventory, Item])
-    @alias(["fight", "gladiator", "battle"])
-    async def cmd_duel(
-        self, message: Message,
-        args: Optional[List] = None,
-        mentions: List[Member] = None,
-        **kwargs
+    def __charge_player(self, dealed_deck, fee):
+        profiles = {}
+        for player, _ in dealed_deck.items():
+            profiles[str(player.id)] = profile = Profile(self.database, player)
+            data = profile.get()
+            bal = data["balance"]
+            num_matches = data["num_matches"]
+            won_chips = data["won_chips"]
+            bal -= fee
+            won_chips -= fee
+            num_matches += 1
+            profile.update(
+                balance=bal,
+                num_matches=num_matches,
+                won_chips=won_chips
+            )
+            self.registered.remove(player)
+        return profiles
+
+    async def __create_gamble_channel(self, message):
+        if not self.catog_channel:
+            self.catog_channel = [
+                chan
+                for chan in message.guild.categories
+                if chan.name.lower() in (
+                    "pokegambler", "text channels",
+                    "pokégambler", "gamble"
+                )
+            ][0]
+        gamblers = [
+            role
+            for role in message.guild.roles
+            if role.name.lower() == "gamblers"
+        ][0]
+        dealers = [
+            role
+            for role in message.guild.roles
+            if role.name.lower() == "dealers"
+        ][0]
+        overwrites = {
+            gamblers: discord.PermissionOverwrite(send_messages=False),
+            message.guild.me: discord.PermissionOverwrite(send_messages=True),
+            dealers: discord.PermissionOverwrite(send_messages=True)
+        }
+        gamble_channel = await message.guild.create_text_channel(
+            name="gamble-here",
+            overwrites=overwrites,
+            category=self.catog_channel
+        )
+        return gamble_channel, gamblers
+
+    async def __cleanup(self, gamble_channel, delay=30.0):
+        await asyncio.sleep(delay)
+        if gamble_channel:
+            await gamble_channel.delete()
+        self.registered = []
+        self.match_status = 0
+
+    def __get_decks(self, num_cards, joker_chance):
+        dealed_deck = {
+            self.registered[i]: card
+            for i, card in enumerate(
+                self.ctx.dealer.get_random_cards(
+                    num_cards=num_cards,
+                    joker_chance=joker_chance
+                )
+            )
+        }
+        closed_decks = [
+            self.ctx.dealer.get_closed_deck(num_cards=i)
+            for i in range(num_cards, 0, -1)
+        ]
+        return dealed_deck, closed_decks
+
+    async def __handle_low_bal(self, usr, gamble_channel):
+        low_bal_embed = get_embed(
+            "Every user gets 100 chips as a starting bonus.\n"
+            "You can buy more or exchange for Poketwo credits.",
+            embed_type="error",
+            title="Not enough Pokechips!",
+            footer="Contact an admin for details."
+        )
+        try:
+            await usr.send(embed=low_bal_embed)
+        except discord.Forbidden:
+            await gamble_channel.send(
+                content=usr.mention,
+                embed=low_bal_embed
+            )
+
+    async def __handle_registration(self, message, **kwargs):
+        fee = kwargs["fee"]
+        max_players = max(2, int(kwargs.pop("max_players", 12)))
+        gamble_channel, gamblers = await self.__create_gamble_channel(message)
+        rules = ', '.join(
+            self.rules[key]
+            for key in kwargs
+            if key in self.rules.keys()
+        ) or 'None'
+        desc = (
+            f"**Entry Fee**: {fee} {self.chip_emoji} "
+            "(Non-refundable unless match fails)\n"
+            f"**Custom Rules**: {rules}\n"
+            "**Transaction Rate**: `<tr>%` "
+            "(will increase by 5% per 3 players if more than 12)\n"
+        )
+        admins = [
+            role
+            for role in message.guild.roles
+            if role.name.lower() == "admins"
+        ][0]
+        hot_time = False
+        if admins in message.author.roles:
+            hot_time = True
+            desc += "**:fire: Hot Time is active! " + \
+                "The chance to get Joker is increased to `20%`!**\n"
+        else:
+            desc += "Chance to get Joker: 5%"
+        register_embed = get_embed(
+            desc,
+            title="A new match is about to start!",
+            footer="React with ➕ (within 30 secs) "
+            "to be included in the match."
+        )
+        first_embed = register_embed.copy()
+        first_embed.description = first_embed.description.replace("<tr>", "10")
+        register_msg = await gamble_channel.send(
+            content=f"Hey {gamblers.mention}",
+            embed=first_embed,
+        )
+        await register_msg.add_reaction("➕")
+        now = datetime.now()
+        while all([
+            (datetime.now() - now).total_seconds() < 30,
+            len(self.registered) < max_players
+        ]):
+            try:
+                _, usr = await self.ctx.wait_for(
+                    "reaction_add",
+                    check=lambda rctn, usr: all([
+                        rctn.message.id == register_msg.id,
+                        rctn.emoji == "➕",
+                        usr.id != self.ctx.user.id,
+                        usr not in self.registered,
+                        not usr.bot
+                    ]),
+                    timeout=(30 - (datetime.now() - now).total_seconds())
+                )
+                bal = Profile(self.database, usr).get()["balance"]
+                if bal < fee:
+                    await self.__handle_low_bal(usr, gamble_channel)
+                    continue
+                self.registered.append(usr)
+                players = ', '.join(player.name for player in self.registered)
+                embed = self.__prep_reg_embed(
+                    register_embed, players,
+                    fee, now, max_players
+                )
+                await register_msg.edit(embed=embed)
+            except asyncio.TimeoutError:
+                continue
+        return gamble_channel, hot_time
+
+    async def __handle_roll(
+        self, message, deck, player,
+        card, gamble_channel, dealed_deck
     ):
-        """Gladiator Battler 1v1.
-        $```scss
-        {command_prefix}duel [chips] @player
-        ```$
+        closed_fl = img2file(deck, "closed.png")
+        card_fl = img2file(
+            card["card_img"],
+            f"{card['card_num']}{card['suit']}.jpeg"
+        )
+        closed_msg = await gamble_channel.send(
+            content=f"{player.mention}, react with 👀 within 10 seconds.",
+            file=closed_fl
+        )
+        await closed_msg.add_reaction("👀")
+        try:
+            await self.ctx.wait_for(
+                "reaction_add",
+                check=lambda rctn, usr: user_rctn(
+                    message, player, rctn, usr,
+                    chan=gamble_channel, emoji="👀"
+                ),
+                timeout=10
+            )
+        except asyncio.TimeoutError:
+            await gamble_channel.send(
+                embed=get_embed(
+                    f"{player.mention}, you didn't react in time."
+                )
+            )
+            await closed_msg.delete()
+            dealed_deck[player].update({
+                "card_num": "0",
+                "card_img": self.ctx.dealer.closed_card.copy()
+            })
+            return
+        await closed_msg.delete()
+        await gamble_channel.send(
+            content=f"{player.mention}, here's your card:",
+            file=card_fl
+        )
+        if card["card_num"] == "Joker":
+            return "Joker"
 
-        @Have a 1v1 Gladiator match against any valid player.
-        Cost defaults to 50 {pokechip_emoji} (minimum) if not provided.
-        Both the players must own at least 1 Gladiator & have enough balance.
-        You can purchase Gladiators from the shop.@
+    async def __announce_winner(
+        self, gamble_channel, dealed_deck,
+        winner, fee, profiles
+    ):
+        profile = profiles[str(winner.id)]
+        data = profile.get()
+        bal = data["balance"]
+        num_wins = data["num_wins"]
+        won_chips = data["won_chips"]
+        transaction_rate = 0.1 + 0.05 * math.floor(
+            max(
+                0,
+                len(self.registered) - 12
+            ) / 3
+        )
+        incr = int(
+            (fee * len(dealed_deck.items())) * (1 - transaction_rate)
+        )
+        bal += incr
+        num_wins += 1
+        if num_wins in [25, 100]:
+            loot_table = Loots(self.database, winner)
+            if num_wins == 25:
+                loot_table.update(tier=2)
+            else:
+                loot_table.update(tier=3)
+        won_chips += incr
+        profile.update(
+            balance=bal,
+            num_wins=num_wins,
+            won_chips=won_chips
+        )
+        title = f"The winner is {winner}!"
+        is_joker = [
+            player
+            for player, card in dealed_deck.items()
+            if card["card_num"] == "Joker"
+        ]
+        if is_joker:
+            title += " (by rolling a Joker)"
+        winner_embed = get_embed(
+            f"{incr} pokechips have been added to their balance.",
+            title=title,
+            footer="10% pokechips from the pot deducted as transaction fee."
+        )
+        await gamble_channel.send(embed=winner_embed)
+        return bool(is_joker)
 
-        ~To battle user ABCD#1234 for 50 chips:
-            ```
-            {command_prefix}duel @ABCD#1234
-            ```
-        To battle user EFGH#5678 for 50,000 chips:
-            ```
-            {command_prefix}duel @EFGH#5678 50000
-            ```~
-        """
-        await self.duels.duel(message, args, mentions, **kwargs)
+    async def __handle_winner(
+        self, dealed_deck,
+        gamble_channel, profiles,
+        lower_wins, fee
+    ):
+        embed = get_enum_embed(
+            [
+                f"{player} rolled a 『{card['card_num']} {card['suit']}』."
+                for player, card in dealed_deck.items()
+            ],
+            title="Roll Table"
+        )
+        players = sorted(
+            dealed_deck.items(),
+            key=lambda x: (
+                self.conv_table[
+                    x[1]["card_num"]
+                ],
+                -self.suits.index(
+                    x[1]["suit"]
+                )
+            ),
+            reverse=True
+        )
+        if lower_wins:
+            players = players[::-1]
+            if self.conv_table[players[0][1]['card_num']] == 0:
+                players.append(players.pop(0))
+        winner = players[0][0]
+        rolled = [
+            dealed_deck[player]["card_img"]
+            for player in [
+                pl[0]
+                for pl in players
+            ]
+        ]
+        rolled_deck = self.ctx.dealer.get_deck(rolled, reverse=True)
+        rolled_fl = img2file(rolled_deck, "rolled.jpg")
+        embed.set_image(url="attachment://rolled.jpg")
+        await gamble_channel.send(embed=embed, file=rolled_fl)
+        # Return is_joker for saving into DB
+        return (
+            winner,
+            await self.__announce_winner(
+                gamble_channel, dealed_deck,
+                winner, fee, profiles
+            )
+        )
+
+    def __prep_reg_embed(
+        self, register_embed, players,
+        fee, now, max_players
+    ):
+        embed = register_embed.copy()
+        embed.description = register_embed.description.replace(
+            "<tr>",
+            str(
+                10 + 5 * math.floor(
+                    max(0, len(self.registered) - 12) / 3
+                )
+            )
+        )
+        rem_secs = int(30 - (datetime.now() - now).total_seconds())
+        embed.set_footer(
+            text=f"React with ➕ (within {rem_secs} secs)"
+            " to be included in the match."
+        )
+        embed.add_field(
+            name=f"Current Participants "
+            f"『{len(self.registered)}/{max_players}』",
+            value=players,
+            inline=False
+        )
+        embed.add_field(
+            name="Pokechips in the pot",
+            value=f"{fee * len(self.registered)} "
+            f"{self.chip_emoji}",
+            inline=False
+        )
+        return embed
+
+    async def __input_handler(
+        self, message, args, profile,
+        default, min_chips, max_chips
+    ):
+        amount = default
+        if args:
+            try:
+                amount = int(args[0])
+            except (ZeroDivisionError, ValueError):
+                await message.channel.send(
+                    embed=get_embed(
+                        f"Amount will be defaulted to {default} chips.",
+                        embed_type="warning",
+                        title="Invalid Input"
+                    )
+                )
+        if any([
+            amount < min_chips,
+            amount > max_chips
+        ]):
+            await message.channel.send(
+                embed=get_embed(
+                    f"Amount should be more than {min_chips} and "
+                    f"less than {max_chips} chips.",
+                    embed_type="error",
+                    title="Invalid Input"
+                )
+            )
+            return None
+        if profile.get()["balance"] < amount:
+            await self.__handle_low_bal(message.author, message.channel)
+            await message.add_reaction("❌")
+            return None
+        return amount

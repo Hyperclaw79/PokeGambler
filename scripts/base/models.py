@@ -574,3 +574,24 @@ class Duels(Minigame):
         self.opponent_gladiator = opponent_gladiator
         self.cost = cost
         self.won = won
+
+
+class DuelActionsModel(Model):
+    """
+    Wrapper for duel actions based DB actions
+    """
+
+    # pylint: disable=no-member
+
+    def __init__(
+        self, database: DBConnector, user: discord.Member,
+        action: Optional[str] = None,
+        level: Optional[str] = None
+    ):
+        super().__init__(database, user, "actions")
+        self.created_at = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        self.created_by = str(user.id)
+        self.action = action
+        self.level = level

@@ -32,46 +32,6 @@ class TradeCommands(Commands):
     Shop related commands fall under this category as well.
     """
 
-    def __get_shop_page(self, catog_str: str, user: Member) -> Embed:
-        categories = Shop.categories
-        catog = categories[Shop.alias_map[catog_str]]
-        user_tier = Loots(self.database, user).tier
-        if Shop.alias_map[catog_str] in [
-            "Tradables", "Consumables", "Gladiators"
-        ]:
-            Shop.refresh_tradables(self.database)
-        if len(catog.items) < 1:
-            emb = get_embed(
-                    f"`{catog.name} Shop` seems to be empty right now.\n"
-                    "Please try again later.",
-                    embed_type="warning",
-                    title="No items found",
-                    thumbnail="https://raw.githubusercontent.com/twitter/"
-                    f"twemoji/master/assets/72x72/{ord(catog.emoji):x}.png"
-                )
-        else:
-            emb = get_embed(
-                    f"**To buy any item, use `{self.ctx.prefix}buy itemid`**",
-                    title=f"{catog} Shop",
-                    no_icon=True
-                )
-            for item in catog.items:
-                itemid = f"{item.itemid:0>8X}" if isinstance(
-                    item.itemid, int
-                ) else item.itemid
-                price = item.price
-                if Shop.alias_map[catog_str] == "Boosts":
-                    price *= (10 ** (user_tier - 1))
-                emb.add_field(
-                        name=f"『{itemid}』 _{item}_ "
-                        f"{price:,} {self.chip_emoji}",
-                        value=f"```\n{item.description}\n```",
-                        inline=False
-                    )
-            # pylint: disable=undefined-loop-variable
-            emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
-        return emb
-
     @model([Loots, Profile, Chest, Inventory])
     @no_thumb
     async def cmd_open(
@@ -680,3 +640,43 @@ class TradeCommands(Commands):
                 title="Transaction Successful"
             )
         )
+
+    def __get_shop_page(self, catog_str: str, user: Member) -> Embed:
+        categories = Shop.categories
+        catog = categories[Shop.alias_map[catog_str]]
+        user_tier = Loots(self.database, user).tier
+        if Shop.alias_map[catog_str] in [
+            "Tradables", "Consumables", "Gladiators"
+        ]:
+            Shop.refresh_tradables(self.database)
+        if len(catog.items) < 1:
+            emb = get_embed(
+                    f"`{catog.name} Shop` seems to be empty right now.\n"
+                    "Please try again later.",
+                    embed_type="warning",
+                    title="No items found",
+                    thumbnail="https://raw.githubusercontent.com/twitter/"
+                    f"twemoji/master/assets/72x72/{ord(catog.emoji):x}.png"
+                )
+        else:
+            emb = get_embed(
+                    f"**To buy any item, use `{self.ctx.prefix}buy itemid`**",
+                    title=f"{catog} Shop",
+                    no_icon=True
+                )
+            for item in catog.items:
+                itemid = f"{item.itemid:0>8X}" if isinstance(
+                    item.itemid, int
+                ) else item.itemid
+                price = item.price
+                if Shop.alias_map[catog_str] == "Boosts":
+                    price *= (10 ** (user_tier - 1))
+                emb.add_field(
+                        name=f"『{itemid}』 _{item}_ "
+                        f"{price:,} {self.chip_emoji}",
+                        value=f"```\n{item.description}\n```",
+                        inline=False
+                    )
+            # pylint: disable=undefined-loop-variable
+            emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
+        return emb

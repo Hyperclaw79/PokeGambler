@@ -381,6 +381,29 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def create_actions_table(self):
+        """
+        SQL endpoint for Duel Actions table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            actions(
+                created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP
+                    NOT NULL,
+                created_by TEXT,
+                action TEXT NOT NULL,
+                level TEXT DEFAULT "Normal",
+                FOREIGN KEY (created_by)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
     def create_tables(self):
         """
         SQL endpoint for triggering multiple table creations.
@@ -500,6 +523,17 @@ class DBConnector:
         self.cursor.execute(
             '''
             DELETE FROM inventory;
+            '''
+        )
+        self.conn.commit()
+
+    def purge_actions(self):
+        """
+        SQL endpoint for purging Duel Actions table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM actions;
             '''
         )
         self.conn.commit()
@@ -1043,6 +1077,27 @@ class DBConnector:
         if not res:
             return []
         return res
+
+    def get_actions(self, user_id: Optional[str] = None) -> List[Dict]:
+        """
+        Gets the Duel actions.
+        A user_id can be provided to get actions they created.
+        """
+        query = "SELECT * FROM actions"
+        if user_id:
+            query += f'\nWHERE created_by IS "{user_id}"'
+        self.cursor.execute(query)
+        results = self.cursor.fetchall()
+        if results:
+            cols = [
+                col[0]
+                for col in self.cursor.description
+            ]
+            return [
+                dict(zip(cols, res))
+                for res in results
+            ]
+        return []
 
 # Items
 

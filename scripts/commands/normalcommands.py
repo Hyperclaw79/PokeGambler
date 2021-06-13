@@ -26,101 +26,6 @@ class NormalCommands(Commands):
     """
     Public/Normal commands for PokeGambler.
     """
-    def __generate_help_embed(
-        self, cmd: Callable,
-        keep_footer: bool = False
-    ):
-        got_doc = False
-        meta = {}
-        if cmd.__doc__:
-            if getattr(cmd, "disabled", False):
-                cmd_name = cmd.__name__.replace('cmd_', '').title()
-                emb = get_embed(
-                    f"**{cmd_name}** is under maintainence.\n"
-                    "Details unavailable, so wait for updates.",
-                    embed_type="warning",
-                    title="Command under Maintainence."
-                )
-                return emb
-            got_doc = True
-            doc_str = cmd.__doc__.replace(
-                "{command_prefix}",
-                self.ctx.prefix
-            ).replace(
-                "{pokechip_emoji}",
-                self.chip_emoji
-            )
-            patt = r"\$(?P<Syntax>[^\$]+)\$\s+" + \
-                r"\@(?P<Description>[^\@]+)" + \
-                r"\@(?:\s+\~(?P<Example>[^\~]+)\~)?"
-            meta = re.search(patt, doc_str).groupdict()
-            emb = discord.Embed(
-                title=cmd.__name__.replace("cmd_", "").title(),
-                description='\u200B',
-                color=11068923
-            )
-            if "no_thumb" not in dir(cmd):
-                emb.set_thumbnail(
-                    url="https://cdn.discordapp.com/attachments/"
-                    "840469669332516904/840469820180529202/"
-                    "pokegambler_logo.png"
-                )
-        else:
-            emb = get_embed(
-                "No help message exists for this command.",
-                embed_type="warning",
-                title="No documentation found."
-            )
-        for key, val in meta.items():
-            if val:
-                val = val.replace("  ", " ")
-                val = '\n'.join(
-                    m.lstrip()
-                    for m in val.split('\n')
-                )
-                emb.add_field(name=f"**{key}**", value=val, inline=False)
-        if all([
-            got_doc,
-            "alias" in dir(cmd)
-        ]):
-            alt_names = getattr(cmd, "alias")[:]
-            if cmd.__name__.replace("cmd_", "") not in alt_names:
-                alt_names.append(cmd.__name__.replace("cmd_", ""))
-            alias_str = ', '.join(sorted(alt_names, key=len))
-            emb.add_field(
-                name="**Alias**",
-                value=f"```\n{alias_str}\n```"
-            )
-        if keep_footer and got_doc:
-            emb.set_footer(
-                text="This command helped? You can help me too "
-                "by donating at https://www.paypal.me/hyperclaw79.",
-                icon_url="https://emojipedia-us.s3.dualstack.us-west-1."
-                "amazonaws.com/thumbs/160/facebook/105/money-bag_1f4b0.png"
-            )
-        return emb
-
-    def __showable_command(self, cmd: Callable, user: Member):
-        def has_access(cmd, user):
-            if is_owner(self.ctx, user):
-                return True
-            if is_admin(user):
-                return not getattr(cmd, "owner_only", False)
-            if is_dealer(user):
-                return not any([
-                    getattr(cmd, "owner_only", False),
-                    getattr(cmd, "admin_only", False)
-                ])
-            return not any([
-                getattr(cmd, "owner_only", False),
-                getattr(cmd, "admin_only", False),
-                getattr(cmd, "dealer_only", False)
-            ])
-        return all([
-            cmd.__doc__,
-            not getattr(cmd, "disabled", False),
-            has_access(cmd, user)
-        ])
 
     @alias("cmds")
     async def cmd_commands(
@@ -414,3 +319,99 @@ class NormalCommands(Commands):
                 title="Current Latency"
             )
         )
+
+    def __generate_help_embed(
+        self, cmd: Callable,
+        keep_footer: bool = False
+    ):
+        got_doc = False
+        meta = {}
+        if cmd.__doc__:
+            if getattr(cmd, "disabled", False):
+                cmd_name = cmd.__name__.replace('cmd_', '').title()
+                emb = get_embed(
+                    f"**{cmd_name}** is under maintainence.\n"
+                    "Details unavailable, so wait for updates.",
+                    embed_type="warning",
+                    title="Command under Maintainence."
+                )
+                return emb
+            got_doc = True
+            doc_str = cmd.__doc__.replace(
+                "{command_prefix}",
+                self.ctx.prefix
+            ).replace(
+                "{pokechip_emoji}",
+                self.chip_emoji
+            )
+            patt = r"\$(?P<Syntax>[^\$]+)\$\s+" + \
+                r"\@(?P<Description>[^\@]+)" + \
+                r"\@(?:\s+\~(?P<Example>[^\~]+)\~)?"
+            meta = re.search(patt, doc_str).groupdict()
+            emb = discord.Embed(
+                title=cmd.__name__.replace("cmd_", "").title(),
+                description='\u200B',
+                color=11068923
+            )
+            if "no_thumb" not in dir(cmd):
+                emb.set_thumbnail(
+                    url="https://cdn.discordapp.com/attachments/"
+                    "840469669332516904/840469820180529202/"
+                    "pokegambler_logo.png"
+                )
+        else:
+            emb = get_embed(
+                "No help message exists for this command.",
+                embed_type="warning",
+                title="No documentation found."
+            )
+        for key, val in meta.items():
+            if val:
+                val = val.replace("  ", " ")
+                val = '\n'.join(
+                    m.lstrip()
+                    for m in val.split('\n')
+                )
+                emb.add_field(name=f"**{key}**", value=val, inline=False)
+        if all([
+            got_doc,
+            "alias" in dir(cmd)
+        ]):
+            alt_names = getattr(cmd, "alias")[:]
+            if cmd.__name__.replace("cmd_", "") not in alt_names:
+                alt_names.append(cmd.__name__.replace("cmd_", ""))
+            alias_str = ', '.join(sorted(alt_names, key=len))
+            emb.add_field(
+                name="**Alias**",
+                value=f"```\n{alias_str}\n```"
+            )
+        if keep_footer and got_doc:
+            emb.set_footer(
+                text="This command helped? You can help me too "
+                "by donating at https://www.paypal.me/hyperclaw79.",
+                icon_url="https://emojipedia-us.s3.dualstack.us-west-1."
+                "amazonaws.com/thumbs/160/facebook/105/money-bag_1f4b0.png"
+            )
+        return emb
+
+    def __showable_command(self, cmd: Callable, user: Member):
+        def has_access(cmd, user):
+            if is_owner(self.ctx, user):
+                return True
+            if is_admin(user):
+                return not getattr(cmd, "owner_only", False)
+            if is_dealer(user):
+                return not any([
+                    getattr(cmd, "owner_only", False),
+                    getattr(cmd, "admin_only", False)
+                ])
+            return not any([
+                getattr(cmd, "owner_only", False),
+                getattr(cmd, "admin_only", False),
+                getattr(cmd, "dealer_only", False)
+            ])
+        return all([
+            cmd.__doc__,
+            not getattr(cmd, "disabled", False),
+            has_access(cmd, user)
+        ])

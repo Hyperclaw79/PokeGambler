@@ -37,27 +37,6 @@ class AdminCommands(Commands):
     Only Admins and Owners will have access to these.
     """
 
-    @staticmethod
-    def __item_factory(category: Type[Item], name: str, **kwargs) -> Item:
-        cls_name = ''.join(
-            word.title()
-            for word in name.split(' ')
-        )
-        item_cls = type(cls_name, (category, ), kwargs)
-        return item_cls(**kwargs)
-
-    def __populate_categories(
-        self, catog: Type[Item],
-        categories: Dict, curr_recc: int
-    ):
-        if curr_recc > 3:
-            return
-        for subcatog in catog.__subclasses__():
-            if subcatog.__name__ != 'Chest':
-                categories[subcatog.__name__] = subcatog
-                curr_recc += 1
-                self.__populate_categories(subcatog, categories, curr_recc)
-
     @admin_only
     @ensure_user
     @alias("upd_bal")
@@ -639,3 +618,24 @@ class AdminCommands(Commands):
                 user
             ).save(itemid)
         await message.add_reaction("👍")
+
+    @staticmethod
+    def __item_factory(category: Type[Item], name: str, **kwargs) -> Item:
+        cls_name = ''.join(
+            word.title()
+            for word in name.split(' ')
+        )
+        item_cls = type(cls_name, (category, ), kwargs)
+        return item_cls(**kwargs)
+
+    def __populate_categories(
+        self, catog: Type[Item],
+        categories: Dict, curr_recc: int
+    ):
+        if curr_recc > 3:
+            return
+        for subcatog in catog.__subclasses__():
+            if subcatog.__name__ != 'Chest':
+                categories[subcatog.__name__] = subcatog
+                curr_recc += 1
+                self.__populate_categories(subcatog, categories, curr_recc)

@@ -46,41 +46,6 @@ class ProfileCommands(Commands):
         self.lbg = LeaderBoardGenerator(self.ctx.assets_path)
         self.bdgen = BadgeGenerator(self.ctx.assets_path)
 
-    def __get_minigame_lb(self, mg_name: str, user: Member) -> List[Dict]:
-        def _commands(module):
-            return [
-                attr.replace("cmd_", "")
-                for attr in dir(module)
-                if all([
-                    attr.startswith("cmd_"),
-                    attr not in getattr(module, "alias", [])
-                ])
-            ]
-
-        def _aliases(module):
-            return [
-                alias.replace("cmd_", "")
-                for alias in getattr(module, "alias", [])
-            ]
-
-        def _get_lb(modules, mg_name, user):
-            leaderboard = None
-            for module in modules:
-                if mg_name in _aliases(module) + _commands(module):
-                    command = getattr(module, f"cmd_{mg_name}")
-                    models = getattr(command, "models", [])
-                    if not models:
-                        continue
-                    for model_ in models:
-                        if issubclass(model_, Minigame):
-                            leaderboard = model_(
-                                self.database, user
-                            ).get_lb()
-                            return leaderboard
-            return leaderboard
-        modules = get_modules(self.ctx)
-        return _get_lb(modules, mg_name, user)
-
     @alias("pr")
     async def cmd_profile(
         self, message: Message,
@@ -509,3 +474,38 @@ class ProfileCommands(Commands):
             "added to your balance.**",
             embed=embed
         )
+
+    def __get_minigame_lb(self, mg_name: str, user: Member) -> List[Dict]:
+        def _commands(module):
+            return [
+                attr.replace("cmd_", "")
+                for attr in dir(module)
+                if all([
+                    attr.startswith("cmd_"),
+                    attr not in getattr(module, "alias", [])
+                ])
+            ]
+
+        def _aliases(module):
+            return [
+                alias.replace("cmd_", "")
+                for alias in getattr(module, "alias", [])
+            ]
+
+        def _get_lb(modules, mg_name, user):
+            leaderboard = None
+            for module in modules:
+                if mg_name in _aliases(module) + _commands(module):
+                    command = getattr(module, f"cmd_{mg_name}")
+                    models = getattr(command, "models", [])
+                    if not models:
+                        continue
+                    for model_ in models:
+                        if issubclass(model_, Minigame):
+                            leaderboard = model_(
+                                self.database, user
+                            ).get_lb()
+                            return leaderboard
+            return leaderboard
+        modules = get_modules(self.ctx)
+        return _get_lb(modules, mg_name, user)
