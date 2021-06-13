@@ -17,7 +17,7 @@ from discord import Member, Message
 from discord.errors import Forbidden, HTTPException
 
 from ..base.items import Item
-from ..base.models import Inventory, Profile
+from ..base.models import Inventory, Loots, Profile
 from .dbconn import DBConnector
 
 if TYPE_CHECKING:
@@ -152,6 +152,7 @@ class BoostItem(ShopItem):
             await asyncio.sleep(30 * 60)
             ctx.boost_dict[user.id][self.itemid]["stack"] = 0
         user = message.author
+        tier = Loots(database, user).tier
         if (
             user.id not in ctx.boost_dict
             or ctx.boost_dict[user.id][self.itemid]["stack"] == 0
@@ -163,10 +164,8 @@ class BoostItem(ShopItem):
             if ctx.boost_dict[user.id][self.itemid]["stack"] == 5:
                 return "You've maxed out to 5 stacks for this boost."
             ctx.boost_dict[user.id][self.itemid]["stack"] += quantity
-        self.debit_player(
-            database=database,
-            user=message.author,
-            quantity=quantity
+        Profile(database, user).debit(
+            amount=((self.price * (10 ** (tier - 1))) * quantity)
         )
         return "success"
 
@@ -416,6 +415,9 @@ class Shop:
         ):
             return "Item does not exist anymore."
         # pylint: disable=no-member
-        if Profile(database, user).balance < item.price:
+        price = item.price
+        if item.__class__ == BoostItem:
+            price *= 10 ** (Loots(database, user).tier - 1)
+        if Profile(database, user).balance < price:
             return "You have Insufficient Balance."
         return "proceed"

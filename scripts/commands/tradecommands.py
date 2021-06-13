@@ -32,9 +32,11 @@ class TradeCommands(Commands):
     Shop related commands fall under this category as well.
     """
 
-    def __get_shop_page(self, args: List, categories: List) -> Embed:
-        catog = categories[Shop.alias_map[args[0].title()]]
-        if Shop.alias_map[args[0].title()] in [
+    def __get_shop_page(self, catog_str: str, user: Member) -> Embed:
+        categories = Shop.categories
+        catog = categories[Shop.alias_map[catog_str]]
+        user_tier = Loots(self.database, user).tier
+        if Shop.alias_map[catog_str] in [
             "Tradables", "Consumables", "Gladiators"
         ]:
             Shop.refresh_tradables(self.database)
@@ -55,11 +57,14 @@ class TradeCommands(Commands):
                 )
             for item in catog.items:
                 itemid = f"{item.itemid:0>8X}" if isinstance(
-                        item.itemid, int
-                    ) else item.itemid
+                    item.itemid, int
+                ) else item.itemid
+                price = item.price
+                if Shop.alias_map[catog_str] == "Boosts":
+                    price *= (10 ** (user_tier - 1))
                 emb.add_field(
                         name=f"『{itemid}』 _{item}_ "
-                        f"{item.price:,} {self.chip_emoji}",
+                        f"{price:,} {self.chip_emoji}",
                         value=f"```\n{item.description}\n```",
                         inline=False
                     )
@@ -357,7 +362,10 @@ class TradeCommands(Commands):
                     )
                 embeds.append(emb)
         else:
-            emb = self.__get_shop_page(args, categories)
+            emb = self.__get_shop_page(
+                args[0].title(),
+                message.author
+            )
             embeds.append(emb)
         await self.paginate(message, embeds)
 
