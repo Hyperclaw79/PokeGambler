@@ -42,10 +42,10 @@ class DuelActions:
     ]
     crit = [
         "<g1> releases a charged 🅴🅽🅴🆁🅶🆈 🆁🅰🆈.",
-        "<g1> infuses weapon with mana and unleashes "
+        "<g1> infuses weapon with mana and unleashes\n"
         "🅴🅻🅴🅼🅴🅽🆃🅰🅻 🆂🆃🆁🅸🅺🅴.",
         "<g1> carries out a 🅵🅻🆄🆁🆁🆈 of 🆂🆃🆁🅸🅺🅴🆂.",
-        "<g1> cracks <g2>'s armor with "
+        "<g1> cracks <g2>'s armor with\n"
         "🅰🆁🅼🅾🆁 🅿🅴🅽🅴🆃🆁🅰🆃🅸🅾🅽.",
         "<g1> aims for vitals and makes <g2> 🅱🅻🅴🅴🅳."
     ]
