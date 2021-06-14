@@ -264,6 +264,7 @@ class DuelCommands(Commands):
                     Use `<g1>` and `<g2>` as placeholders for gladiator names.
                     Default formatting won't work, so use unicode characters
                     for emphasising any word.
+                    Max Characters Limit: 50
 
                     For example:
                         ```
@@ -293,7 +294,7 @@ class DuelCommands(Commands):
         action = reply.content
         DuelActionsModel(
             self.database, message.author,
-            action, choice
+            action[:50], choice
         ).save()
         await message.channel.send(
             embed=get_embed(
@@ -302,6 +303,7 @@ class DuelCommands(Commands):
                 title="Duel Action saved"
             )
         )
+        self.duelactions.refresh()
 
     def __duel_get_action(
         self, glads: List[Gladiator],
