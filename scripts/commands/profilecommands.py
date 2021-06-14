@@ -461,7 +461,7 @@ class ProfileCommands(Commands):
             thumbnail=chest.asset_url,
             footer=f"Current Streak: {daily_streak}"
         )
-        profile.credit(loot)
+        profile.credit(int(loot))
         loot_model.update(
             earned=(earned + loot),
             daily_streak=daily_streak,
@@ -470,7 +470,7 @@ class ProfileCommands(Commands):
             )
         )
         await message.channel.send(
-            f"**Daily loot of {loot} <a:blinker:843844481220083783> "
+            f"**Daily loot of {int(loot)} <a:blinker:843844481220083783> "
             "added to your balance.**",
             embed=embed
         )
