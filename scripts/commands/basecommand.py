@@ -276,6 +276,22 @@ def no_thumb(func: Callable):
     return wrapped
 
 
+def cooldown(secs: int):
+    '''
+    Add a custom cooldown for a command.
+    '''
+    def decorator(func: Callable):
+        func.__dict__["cooldown"] = secs
+
+        @wraps(func)
+        def wrapped(self, message, *args, **kwargs):
+            # if func not in self.ctx.cooldown_cmds:
+            #     self.ctx.cooldown_cmds[func] = {}
+            return func(self, *args, message=message, **kwargs)
+        return wrapped
+    return decorator
+
+
 class Commands(ABC):
     '''
     The Base command class which serves as the starting point for all commands.

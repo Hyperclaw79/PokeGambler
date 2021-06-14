@@ -24,7 +24,7 @@ from ..helpers.utils import (
     img2file, wait_for, dm_send
 )
 from .basecommand import (
-    Commands, alias, model, no_thumb
+    Commands, alias, cooldown, model, no_thumb
 )
 
 if TYPE_CHECKING:
@@ -116,6 +116,7 @@ class DuelCommands(Commands):
         super().__init__(*args, **kwargs)
         self.duelactions = DuelActions(self.ctx, self.database)
 
+    @cooldown(300)
     @model([Duels, Profile, Inventory, Item])
     @alias(["fight", "gladiator", "battle"])
     async def cmd_duel(

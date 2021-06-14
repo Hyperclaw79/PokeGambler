@@ -8,6 +8,7 @@ import os
 import sys
 import traceback
 from datetime import datetime
+from typing import Callable
 
 import aiohttp
 import discord
@@ -21,9 +22,9 @@ from scripts.base.dbconn import DBConnector
 from scripts.helpers.logger import CustomLogger
 # pylint: disable=cyclic-import
 from scripts.helpers.utils import (
-    get_ascii, prettify_discord, get_embed,
-    parse_command, get_rand_headers, is_owner,
-    online_now
+    dm_send, get_ascii, get_formatted_time,
+    prettify_discord, get_embed, parse_command,
+    get_rand_headers, is_owner, online_now
 )
 
 
@@ -57,6 +58,7 @@ class PokeGambler(discord.Client):
         self.sess = None
         self.owner_mode = False
         self.cooldown_users = {}
+        self.cooldown_cmds = {}
         self.loot_cd = {}
         self.boost_dict = {}
         # Classes
@@ -159,6 +161,34 @@ class PokeGambler(discord.Client):
             return True
         self.cooldown_users[message.author] = datetime.now()
 
+    async def __handle_cmd_cd(
+        self, message: Message,
+        method: Callable,
+        cooldown: int
+    ) -> bool:
+        self.cooldown_cmds[method] = self.cooldown_cmds.get(method, {})
+        if message.author not in self.cooldown_cmds[method]:
+            self.cooldown_cmds[method][message.author] = datetime.now()
+        else:
+            elapsed = (
+                datetime.now() - self.cooldown_cmds[method][message.author]
+            ).total_seconds()
+            if elapsed < cooldown:
+                await message.add_reaction("⌛")
+                rem_time = get_formatted_time(cooldown - elapsed)
+                await dm_send(
+                    message, message.author,
+                    embed=get_embed(
+                        f"You need to wait {rem_time}"
+                        " before reusing that command.",
+                        embed_type="error",
+                        title="Command On Cooldown"
+                    )
+                )
+                return True
+            self.cooldown_cmds[method].pop(message.author)
+        return False
+
     def load_commands(
         self, module_type: str,
         reload_module: bool = False
@@ -193,6 +223,7 @@ class PokeGambler(discord.Client):
 
 # Bot Base
 
+    # pylint: disable=too-many-return-statements, too-many-branches
     async def on_message(self, message: Message):
         """
         On_message event from Discord API.
@@ -238,6 +269,11 @@ class PokeGambler(discord.Client):
                     )
                 )
                 return
+            cmd_cd = getattr(method, "cooldown", None)
+            if cmd_cd:
+                on_cmd_cd = await self.__handle_cmd_cd(message, method, cmd_cd)
+                if on_cmd_cd:
+                    return
             kwargs = {
                 "message": message,
                 "args": args,
