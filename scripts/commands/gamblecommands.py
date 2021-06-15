@@ -15,7 +15,7 @@ from typing import List, Optional, TYPE_CHECKING
 import discord
 
 from ..base.models import (
-    Flips, Loots, Matches,
+    Boosts, Flips, Loots, Matches,
     Moles, Profile
 )
 from ..helpers.checks import user_check, user_rctn
@@ -230,7 +230,9 @@ class GambleCommands(Commands):
         )
         msg = f"PokeGambler choose {valids[2:][idx].title()}.\n"
         if choice == idx:
-            amt_mult = 1
+            amt_mult = Boosts(
+                self.database, message.author
+            ).get()["Flipster"] + 1
             boosts = self.ctx.boost_dict.get(message.author.id, None)
             if boosts:
                 amt_mult += boosts['boost_flip']['stack'] * 0.1

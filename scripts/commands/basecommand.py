@@ -307,6 +307,7 @@ class Commands(ABC):
         self.enabled = kwargs.get('enabled', True)
         self.alias = []
         self.chip_emoji = "<:pokechip:840469159242760203>"
+        self.bond_emoji = "<:pokebond:853991200628932608>"
         cmds = [
             getattr(self, attr)
             for attr in dir(self)

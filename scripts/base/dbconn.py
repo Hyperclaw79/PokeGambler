@@ -165,7 +165,7 @@ class DBConnector:
                 balance INT DEFAULT "100" NOT NULL,
                 num_matches INT DEFAULT "0" NOT NULL,
                 num_wins INT DEFAULT "0" NOT NULL,
-                purchased_chips INT DEFAULT "0" NOT NULL,
+                pokebonds INT DEFAULT "0" NOT NULL,
                 won_chips INT DEFAULT "0" NOT NULL,
                 is_dealer BOOLEAN DEFAULT "0" NOT NULL
             );
@@ -321,11 +321,31 @@ class DBConnector:
             loots(
                 user_id TEXT,
                 tier INT DEFAULT "1" NOT NULL,
-                loot_boost INT DEFAULT "1" NOT NULL,
-                treasure_boost INT DEFAULT "1" NOT NULL,
                 earned INT DEFAULT "0" NOT NULL,
                 daily_claimed_on TIMESTAMP NOT NULL,
                 daily_streak INT DEFAULT "0" NOT NULL,
+                FOREIGN KEY (user_id)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
+    def create_boosts_table(self):
+        """
+        SQL endpoint for Boosts table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            boosts(
+                user_id TEXT,
+                lucky_looter INT DEFAULT "0" NOT NULL,
+                loot_lust INT DEFAULT "0" NOT NULL,
+                fortune_burst INT DEFAULT "0" NOT NULL,
+                flipster INT DEFAULT "0" NOT NULL,
                 FOREIGN KEY (user_id)
                     REFERENCES profile (user_id)
                     ON DELETE SET NULL
@@ -501,6 +521,17 @@ class DBConnector:
         self.cursor.execute(
             '''
             DELETE FROM loots;
+            '''
+        )
+        self.conn.commit()
+
+    def purge_boosts(self):
+        """
+        SQL endpoint for purging Boosts table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM boosts;
             '''
         )
         self.conn.commit()
@@ -802,8 +833,8 @@ class DBConnector:
         self.cursor.execute(
             '''
             SELECT user_id FROM profile
-            WHERE purchased_chips > 100
-            ORDER BY purchased_chips DESC
+            WHERE pokebonds > 100
+            ORDER BY pokebonds DESC
             LIMIT 1;
             '''
         )

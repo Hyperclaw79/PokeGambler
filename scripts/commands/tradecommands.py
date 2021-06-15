@@ -6,16 +6,19 @@ Trade Commands Module
 
 from __future__ import annotations
 import asyncio
-from datetime import datetime
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Type
+import re
 
 from ..base.items import Item, Chest
-from ..base.models import Inventory, Loots, Profile
-from ..base.shop import Shop, Title, TradebleItem
-
-from ..helpers.utils import (
-    dedent, get_embed, get_formatted_time
+from ..base.models import (
+    Inventory, Loots, Profile
 )
+from ..base.shop import (
+    BoostItem, PremiumBoostItem,
+    PremiumShop, Shop, Title
+)
+
+from ..helpers.utils import dedent, get_embed
 
 from .basecommand import (
     Commands, alias, dealer_only,
@@ -256,12 +259,14 @@ class TradeCommands(Commands):
     ):
         """Access PokeGambler Shop.
         $```scss
-        {command_prefix}shop [category]
+        {command_prefix}shop [category] [--premium]
         ```$
 
         @Used to access the **PokeGambler Shop.**
         If no arguments are provided, a list of categories will be displayed.
         If a category is provided, list of items will be shown.
+        To access the Premium shop, use the kwarg `--premium` at the end.
+        > You need to own PokeBonds to access this shop.
 
         There are currently 3 shop categories:
         ```md
@@ -277,10 +282,30 @@ class TradeCommands(Commands):
         To view the shop for Titles:
             ```
             {command_prefix}shop titles
+            ```
+        To view the Premium shop for Gladiators:
+            ```
+            {command_prefix}shop gladiators --premium
             ```~
         """
-        categories = Shop.categories
-        shop_alias = Shop.alias_map
+        shop = Shop
+        if kwargs.get('premium'):
+            shop = PremiumShop
+            if Profile(
+                self.database,
+                message.author
+            ).get()["pokebonds"] == 0:
+                await message.channel.send(
+                    embed=get_embed(
+                        "This option is available only to users"
+                        " who purchased PokeBonds.",
+                        embed_type="error",
+                        title="Premium Only"
+                    )
+                )
+                return
+        categories = shop.categories
+        shop_alias = shop.alias_map
         if args and args[0].title() not in shop_alias:
             cat_str = "\n".join(categories)
             await message.channel.send(
@@ -294,11 +319,11 @@ class TradeCommands(Commands):
             return
         embeds = []
         if not args:
-            Shop.refresh_tradables(self.database)
+            shop.refresh_tradables(self.database)
             categories = {
                 key: catog
                 for key, catog in sorted(
-                    Shop.categories.items(),
+                    shop.categories.items(),
                     key=lambda x: len(x[1].items),
                     reverse=True
                 )
@@ -323,10 +348,17 @@ class TradeCommands(Commands):
                 embeds.append(emb)
         else:
             emb = self.__get_shop_page(
+                shop,
                 args[0].title(),
                 message.author
             )
             embeds.append(emb)
+        if kwargs.get("premium"):
+            for emb in embeds:
+                emb.set_image(
+                    url="https://cdn.discordapp.com/attachments/"
+                    "840469669332516904/853990953953525870/pokebond.png"
+                )
         await self.paginate(message, embeds)
 
     async def cmd_buy(
@@ -359,9 +391,13 @@ class TradeCommands(Commands):
             return
         itemid = args[0].lower()
         quantity = int(kwargs.get('quantity', 1))
-        Shop.refresh_tradables(self.database)
+        shop = Shop
+        shop.refresh_tradables(self.database)
         try:
-            item = Shop.get_item(self.database, itemid)
+            item = shop.get_item(self.database, itemid)
+            if not item:
+                shop = PremiumShop
+                item = shop.get_item(self.database, itemid)
         except (ValueError, ZeroDivisionError):
             await message.channel.send(
                 embed=get_embed(
@@ -381,7 +417,7 @@ class TradeCommands(Commands):
                 )
             )
             return
-        status = Shop.validate(self.database, message.author, item)
+        status = shop.validate(self.database, message.author, item, quantity)
         if status != "proceed":
             await message.channel.send(
                 embed=get_embed(
@@ -397,7 +433,7 @@ class TradeCommands(Commands):
             quantity=quantity,
             ctx=self.ctx
         )
-        quant_str = f"x {quantity}" if isinstance(item, TradebleItem) else ''
+        quant_str = f"x {quantity}" if quantity > 1 else ''
         res = (await task) if asyncio.iscoroutinefunction(
             item.buy
         ) else task
@@ -410,11 +446,19 @@ class TradeCommands(Commands):
                 )
             )
             return
+        spent = item.price * quantity
+        if item.__class__ in [BoostItem, PremiumBoostItem]:
+            tier = Loots(self.database, message.author).tier
+            spent *= (10 ** (tier - 1))
+        curr = self.chip_emoji
+        if item.premium:
+            spent //= 10
+            curr = self.bond_emoji
         await message.channel.send(
             embed=get_embed(
                 f"Successfully purchased **{item}**{quant_str}.\n"
                 "Your account has been debited: "
-                f"**{item.price * quantity}** {self.chip_emoji}",
+                f"**{spent}** {curr}",
                 title="Success",
                 footer=(
                     "Your nickname might've not changed if it's too long.\n"
@@ -490,60 +534,25 @@ class TradeCommands(Commands):
                 )
             )
             return
+        bonds = False
+        curr = self.chip_emoji
+        gained = new_item.price * quantity
+        if new_item.premium:
+            gained //= 10
+            curr = self.bond_emoji
+            bonds = True
         Profile(self.database, message.author).credit(
-            new_item.price * quantity
+            gained, bonds=bonds
         )
         Shop.refresh_tradables(self.database)
         await message.channel.send(
             embed=get_embed(
                 f"Succesfully sold `{deleted}` of your listed item(s).\n"
                 "Your account has been credited: "
-                f"**{new_item.price * quantity}** {self.chip_emoji}",
+                f"**{gained}** {curr}",
                 title="Item(s) Sold"
             )
         )
-
-    async def cmd_boosts(self, message: Message, **kwargs):
-        """Check active boosts.
-        $```scss
-        {command_prefix}boosts
-        ```$
-
-        @Check your active purchased boosts.@
-        """
-        def __get_desc(boost):
-            desc_str = f"{boost['description']}\nStack: {boost['stack']}"
-            expires_in = (30 * 60) - (
-                datetime.now() - boost["added_on"]
-            ).total_seconds()
-            if expires_in > 0 and boost['stack'] > 0:
-                expires_in = get_formatted_time(
-                    expires_in, show_hours=False
-                ).replace('**', '')
-            else:
-                expires_in = "Expired / Not Purchased Yet"
-            desc_str += f"\nExpires in: {expires_in}"
-            return f"```css\n{desc_str}\n```"
-        boosts = self.ctx.boost_dict.get(message.author.id, None)
-        if not boosts:
-            await message.channel.send(
-                embed=get_embed(
-                    "You don't have any active boosts.",
-                    title="No Boosts"
-                )
-            )
-            return
-        emb = get_embed(
-            "\u200B",
-            title="Active Boosts"
-        )
-        for val in boosts.values():
-            emb.add_field(
-                name=val["name"],
-                value=__get_desc(val),
-                inline=False
-            )
-        await message.channel.send(embed=emb)
 
     @dealer_only
     @model(Profile)
@@ -641,17 +650,21 @@ class TradeCommands(Commands):
             )
         )
 
-    def __get_shop_page(self, catog_str: str, user: Member) -> Embed:
-        categories = Shop.categories
-        catog = categories[Shop.alias_map[catog_str]]
+    def __get_shop_page(
+        self, shop: Type[Shop],
+        catog_str: str, user: Member
+    ) -> Embed:
+        shopname = re.sub('([A-Z]+)', r' \1', shop.__name__).strip()
+        categories = shop.categories
+        catog = categories[shop.alias_map[catog_str]]
         user_tier = Loots(self.database, user).tier
-        if Shop.alias_map[catog_str] in [
+        if shop.alias_map[catog_str] in [
             "Tradables", "Consumables", "Gladiators"
         ]:
-            Shop.refresh_tradables(self.database)
+            shop.refresh_tradables(self.database)
         if len(catog.items) < 1:
             emb = get_embed(
-                    f"`{catog.name} Shop` seems to be empty right now.\n"
+                    f"`{catog.name} {shopname}` seems to be empty right now.\n"
                     "Please try again later.",
                     embed_type="warning",
                     title="No items found",
@@ -661,7 +674,7 @@ class TradeCommands(Commands):
         else:
             emb = get_embed(
                     f"**To buy any item, use `{self.ctx.prefix}buy itemid`**",
-                    title=f"{catog} Shop",
+                    title=f"{catog} {shopname}",
                     no_icon=True
                 )
             for item in catog.items:
@@ -669,11 +682,15 @@ class TradeCommands(Commands):
                     item.itemid, int
                 ) else item.itemid
                 price = item.price
-                if Shop.alias_map[catog_str] == "Boosts":
+                curr = self.chip_emoji
+                if item.premium:
+                    price //= 10
+                    curr = self.bond_emoji
+                if shop.alias_map[catog_str] == "Boosts":
                     price *= (10 ** (user_tier - 1))
                 emb.add_field(
                         name=f"『{itemid}』 _{item}_ "
-                        f"{price:,} {self.chip_emoji}",
+                        f"{price:,} {curr}",
                         value=f"```\n{item.description}\n```",
                         inline=False
                     )

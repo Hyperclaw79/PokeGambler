@@ -203,7 +203,7 @@ class Profile(UnlockedModel):
             "balance": 100,
             "num_matches": 0,
             "num_wins": 0,
-            "purchased_chips": 0,
+            "pokebonds": 0,
             "won_chips": 100,
             "is_dealer": "dealers" in [
                 role.name.lower()
@@ -228,23 +228,35 @@ class Profile(UnlockedModel):
             badges.append("dealer")
         return badges
 
-    def debit(self, amount: int):
+    def debit(self, amount: int, bonds: bool = False):
         """
         Shorthand method to subtract from balance and won_chips.
         """
-        self.update(
-            balance=self.balance - amount,
-            won_chips=self.won_chips - amount
-        )
+        if bonds:
+            self.update(
+                balance=self.balance - (amount * 10),
+                pokebonds=self.pokebonds - amount
+            )
+        else:
+            self.update(
+                balance=self.balance - amount,
+                won_chips=self.won_chips - amount
+            )
 
-    def credit(self, amount: int):
+    def credit(self, amount: int, bonds: bool = False):
         """
         Shorthand method to add to balance and won_chips.
         """
-        self.update(
-            balance=self.balance + amount,
-            won_chips=self.won_chips + amount
-        )
+        if bonds:
+            self.update(
+                balance=self.balance + (amount * 10),
+                pokebonds=self.pokebonds + amount
+            )
+        else:
+            self.update(
+                balance=self.balance + amount,
+                won_chips=self.won_chips + amount
+            )
 
     @classmethod
     def get_all(
@@ -319,6 +331,9 @@ class Blacklist(Model):
         Also resets their profile.
         """
         Profile(self.database, self.user).reset()
+        Inventory(self.database, self.user).destroy()
+        Boosts(self.database, self.user).reset()
+        Loots(self.database, self.user).reset()
         super().save()
 
     def pardon(self):
@@ -496,8 +511,6 @@ class Loots(UnlockedModel):
     def _default(self):
         self.user_id: str = str(self.user.id)
         self.tier: int = 1
-        self.loot_boost: int = 1
-        self.treasure_boost: int = 1
         self.earned: int = 0
         self.daily_claimed_on: str = (
             datetime.now() - timedelta(days=1)
@@ -505,6 +518,18 @@ class Loots(UnlockedModel):
             "%Y-%m-%d %H:%M:%S"
         )
         self.daily_streak: int = 0
+
+
+class Boosts(UnlockedModel):
+    """
+    Wrapper for Boosts based DB actions.
+    """
+    def _default(self):
+        self.user_id: str = str(self.user.id)
+        self.lucky_looter: int = 0
+        self.loot_lust: int = 0
+        self.fortune_burst: int = 0
+        self.flipster: int = 0
 
 
 class Flips(Minigame):

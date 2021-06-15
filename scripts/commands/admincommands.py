@@ -135,20 +135,8 @@ class AdminCommands(Commands):
         profile = await get_profile(self.database, message, user_id)
         if not profile:
             return
-        data = profile.get()
-        balance = data["balance"]
-        purchased_chips = data["purchased_chips"]
-        won_chips = data["won_chips"]
-        balance += increment
-        if kwargs.get("purchased", False):
-            purchased_chips += increment
-        else:
-            won_chips += increment
-        profile.update(
-            balance=balance,
-            purchased_chips=purchased_chips,
-            won_chips=won_chips
-        )
+        bonds = kwargs.get("purchased", False)
+        profile.credit(increment, bonds=bonds)
         await message.add_reaction("👍")
 
     @admin_only
@@ -298,7 +286,6 @@ class AdminCommands(Commands):
             user, message.author,
             reason=kwargs.get("reason", None)
         ).save()
-        Inventory(self.database, user).destroy()
         await message.add_reaction("👍")
 
     @admin_only

@@ -27,6 +27,9 @@ class AssetGenerator(ABC):
         self.pokechip = Image.open(
             os.path.join(asset_path, "pokechip.png")
         )
+        self.pokebond = Image.open(
+            os.path.join(asset_path, "pokebond.png")
+        )
 
     @abstractmethod
     def get(self, **kwargs):
@@ -203,7 +206,7 @@ class WalletGenerator(AssetGenerator):
                 "fontsize": 54
             },
             {
-                "txt": data["purchased_chips"],
+                "txt": data["pokebonds"],
                 "start_pos": (620, 235),
                 "bbox": (255, 70),
                 "fontsize": 54

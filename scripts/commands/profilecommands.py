@@ -6,7 +6,7 @@ Profile Commands Module
 
 from __future__ import annotations
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from typing import Dict, List, Optional, TYPE_CHECKING
 
@@ -14,9 +14,11 @@ from PIL import Image
 
 from ..base.items import Chest
 from ..base.models import (
-    Inventory, Loots, Matches,
+    Boosts, Inventory, Loots, Matches,
     Minigame, Profile
 )
+from ..base.shop import BoostItem
+
 from ..helpers.imageclasses import (
     BadgeGenerator, LeaderBoardGenerator,
     ProfileCardGenerator, WalletGenerator
@@ -118,7 +120,7 @@ class ProfileCommands(Commands):
         data = {
             key: (
                 f"{val:,}" if key in [
-                    "won_chips", "purchased_chips", "balance"
+                    "won_chips", "pokebonds", "balance"
                 ]
                 else str(val)
             )
@@ -322,22 +324,28 @@ class ProfileCommands(Commands):
         `Cooldown Reduction Boost incoming soon`@
         """
         on_cooldown = self.ctx.loot_cd.get(message.author, None)
-        cd_reducer = 0
-        loot_mult = 1
-        tr_mult = 0
+        perm_boosts = Boosts(
+            self.database, message.author
+        ).get()
+        loot_mult = 1 + (perm_boosts["lucky_looter"] * 0.05)
+        cd_reducer = perm_boosts["loot_lust"]
+        tr_mult = 0.1 * perm_boosts["fortune_burst"]
         boosts = self.ctx.boost_dict.get(message.author.id, None)
         if boosts:
-            cd_reducer = boosts['boost_lt_cd']['stack']
+            cd_reducer += boosts['boost_lt_cd']['stack']
             loot_mult += 0.05 * boosts['boost_lt']['stack']
             tr_mult += 0.1 * boosts['boost_tr']['stack']
         cd_time = 60 * (10 - cd_reducer)
-        if on_cooldown and (
-            datetime.now() - self.ctx.loot_cd[message.author]
-        ).total_seconds() < cd_time:
+        loot_cd = self.ctx.loot_cd.get(
+            message.author,
+            datetime.now() - timedelta(minutes=10)
+        )
+        elapsed = (
+            datetime.now() - loot_cd
+        ).total_seconds()
+        if on_cooldown and elapsed < cd_time:
             time_remaining = get_formatted_time(
-                cd_time - (
-                    datetime.now() - self.ctx.loot_cd[message.author]
-                ).total_seconds(),
+                cd_time - elapsed,
                 show_hours=False
             )
             await message.add_reaction("⌛")
@@ -354,20 +362,18 @@ class ProfileCommands(Commands):
         profile = Profile(self.database, message.author)
         loot_model = Loots(self.database, message.author)
         loot_info = loot_model.get()
-        boost = loot_info["loot_boost"]
         earned = loot_info["earned"]
         tier = loot_info["tier"]
-        treasure_chance = 0.1 * loot_info["treasure_boost"] + tr_mult
         loot = int(
-            random.randint(5, 10) * boost * (
+            random.randint(5, 10) * (
                 10 ** (tier - 1)
             ) * loot_mult
         )
-        loot *= 2  # x2 BETA Bonus
-        treasure_chance *= 2  # x2 BETA Bonus
+        loot *= 2  # BETA x2 Bonus
+        tr_mult *= 2  # BETA x2 Bonus
         embed = None
         proc = random.uniform(0, 1.0)
-        if proc <= treasure_chance:
+        if proc <= tr_mult:
             chest = Chest.get_chest(tier=tier)
             chest.save(self.database)
             Inventory(self.database, message.author).save(
@@ -407,8 +413,10 @@ class ProfileCommands(Commands):
         """
         profile = Profile(self.database, message.author)
         loot_model = Loots(self.database, message.author)
+        boost_model = Boosts(self.database, message.author)
         loot_info = loot_model.get()
-        boost = loot_info["loot_boost"]
+        boost_info = boost_model.get()
+        boost = boost_info["lucky_looter"]
         earned = loot_info["earned"]
         tier = loot_info["tier"]
         daily_streak = loot_info["daily_streak"]
@@ -447,7 +455,7 @@ class ProfileCommands(Commands):
         loot = random.randint(5, 10) * boost * (10 ** tier)
         if daily_streak % 5 == 0 and daily_streak > 0:
             loot += 100 * (daily_streak / 5)
-        loot *= 2  # x2 BETA Bonus
+        loot *= 2  # BETA x2 Bonus
         chest = Chest.get_chest(tier=tier)
         chest.description += f"\n[Daily for {message.author.id}]"
         chest.save(self.database)
@@ -474,6 +482,61 @@ class ProfileCommands(Commands):
             "added to your balance.**",
             embed=embed
         )
+
+    @model(Boosts)
+    async def cmd_boosts(self, message: Message, **kwargs):
+        """Check active boosts.
+        $```scss
+        {command_prefix}boosts
+        ```$
+
+        @Check your active purchased boosts.@
+        """
+        def __get_desc(boost):
+            prm_bst = perm_boosts[boost['name'].lower().replace(' ', '_')]
+            total = boost['stack'] + prm_bst
+            desc_str = f"{boost['description']}\nStack: {total}"
+            if prm_bst > 0:
+                desc_str += f" ({prm_bst} Permanent)"
+            expires_in = (30 * 60) - (
+                datetime.now() - boost["added_on"]
+            ).total_seconds()
+            if expires_in > 0 and boost['stack'] > 0:
+                expires_in = get_formatted_time(
+                    expires_in, show_hours=False
+                ).replace('**', '')
+            else:
+                expires_in = "Expired / Not Purchased Yet"
+            desc_str += f"\nExpires in: {expires_in}"
+            return f"```css\n{desc_str}\n```"
+        boosts = self.ctx.boost_dict.get(message.author.id, None)
+        perm_boosts = Boosts(self.database, message.author).get()
+        if not (
+            boosts or any(
+                bst > 1
+                for bst in perm_boosts.values()
+            )
+        ):
+            await message.channel.send(
+                embed=get_embed(
+                    "You don't have any active boosts.",
+                    title="No Boosts"
+                )
+            )
+            return
+        emb = get_embed(
+            "\u200B",
+            title="Active Boosts"
+        )
+        if not boosts:
+            boosts = BoostItem.create_boost_dict()
+        for val in boosts.values():
+            emb.add_field(
+                name=val["name"],
+                value=__get_desc(val),
+                inline=False
+            )
+        await message.channel.send(embed=emb)
 
     def __get_minigame_lb(self, mg_name: str, user: Member) -> List[Dict]:
         def _commands(module):
