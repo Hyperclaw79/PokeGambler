@@ -416,7 +416,7 @@ class ProfileCommands(Commands):
         boost_model = Boosts(self.database, message.author)
         loot_info = loot_model.get()
         boost_info = boost_model.get()
-        boost = boost_info["lucky_looter"]
+        boost = boost_info["lucky_looter"] + 1
         earned = loot_info["earned"]
         tier = loot_info["tier"]
         daily_streak = loot_info["daily_streak"]
