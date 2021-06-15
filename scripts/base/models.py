@@ -192,6 +192,8 @@ class Profile(UnlockedModel):
             self.is_dealer
         ]):
             self.update(is_dealer=False)
+        # BETA: Patch for balance
+        self.balance = self.won_chips + 10 * self.pokebonds
 
     def __eq__(self, other: Profile) -> bool:
         return self.user.id == other.user.id
