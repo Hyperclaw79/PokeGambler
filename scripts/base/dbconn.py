@@ -148,6 +148,14 @@ class DBConnector:
             list_str = list_str[::-1].replace(',', '', 1)[::-1]
         return list_str
 
+    def _get_result(self):
+        res = self.cursor.fetchone()
+        if res:
+            names = (col[0] for col in self.cursor.description)
+            return dict(zip(names, res))
+        return None
+
+
 # DDL
 
 # Creation
@@ -593,11 +601,7 @@ class DBConnector:
             ''',
             (user_id,)
         )
-        res = self.cursor.fetchone()
-        if res:
-            names = (col[0] for col in self.cursor.description)
-            return dict(zip(names, res))
-        return None
+        return self._get_result()
 
     def save_model(self, model: str, **kwargs) -> int:
         """
@@ -689,15 +693,13 @@ class DBConnector:
             SELECT * FROM profile
             JOIN loots
             USING (user_id)
+            JOIN boosts
+            USING (user_id)
             WHERE user_id IS ?;
             """,
             (user_id, )
         )
-        res = self.cursor.fetchone()
-        if res:
-            names = (col[0] for col in self.cursor.description)
-            return dict(zip(names, res))
-        return None
+        return self._get_result()
 
     def get_all_profiles(self, ids_only: bool = False) -> List:
         """
@@ -1189,11 +1191,7 @@ class DBConnector:
             ''',
             (itemid,)
         )
-        res = self.cursor.fetchone()
-        if res:
-            names = (col[0] for col in self.cursor.description)
-            return dict(zip(names, res))
-        return None
+        return self._get_result()
 
     def get_item_from_name(self, name: str) -> Dict:
         """
@@ -1207,11 +1205,7 @@ class DBConnector:
             ''',
             (name,)
         )
-        res = self.cursor.fetchone()
-        if res:
-            names = (col[0] for col in self.cursor.description)
-            return dict(zip(names, res))
-        return None
+        return self._get_result()
 
     def delete_item(self, itemid: int) -> None:
         """
