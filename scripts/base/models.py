@@ -50,11 +50,13 @@ class Model(ABC):
             ]):
                 yield (attr, getattr(self, attr))
 
-    def get(self):
+    def get(self, param=None):
         """
         Returns the Model object as a dictionary.
         """
-        return dict(self)
+        if not param:
+            return dict(self)
+        return dict(self).get(param, None)
 
     def save(self):
         """

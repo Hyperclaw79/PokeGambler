@@ -309,7 +309,7 @@ class GambleCommands(Commands):
         cost = [50, 100, 150, 200, 250][level]
         multiplier = [3, 4, 10, 50, 100][level]
         profile = Profile(self.database, message.author)
-        if profile.get()["balance"] < cost:
+        if profile.get("balance") < cost:
             await self.__handle_low_bal(message.author, message.channel)
             await message.add_reaction("❌")
             return
@@ -595,7 +595,7 @@ class GambleCommands(Commands):
                     ]),
                     timeout=(30 - (datetime.now() - now).total_seconds())
                 )
-                bal = Profile(self.database, usr).get()["balance"]
+                bal = Profile(self.database, usr).get("balance")
                 if bal < fee:
                     await self.__handle_low_bal(usr, gamble_channel)
                     continue
@@ -811,7 +811,7 @@ class GambleCommands(Commands):
                 )
             )
             return None
-        if profile.get()["balance"] < amount:
+        if profile.get("balance") < amount:
             await self.__handle_low_bal(message.author, message.channel)
             await message.add_reaction("❌")
             return None

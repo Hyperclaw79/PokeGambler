@@ -631,7 +631,7 @@ class TradeCommands(Commands):
         author_prof = Profile(self.database, message.author)
         mention_prof = Profile(self.database, mentions[0])
         amount = int(args[0])
-        if author_prof.get()["balance"] < amount:
+        if author_prof.get("balance") < amount:
             await message.channel.send(
                 embed=get_embed(
                     f"You don't have enough {self.chip_emoji}.",

@@ -227,11 +227,18 @@ class DuelCommands(Commands):
         """
         levels = ["Normal", "Critical"]
         dmg_info = ["(dmg < 150)", "(dmg >= 150)"]
+        cost_info = [
+            "(200 Pokechips)",
+            "(200 Pokebonds)"
+        ]
+        charges = ["won_chips", "pokebonds"]
         lvl_msg = await message.channel.send(
             embed=get_enum_embed(
                 [
-                    f"{lvl} {dmg}"
-                    for lvl, dmg in zip(levels, dmg_info)
+                    f"{lvl} {dmg} {cost}"
+                    for lvl, dmg, cost in zip(
+                        levels, dmg_info, cost_info
+                    )
                 ],
                 title="Choose the action level"
             )
@@ -254,6 +261,18 @@ class DuelCommands(Commands):
                     "Please reuse the command.",
                     embed_type="error",
                     title="Invalid Choice"
+                )
+            )
+            return
+        profile = Profile(self.database, message.author)
+        if profile.get(
+            charges[levels.index(choice)]
+        ) < 200:
+            await message.channel.send(
+                embed=get_embed(
+                    "You cannot afford to create that action.",
+                    embed_type="error",
+                    title="Insufficient Balance"
                 )
             )
             return
@@ -291,7 +310,17 @@ class DuelCommands(Commands):
                 )
             )
             return
-        action = reply.content
+        action = "\n".join(reply.content.splitlines()[:2])
+        # Ensure there's only one placeholder for each gladiator.
+        for placeholder in ["<g1>", "<g2>"]:
+            action = action.replace(
+                placeholder,
+                "placeholder",
+                1
+            ).replace(placeholder, " ").replace(
+                "placeholder",
+                placeholder
+            )
         DuelActionsModel(
             self.database, message.author,
             action[:100], choice
@@ -303,6 +332,7 @@ class DuelCommands(Commands):
                 title="Duel Action saved"
             )
         )
+        profile.debit(200, bonds=levels.index(choice))
         self.duelactions.refresh()
 
     def __duel_get_action(
@@ -327,7 +357,7 @@ class DuelCommands(Commands):
             amount = int(args[0])
         else:
             amount = 50
-            if user_profile.get()['balance'] >= 50:
+            if user_profile.get('balance') >= 50:
                 await message.channel.send(
                     embed=get_embed(
                         "Amount of chips not specified, "
@@ -336,7 +366,7 @@ class DuelCommands(Commands):
                         title="No Pokechips count"
                     )
                 )
-        if user_profile.get()['balance'] < amount:
+        if user_profile.get('balance') < amount:
             await dm_send(
                 message, message.author,
                 embed=get_embed(
@@ -470,7 +500,7 @@ class DuelCommands(Commands):
         profile: Profile, gladiator: Gladiator,
         cost: int
     ) -> bool:
-        if profile.get()["balance"] < cost:
+        if profile.get("balance") < cost:
             await message.channel.send(
                 embed=get_embed(
                     f"Match cancelled cause **{user.name}** can't afford it.",
