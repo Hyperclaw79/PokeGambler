@@ -215,7 +215,7 @@ class NormalCommands(Commands):
         if len(args) > 0 and args[0].isdigit():
             amt = int(args[0])
         emb = discord.Embed(
-            title="**Thank you very much for you generousness.**",
+            title="**Thank you very much for you generosity.**",
             color=16766720,
             url=f"https://www.paypal.com/paypalme2/hyperclaw79/{amt}"
         )

@@ -170,7 +170,7 @@ class GambleCommands(Commands):
 
         @A quick way to x2 your pokechips ||(or halve it)|| using a chip flip.
         If no amount is specified, 50 chips will be used by default.
-        Minimum 50 chips and maximim 9999 chips can be used.@
+        Minimum 50 chips and maximum 9999 chips can be used.@
 
         ~To flip for 50 {pokechip_emoji}:
             ```
@@ -268,7 +268,7 @@ class GambleCommands(Commands):
 
         @Find the hidden chip for a chance to win a jackpot.
         If no amount is specified, 50 chips will be used by default.
-        Minimum 50 chips and maximim 9999 chips can be used.
+        Minimum 50 chips and maximum 9999 chips can be used.
         You can choose difficulty level (default 1) and rewards will scale.
         ```py
         ╔═══════╦═══════╦══════╦════════╗
