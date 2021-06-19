@@ -155,10 +155,9 @@ class DBConnector:
             return dict(zip(names, res))
         return None
 
-
-# DDL
-
+# region DDL
 # Creation
+
     def create_profile_table(self):
         """
         SQL endpoint for Profile table creation.
@@ -587,6 +586,7 @@ class DBConnector:
                 not attr.endswith("tables")
             ]):
                 getattr(self, attr)()
+# endregion
 
 # UnlockedModel
 
