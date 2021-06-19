@@ -215,7 +215,13 @@ class ProfileCommands(Commands):
                 )
             )
             return
-        leaderboard = leaderboard[:12]
+        leaderboard = [
+            usr
+            for usr in leaderboard
+            if message.guild.get_member(
+                int(usr['user_id'])
+            )
+        ][:12]
         for idx, data in enumerate(leaderboard):
             data["rank"] = idx + 1
             data["balance"] = f'{data["balance"]:,}'

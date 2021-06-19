@@ -750,7 +750,7 @@ class DBConnector:
             FROM profile
             WHERE num_matches > 0
             ORDER BY {sort_by} DESC
-            LIMIT 10;
+            LIMIT 20;
             '''
         )
         results = self.cursor.fetchall()
