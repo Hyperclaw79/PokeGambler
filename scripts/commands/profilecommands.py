@@ -335,7 +335,7 @@ class ProfileCommands(Commands):
         ).get()
         loot_mult = 1 + (perm_boosts["lucky_looter"] * 0.05)
         cd_reducer = perm_boosts["loot_lust"]
-        tr_mult = 0.1 * perm_boosts["fortune_burst"]
+        tr_mult = 0.1 * (perm_boosts["fortune_burst"] + 1)
         boosts = self.ctx.boost_dict.get(message.author.id, None)
         if boosts:
             cd_reducer += boosts['boost_lt_cd']['stack']
