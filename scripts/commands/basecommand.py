@@ -8,7 +8,7 @@ It also has some useful decorators for the commands.
 from __future__ import annotations
 from abc import ABC
 from functools import wraps
-from typing import Callable, List, TYPE_CHECKING, Union
+from typing import Callable, List, Optional, TYPE_CHECKING, Union
 
 import discord
 
@@ -21,7 +21,7 @@ from ..helpers.utils import (
 )
 
 if TYPE_CHECKING:
-    from discord import Embed, Message, Member
+    from discord import Embed, Message, Member, File
     from bot import PokeGambler
     from ..base.dbconn import DBConnector
 
@@ -337,10 +337,20 @@ class Commands(ABC):
         self.enabled = False
         return self.enabled
 
-    async def paginate(self, message: Message, embeds: List[Embed]):
+    async def paginate(
+        self, message: Message,
+        embeds: List[Embed],
+        files: Optional[List[File]] = None
+    ):
         """
         Convenience method for conditional pagination.
         """
+        if files:
+            msg = await message.guild.get_channel(
+                self.ctx.configs["img_upload_channel"]
+            ).send(files=files)
+            for idx, attachment in enumerate(msg.attachments):
+                embeds[idx].set_image(url=attachment.proxy_url)
         base = await message.channel.send(embed=embeds[0])
         if len(embeds) > 1:
             if not embeds[0].footer:
@@ -348,7 +358,10 @@ class Commands(ABC):
                     emb.set_footer(
                         text=f"{idx + 1} / {len(embeds)}"
                     )
-            pager = Paginator(message, base, embeds, self.ctx)
+            pager = Paginator(
+                message, base,
+                embeds, self.ctx
+            )
             await pager.run()
 
 

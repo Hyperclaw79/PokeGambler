@@ -11,6 +11,7 @@ from io import BytesIO
 from typing import Dict, List, Optional, TYPE_CHECKING
 
 from PIL import Image
+import discord
 
 from ..base.items import Chest
 from ..base.models import (
@@ -221,16 +222,28 @@ class ProfileCommands(Commands):
             if message.guild.get_member(
                 int(usr['user_id'])
             )
-        ][:12]
+        ][:20]
         for idx, data in enumerate(leaderboard):
             data["rank"] = idx + 1
             data["balance"] = f'{data["balance"]:,}'
+        embeds = []
+        files = []
         for i in range(0, len(leaderboard), 4):
             batch_4 = leaderboard[i: i + 4]
             img = await self.lbg.get(self.ctx, batch_4)
-            await message.channel.send(
-                file=img2file(img, f"leaderboard{i}.jpg")
+            lb_fl = img2file(img, f"leaderboard{i}.jpg")
+            emb = discord.Embed(
+                title="",
+                description="",
+                color=discord.Colour.dark_theme()
             )
+            embeds.append(emb)
+            files.append(lb_fl)
+            # await message.channel.send(
+            #     embed=emb,
+            #     file=lb_fl
+            # )
+        await self.paginate(message, embeds, files)
 
     @alias("#")
     async def cmd_rank(self, message: Message, **kwargs):
