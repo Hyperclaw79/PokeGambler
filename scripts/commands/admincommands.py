@@ -619,7 +619,7 @@ class AdminCommands(Commands):
         self, catog: Type[Item],
         categories: Dict, curr_recc: int
     ):
-        if curr_recc > 3:
+        if getattr(catog, '__module__', None) != "scripts.base.items":
             return
         for subcatog in catog.__subclasses__():
             if subcatog.__name__ != 'Chest':
