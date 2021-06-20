@@ -47,7 +47,7 @@ class TradeCommands(Commands):
 
         """Opens a PokeGambler treasure chest or a Lootbag.
         $```scss
-        {command_prefix}open itemid
+        {command_prefix}open itemid/chest name
         ```$
 
         @Opens a treasure chest or a Lootbag that you own.
@@ -74,16 +74,16 @@ class TradeCommands(Commands):
         To open a lootbag with ID 0000AAAA:
             ```
             {command_prefix}open 0000AAAA
+            ```
+        To open all Gold Chests in your inventory:
+            ```
+            {command_prefix}open gold chest
             ```~
         """
         if not args:
             return
-        try:
-            itemid = int(args[0], 16)
-            openable = Item.from_id(self.database, itemid)
-        except (ValueError, ZeroDivisionError):
-            openable = None
-        if not openable:
+        openables = self.__open_get_openables(message, args)
+        if not openables:
             await message.channel.send(
                 embed=get_embed(
                     "Make sure you actually own this Item.",
@@ -92,51 +92,7 @@ class TradeCommands(Commands):
                 )
             )
             return
-        if not Inventory(
-            self.database, message.author
-        ).from_id(itemid):
-            await message.channel.send(
-                embed=get_embed(
-                    f"That's not your own {openable.category}.",
-                    embed_type="error",
-                    title="Invalid Chest/Lootbag ID"
-                )
-            )
-            return
-        chips = openable.chips
-        Profile(self.database, message.author).credit(chips)
-        loot_model = Loots(self.database, message.author)
-        earned = loot_model.get()["earned"]
-        loot_model.update(
-            earned=(earned + chips)
-        )
-        content = f"You have recieved **{chips}** {self.chip_emoji}."
-        items = []
-        if openable.name == "Legendary Chest":
-            item = openable.get_random_collectible(self.database)
-            if item:
-                content += "\nAnd woah, you also got a " + \
-                    f"**『{item.emoji}』 {item}**!"
-                items = [item]
-        elif openable.category == 'Lootbag':
-            items = openable.get_random_items(self.database)
-            item_str = ', '.join(
-                f"**『{item.emoji}』 {item}**"
-                for item in items
-            )
-            content += "\nAnd you also got these items:\n" + \
-                f"{item_str}"
-        for item in items:
-            Inventory(self.database, message.author).save(
-                int(item.itemid, 16)
-            )
-        openable.delete(self.database)
-        await message.channel.send(
-            embed=get_embed(
-                content,
-                title=f"Opened a {openable.name}"
-            )
-        )
+        await self.__open_handle_rewards(message, openables)
 
     @model(Item)
     @ensure_item
@@ -697,3 +653,95 @@ class TradeCommands(Commands):
             # pylint: disable=undefined-loop-variable
             emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
         return emb
+
+    def __open_get_openables(
+        self, message: Message,
+        args: List[str]
+    ) -> List[Item]:
+        try:
+            chest_name = " ".join(args).title().replace('Chest', '').strip()
+            lb_name = " ".join(args).title()
+            if chest_name in (
+                chest.__name__.replace('Chest', '')
+                for chest in Chest.__subclasses__()
+            ):
+                chests = Inventory(
+                    self.database, message.author
+                ).from_name(f"{chest_name} Chest")
+                if not chests:
+                    raise ValueError(f"No {chest_name} Chests in Inventory.")
+                openables = [
+                    Item.from_id(self.database, itemid)
+                    for itemid in chests
+                ]
+            elif "Lootbag" in lb_name:
+                bags = Inventory(
+                    self.database, message.author
+                ).from_name(lb_name)
+                if not bags:
+                    raise ValueError(f"No {lb_name} in Inventory.")
+                openables = [
+                    Item.from_id(self.database, itemid)
+                    for itemid in bags
+                ]
+            else:
+                itemid = int(args[0], 16)
+                openable = Inventory(
+                    self.database, message.author
+                ).from_id(itemid)
+                if openable:
+                    openable = Item.from_id(self.database, itemid)
+                openables = [openable]
+        except (ValueError, ZeroDivisionError):
+            openables = []
+        return openables
+
+    async def __open_handle_rewards(
+        self, message: Message,
+        openables: List[Chest]
+    ) -> str:
+        chips = sum(
+            chest.chips
+            for chest in openables
+        )
+        Profile(self.database, message.author).credit(chips)
+        loot_model = Loots(self.database, message.author)
+        earned = loot_model.get()["earned"]
+        loot_model.update(
+            earned=(earned + chips)
+        )
+        content = f"You have recieved **{chips}** {self.chip_emoji}."
+        items = []
+        for openable in openables:
+            if openable.name == "Legendary Chest":
+                item = openable.get_random_collectible(self.database)
+                if item:
+                    items.append(item)
+            elif openable.category == 'Lootbag':
+                res = openable.get_random_items(self.database)
+                if res:
+                    items.extend(res)
+        if items:
+            item_str = '\n'.join(
+                f"**『{item.emoji}』 {item}**"
+                for item in items
+            )
+            content += f"\nAnd woah, you also got:\n{item_str}"
+        inv = Inventory(self.database, message.author)
+        for item in items:
+            inv.save(
+                int(item.itemid, 16)
+            )
+        inv.delete([
+            int(openable.itemid, 16)
+            for openable in openables
+        ])
+        quant_str = ''
+        if len(openables) > 1:
+            quant_str = f"x{len(openables)} "
+        await message.channel.send(
+            embed=get_embed(
+                content,
+                title=f"Opened {quant_str}{openables[0].name}"
+            )
+        )

@@ -1597,9 +1597,10 @@ class DBConnector:
         If quantity is -1, all items of the name will be removed.
         Returns number of records actually deleted.
         """
-        statement = 'DELETE FROM inventory'
+        statement = 'DELETE FROM inventory\n'
         if isinstance(item_inp, list):
-            statement += 'WHERE itemid IN ?'
+            statement += f'WHERE itemid IN {self.__encode_list(item_inp)}'
+            inp = ()
         else:
             statement += f'''
             WHERE itemid IN (
@@ -1609,9 +1610,10 @@ class DBConnector:
                 LIMIT {quantity}
             )
             '''
+            inp = (item_inp, )
         if user_id:
             statement += f" AND user_id IS '{user_id}'"
-        self.cursor.execute(statement, (item_inp, ))
+        self.cursor.execute(statement, inp)
         self.conn.commit()
         self.cursor.execute('SELECT changes();')
         return self.cursor.fetchone()[0]

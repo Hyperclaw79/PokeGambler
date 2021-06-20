@@ -457,6 +457,18 @@ class Inventory(Model):
             return item
         return None
 
+    def from_name(self, name: str) -> List[Item]:
+        """
+        Gets a list of items by name if it exists in user's inventory.
+        """
+        items = self.database.inv_name2items(self.user_id, name)
+        if items:
+            return [
+                item['itemid']
+                for item in items
+            ]
+        return []
+
     # pylint: disable=arguments-differ, no-member
     def save(self, itemid: int):
         """
