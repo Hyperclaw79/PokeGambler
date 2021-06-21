@@ -240,6 +240,7 @@ class NormalCommands(Commands):
         )
 
     async def cmd_info(self, message: Message, **kwargs):
+        # BETA: Modify info before release.
         """Gives info about PokeGambler
         $```scss
         {command_prefix}info
