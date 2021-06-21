@@ -292,6 +292,34 @@ def cooldown(secs: int):
     return decorator
 
 
+def check_completion(func: Callable):
+    '''
+    Checks if a command is already in progress for a user.
+    '''
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        async def with_calback(self, message, *args, **kwargs):
+            await func(self, *args, message=message, **kwargs)
+            self.ctx.pending_cmds[
+                func.__name__
+            ].remove(message.author.id)
+        if self.ctx.pending_cmds.get(func.__name__, None):
+            if message.author.id in self.ctx.pending_cmds[func.__name__]:
+                return message.channel.send(
+                    embed=get_embed(
+                        "You already triggered this command once.\n"
+                        "Please complete it before using it again.",
+                        embed_type="error",
+                        title="Command Pending"
+                    )
+                )
+            self.ctx.pending_cmds[func.__name__].append(message.author.id)
+            return with_calback(self, *args, message=message, **kwargs)
+        self.ctx.pending_cmds[func.__name__] = [message.author.id]
+        return with_calback(self, *args, message=message, **kwargs)
+    return wrapped
+
+
 class Commands(ABC):
     '''
     The Base command class which serves as the starting point for all commands.

@@ -25,8 +25,8 @@ from ..helpers.utils import (
     img2file, wait_for
 )
 from .basecommand import (
-    Commands, alias, dealer_only,
-    model, no_thumb
+    Commands, alias, check_completion,
+    dealer_only, model, no_thumb
 )
 
 if TYPE_CHECKING:
@@ -158,6 +158,7 @@ class GambleCommands(Commands):
 
     @model([Flips, Profile])
     @alias(["flip", "chipflip"])
+    @check_completion
     async def cmd_quickflip(
         self, message: Message,
         args: Optional[List] = None,
@@ -260,6 +261,7 @@ class GambleCommands(Commands):
     @model([Moles, Profile])
     @alias(["mole", "whack"])
     @no_thumb
+    @check_completion
     async def cmd_whackamole(self, message: Message, **kwargs):
         """Find the chip minigame.
         $```scss

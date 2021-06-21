@@ -61,6 +61,7 @@ class PokeGambler(discord.Client):
         self.cooldown_cmds = {}
         self.loot_cd = {}
         self.boost_dict = {}
+        self.pending_cmds = {}
         # Classes
         self.database = DBConnector(self.db_path)
         self.logger = CustomLogger(

@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 from collections import namedtuple
 import random
+import re
 from typing import List, Optional, TYPE_CHECKING
 
 import discord
@@ -24,7 +25,8 @@ from ..helpers.utils import (
     img2file, wait_for, dm_send
 )
 from .basecommand import (
-    Commands, alias, cooldown, model, no_thumb
+    Commands, alias, check_completion,
+    cooldown, model, no_thumb
 )
 
 if TYPE_CHECKING:
@@ -213,6 +215,7 @@ class DuelCommands(Commands):
 
     @alias("action+")
     @model([DuelActionsModel, Profile])
+    @check_completion
     @no_thumb
     async def cmd_create_action(self, message: Message, **kwargs):
         """Create a custom Duel Action.
@@ -336,6 +339,7 @@ class DuelCommands(Commands):
         profile.debit(200, bonds=levels.index(choice))
         self.duelactions.refresh()
 
+    @check_completion
     @model(Inventory)
     async def cmd_gladnick(self, message: Message, **kwargs):
         """Rename your Gladiator.
@@ -378,7 +382,19 @@ class DuelCommands(Commands):
             ]),
             timeout="inf"
         )
-        new_name = reply.content[:10].title()
+        new_name = re.sub(r"[^\x00-\x7F]+", "", reply.content[:10].title()).strip()
+        if not new_name:
+            await dm_send(
+                message,
+                message.author,
+                embed=get_embed(
+                    "That name is not allowed, keep it simple.\n"
+                    "Please reuse the command later.",
+                    embed_type="error",
+                    title="Invalid Nickname"
+                )
+            )
+            return
         glad.rename(self.database, new_name)
         inv.delete([tickets[0]], quantity=1)
         await dm_send(
