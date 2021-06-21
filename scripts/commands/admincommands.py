@@ -364,7 +364,8 @@ class AdminCommands(Commands):
         chan = message.guild.get_channel(
             int(os.getenv("ANNOUNCEMENT_CHANNEL"))
         )
-        await chan.send(content=content)
+        msg = await chan.send(content=content)
+        await msg.publish()
         await reply.add_reaction("👍")
 
     @admin_only
