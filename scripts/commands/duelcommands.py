@@ -382,7 +382,10 @@ class DuelCommands(Commands):
             ]),
             timeout="inf"
         )
-        new_name = re.sub(r"[^\x00-\x7F]+", "", reply.content[:10].title()).strip()
+        new_name = re.sub(
+            r"[^\x00-\x7F]+", "",
+            reply.content[:10].title()
+        ).strip()
         if not new_name:
             await dm_send(
                 message,
