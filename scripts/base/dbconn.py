@@ -1270,6 +1270,10 @@ class DBConnector:
             '''
             SELECT * FROM items
             WHERE category <> 'Chest'
+                AND itemid NOT IN (
+                    SELECT itemid FROM inventory
+                    WHERE itemid IS NOT NULL
+                )
             GROUP BY name
             ORDER BY category, name;
             '''
