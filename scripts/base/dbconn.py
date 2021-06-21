@@ -1631,6 +1631,20 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def rename_gladiator(self, itemid: int, name: str):
+        """
+        Renames a user owned Gladiator.
+        """
+        self.cursor.execute(
+            '''
+            UPDATE items
+            SET name=?
+            WHERE itemid IS ?
+            ''',
+            (name, itemid)
+        )
+        self.conn.commit()
+
 
 if __name__ == "__main__":
     dbconn = DBConnector(db_path='data/pokegambler.db')

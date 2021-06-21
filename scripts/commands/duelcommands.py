@@ -212,6 +212,7 @@ class DuelCommands(Commands):
             )
 
     @alias("action+")
+    @model([DuelActionsModel, Profile])
     @no_thumb
     async def cmd_create_action(self, message: Message, **kwargs):
         """Create a custom Duel Action.
@@ -335,6 +336,60 @@ class DuelCommands(Commands):
         profile.debit(200, bonds=levels.index(choice))
         self.duelactions.refresh()
 
+    @model(Inventory)
+    async def cmd_gladnick(self, message: Message, **kwargs):
+        """Rename your Gladiator.
+        $```scss
+        {command_prefix}gladnick
+        ```$
+
+        @You can rename your gladiator using a Gladiator Name Change ticket.
+        The ticket can be purchased from the Consumables Shop.@
+        """
+        inv = Inventory(self.database, message.author)
+        tickets = inv.from_name("Gladiator Nickname Change")
+        if not tickets:
+            await message.channel.send(
+                embed=get_embed(
+                    "You do not have any renaming tickets.\n"
+                    "You can buy one from the Consumables Shop.",
+                    embed_type="error",
+                    title="Insufficient Tickets"
+                )
+            )
+            return
+        glad = await self.__duel_get_gladiator(message, message.author)
+        if not glad:
+            return
+        inp_msg = await dm_send(
+            message,
+            message.author,
+            embed=get_embed(
+                "Use a sensible name (Max 10 chars) for your gladiator.",
+                title="Enter New Nickname"
+            )
+        )
+        reply = await wait_for(
+            inp_msg.channel, self.ctx,
+            init_msg=inp_msg,
+            check=lambda msg: all([
+                msg.author.id == message.author.id,
+                msg.channel.id == inp_msg.channel.id
+            ]),
+            timeout="inf"
+        )
+        new_name = reply.content[:10].title()
+        glad.rename(self.database, new_name)
+        inv.delete([tickets[0]], quantity=1)
+        await dm_send(
+            message,
+            message.author,
+            embed=get_embed(
+                f"Successfully renamed your Gladiator to {new_name}.",
+                title="Rename Complete"
+            )
+        )
+
     def __duel_get_action(
         self, glads: List[Gladiator],
         damages: List[int]
@@ -447,7 +502,7 @@ class DuelCommands(Commands):
             message, user,
             embed=get_embed(
                 f"Successfully chosen 『**{gladiator}**』"
-                "as Gladiator for this match.",
+                "for this command/match.",
                 title="Gladiator Confirmed"
             )
         )

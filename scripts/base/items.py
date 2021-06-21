@@ -96,7 +96,14 @@ class Item(ABC):
         """
         Returns the name of the Item.
         """
-        return str(self)
+        return getattr(self, "_name", str(self))
+
+    @name.setter
+    def name(self, value: str):
+        """
+        Sets the name of the Item.
+        """
+        self._name = value
 
     @property
     def details(self) -> Embed:
@@ -491,6 +498,13 @@ class Gladiator(Consumable):
     def __init__(self, **kwargs):
         kwargs.pop('category', None)
         super().__init__(category="Gladiator", **kwargs)
+
+    def rename(self, database: DBConnector, name: str):
+        """
+        Wrapper for Gladiator rename DB call.
+        """
+        self.name = name
+        database.rename_gladiator(int(self.itemid, 16), name)
 
 
 @dataclass
