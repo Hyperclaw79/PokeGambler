@@ -628,8 +628,15 @@ class TradeCommands(Commands):
                     f"twemoji/master/assets/72x72/{ord(catog.emoji):x}.png"
                 )
         else:
+            profile = Profile(self.database, user)
+            balance = (
+                f"`{profile.get('pokebonds'):,}` {self.bond_emoji}"
+                if shop is PremiumShop
+                else f"`{profile.get('won_chips'):,}` {self.chip_emoji}"
+            )
             emb = get_embed(
-                    f"**To buy any item, use `{self.ctx.prefix}buy itemid`**",
+                    f"**To buy any item, use `{self.ctx.prefix}buy itemid`**"
+                    f"\n**You currently have: {balance}**",
                     title=f"{catog} {shopname}",
                     no_icon=True
                 )
