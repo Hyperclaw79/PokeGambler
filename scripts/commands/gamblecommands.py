@@ -231,8 +231,8 @@ class GambleCommands(Commands):
         )
         msg = f"PokeGambler choose {valids[2:][idx].title()}.\n"
         if choice == idx:
-            amt_mult = 0.1 * (
-                Boosts(
+            amt_mult = 1 + (
+                0.1 * Boosts(
                     self.database, message.author
                 ).get()["flipster"] + 1
             )
