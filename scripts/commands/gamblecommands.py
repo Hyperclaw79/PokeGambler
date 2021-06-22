@@ -234,7 +234,7 @@ class GambleCommands(Commands):
             amt_mult = 1 + (
                 0.1 * Boosts(
                     self.database, message.author
-                ).get()["flipster"] + 1
+                ).get()["flipster"]
             )
             boosts = self.ctx.boost_dict.get(message.author.id, None)
             if boosts:
