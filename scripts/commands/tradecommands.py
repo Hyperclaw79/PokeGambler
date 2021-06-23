@@ -54,13 +54,13 @@ class TradeCommands(Commands):
         There are 3 different chests and scale with your tier.
         Here's a drop table:
         ```py
-        ╔══════╦═══════════╦═══════════╦══════════════╗
-        ║ Tier ║   Chest   ║ Drop Rate ║  Pokechips   ║
-        ╠══════╬═══════════╬═══════════╬══════════════╣
-        ║   1  ║  Common   ║    66%    ║   34 - 191   ║
-        ║   2  ║   Gold    ║    25%    ║  192 - 1110  ║
-        ║   3  ║ Legendary ║     9%    ║ 1111 - 10000 ║
-        ╚══════╩═══════════╩═══════════╩══════════════╝
+        ╔════╦═════════╦═════════╦════════════╗
+        ║Tier║  Chest  ║Drop Rate║ Pokechips  ║
+        ╠════╬═════════╬═════════╬════════════╣
+        ║  1 ║ Common  ║   66%   ║  34 - 191  ║
+        ║  2 ║  Gold   ║   25%   ║ 192 - 1110 ║
+        ║  3 ║Legendary║    9%   ║1111 - 10000║
+        ╚════╩═════════╩═════════╩════════════╝
         ```
         Lootbags are similar to Chests but they will contain items for sure.
         They can either be Normal or Premium.

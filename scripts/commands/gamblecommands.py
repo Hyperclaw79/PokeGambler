@@ -274,13 +274,13 @@ class GambleCommands(Commands):
         You can choose difficulty level (default 1) and rewards will scale.
         ```py
         ╔═══════╦═══════╦══════╦════════╗
-        ║ Level ║ Board ║ Cost ║ Reward ║
+        ║ Level ║ Board ║ Cost ║ Reward ║
         ╠═══════╬═══════╬══════╬════════╣
-        ║   1   ║  3x3  ║   50 ║   x3   ║
-        ║   2   ║  4x4  ║  100 ║   x4   ║
-        ║   3   ║  5x5  ║  150 ║   x10  ║
-        ║   4   ║  6x6  ║  200 ║   x50  ║
-        ║   5   ║  7x7  ║  250 ║   x100 ║
+        ║   1   ║  3x3  ║   50 ║   x3   ║
+        ║   2   ║  4x4  ║  100 ║   x4   ║
+        ║   3   ║  5x5  ║  150 ║   x10  ║
+        ║   4   ║  6x6  ║  200 ║   x50  ║
+        ║   5   ║  7x7  ║  250 ║   x100 ║
         ╚═══════╩═══════╩══════╩════════╝
         ```@
 
