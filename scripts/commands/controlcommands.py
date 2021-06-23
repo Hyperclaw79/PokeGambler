@@ -644,7 +644,7 @@ class ControlCommands(Commands):
 
         @`👑 Owner Command`
         Waits for JSON file attachment and loads the data into Items table.
-        Attachment's name should be `items.json`.
+        Attachment's name should be `items.json`.@
         """
         info_msg = await message.channel.send(
             embed=get_embed(
