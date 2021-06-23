@@ -376,9 +376,10 @@ class Commands(ABC):
         if files:
             msg = await message.guild.get_channel(
                 self.ctx.configs["img_upload_channel"]
-            ).send(files=files)
-            for idx, attachment in enumerate(msg.attachments):
-                embeds[idx].set_image(url=attachment.proxy_url)
+            ).send(file=files[0])
+            embeds[0].set_image(
+                url=msg.attachments[0].proxy_url
+            )
         base = await message.channel.send(embed=embeds[0])
         if len(embeds) > 1:
             if not embeds[0].footer:
@@ -388,7 +389,8 @@ class Commands(ABC):
                     )
             pager = Paginator(
                 message, base,
-                embeds, self.ctx
+                embeds, files,
+                self.ctx
             )
             await pager.run()
 

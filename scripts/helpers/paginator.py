@@ -6,16 +6,15 @@ Custom Pagination Module for Discord Embeds.
 
 
 from __future__ import annotations
-import asyncio
 
-from typing import List, TYPE_CHECKING
+import asyncio
+from typing import TYPE_CHECKING, List
 
 import discord
-from discord import Message, Embed
 
 if TYPE_CHECKING:
     from bot import PokeGambler
-
+    from discord import Embed, File, Message
 
 class Paginator:
     """Custom Pagination for Discord Embeds
@@ -44,12 +43,14 @@ class Paginator:
 
     def __init__(
         self, message: Message, base: Message,
-        embeds: List[Embed], ctx: PokeGambler
+        embeds: List[Embed], files: List[File],
+        ctx: PokeGambler
     ):
         self.message = message
         self.base = base
         self.pointers = ['👈', '👉', '❌']
         self.embeds = embeds
+        self.files = files
         self.cursor = 0
         self.ctx = ctx
 
@@ -68,6 +69,17 @@ class Paginator:
             option = self.pointers.index(reaction.emoji)
             if option == 1 and self.cursor < len(self.embeds) - 1:
                 self.cursor += 1
+                if (
+                    self.files
+                    and len(self.files) > self.cursor
+                    and not self.embeds[self.cursor].image.url
+                ):
+                    msg = await self.base.guild.get_channel(
+                        self.ctx.configs["img_upload_channel"]
+                    ).send(file=self.files[self.cursor])
+                    self.embeds[self.cursor].set_image(
+                        url=msg.attachments[0].proxy_url
+                    )
                 await self.base.edit(embed=self.embeds[self.cursor])
             elif option == 0 and self.cursor > 0:
                 self.cursor -= 1
@@ -93,6 +105,17 @@ class Paginator:
             option = self.pointers.index(reaction.emoji)
             if option == 1 and self.cursor < len(self.embeds) - 1:
                 self.cursor += 1
+                if (
+                    self.files
+                    and len(self.files) > self.cursor
+                    and not self.embeds[self.cursor].image.url
+                ):
+                    msg = await self.base.guild.get_channel(
+                        self.ctx.configs["img_upload_channel"]
+                    ).send(file=self.files[self.cursor])
+                    self.embeds[self.cursor].set_image(
+                        url=msg.attachments[0].proxy_url
+                    )
                 await self.base.edit(embed=self.embeds[self.cursor])
             elif option == 0 and self.cursor > 0:
                 self.cursor -= 1
