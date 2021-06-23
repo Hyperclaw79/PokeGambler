@@ -2,7 +2,7 @@
 Custom Pagination Module for Discord Embeds.
 """
 
-# pylint: disable=inconsistent-return-statements
+# pylint: disable=inconsistent-return-statements, too-many-arguments
 
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import discord
 if TYPE_CHECKING:
     from bot import PokeGambler
     from discord import Embed, File, Message
+
 
 class Paginator:
     """Custom Pagination for Discord Embeds
