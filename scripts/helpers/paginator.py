@@ -8,7 +8,7 @@ Custom Pagination Module for Discord Embeds.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, List
+from typing import Optional, TYPE_CHECKING, List
 
 import discord
 
@@ -42,9 +42,10 @@ class Paginator:
     # pylint: disable=too-few-public-methods
 
     def __init__(
-        self, message: Message, base: Message,
-        embeds: List[Embed], files: List[File],
-        ctx: PokeGambler
+        self, ctx: PokeGambler,
+        message: Message, base: Message,
+        embeds: List[Embed],
+        files: Optional[List[File]] = None
     ):
         self.message = message
         self.base = base

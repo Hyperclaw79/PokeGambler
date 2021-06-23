@@ -425,7 +425,7 @@ class ControlCommands(Commands):
         if len(embeds) > 1:
             for idx, emb in enumerate(embeds):
                 emb.title += f" ({idx + 1}/{len(embeds)})"
-            pager = Paginator(message, base, embeds, self.ctx)
+            pager = Paginator(self.ctx, message, base, embeds)
             await pager.run()
 
     @owner_only

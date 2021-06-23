@@ -195,7 +195,7 @@ class NormalCommands(Commands):
             embed=embeds[0]
         )
         if len(embeds) > 1:
-            pager = Paginator(message, base, embeds, self.ctx)
+            pager = Paginator(self.ctx, message, base, embeds)
             await pager.run(content='**PokeGambler Commands List:**\n')
 
     @alias('$')

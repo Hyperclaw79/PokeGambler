@@ -388,9 +388,8 @@ class Commands(ABC):
                         text=f"{idx + 1} / {len(embeds)}"
                     )
             pager = Paginator(
-                message, base,
-                embeds, files,
-                self.ctx
+                self.ctx, message, base,
+                embeds, files
             )
             await pager.run()
 
