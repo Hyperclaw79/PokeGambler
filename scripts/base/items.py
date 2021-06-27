@@ -150,7 +150,10 @@ class Item(ABC):
         return database.get_item(itemid)
 
     @classmethod
-    def _new_item(cls: Type[Item], item: Dict) -> Item:
+    def _new_item(
+        cls: Type[Item], item: Dict,
+        force_new: bool = False
+    ) -> Item:
         category = cls.get_category(item)
         item.pop('category', None)
         itemid = item.pop('itemid', None)
@@ -162,13 +165,14 @@ class Item(ABC):
             (category, ),
             item
         )(**item)
-        new_item.itemid = f'{itemid:0>8X}'
+        if not force_new:
+            new_item.itemid = f'{itemid:0>8X}'
         return new_item
 
     @classmethod
     def from_id(
         cls: Type[Item], database: DBConnector,
-        itemid: int
+        itemid: int, force_new: bool = False
     ) -> Item:
         """
         Returns a item of specified ID or None.
@@ -178,12 +182,15 @@ class Item(ABC):
             return None
         if item["category"] == "Chest":
             return Chest.from_id(database, itemid)
-        return cls._new_item(item)
+        new_item = cls._new_item(item, force_new=force_new)
+        if force_new:
+            new_item.save(database)
+        return new_item
 
     @classmethod
     def from_name(
         cls: Type[Item], database: DBConnector,
-        name: str
+        name: str, force_new: bool = False
     ) -> Item:
         """
         Returns a item of specified name or None.
@@ -191,7 +198,10 @@ class Item(ABC):
         item = database.get_item_from_name(name)
         if not item:
             return None
-        return cls._new_item(item)
+        new_item = cls._new_item(item, force_new=force_new)
+        if force_new:
+            new_item.save(database)
+        return new_item
 
     @classmethod
     def get_category(cls: Type[Item], item: Dict) -> Type[Item]:
@@ -365,6 +375,7 @@ class Chest(Treasure):
         chests = [CommonChest, GoldChest, LegendaryChest]
         return chests[tier - 1]()
 
+    # pylint: disable=arguments-differ
     @classmethod
     def from_id(
         cls: Type[Chest],

@@ -407,7 +407,7 @@ class Shop:
     def get_item(
         cls: Type[Shop],
         database: DBConnector,
-        itemid: str
+        itemid: str, force_new: bool = False
     ) -> ShopItem:
         """
         Returns the item registered in Shop based on itemID.
@@ -419,11 +419,11 @@ class Shop:
             for ch in itemid
         ):
             return None
-        item = Item.from_id(database, int(itemid, 16))
+        item = Item.from_id(database, int(itemid, 16), force_new=force_new)
         if cls._premium_cond(item.premium):  # pylint: disable=no-member
             return None
         return TradebleItem(
-            itemid=int(itemid, 16),
+            itemid=int(item.itemid, 16),
             **dict(item)
         )
 
@@ -450,6 +450,9 @@ class Shop:
                 for itm in cls.categories[category].items
             )
         ]
+        if len(cls.categories[category].items) + len(new_items) <= 5:
+            cls.categories[category].items.extend(new_items)
+            return
         removables = [
             item
             for item in cls.categories[category].items[::-1]
@@ -471,6 +474,12 @@ class Shop:
         """
         item_types = ["Tradables", "Consumables", "Gladiators"]
         for item_type in item_types:
+            # Check availability of existing items
+            cls.categories[item_type].items = [
+                item
+                for item in cls.categories[item_type].items
+                if database.get_item(item.itemid)
+            ]
             items = [
                 TradebleItem(
                     item["itemid"], item["name"],

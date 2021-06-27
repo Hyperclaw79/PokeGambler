@@ -527,6 +527,31 @@ class AdminCommands(Commands):
         )
         await reply.add_reaction("👍")
 
+    @ensure_item
+    @alias("item-")
+    async def cmd_delete_item(
+        self, message: Message,
+        args: List[str] = None,
+        **kwargs
+    ):
+        """Deletes an Item from the database.
+        $```scss
+        {command_prefix}delete_item itemid
+        ```$
+
+        @`🛡️ Admin Command`
+        Delete an item from the database.
+        If the item was in anyone's inventory, it will be gone.@
+
+        ~To delete a Golden Cigar with ID 0000FFFF:
+            ```
+            {command_prefix}item- 0000FFFF
+            ```~
+        """
+        item = kwargs.get("item")
+        item.delete(self.database)
+        await message.add_reaction("👍")
+
     @admin_only
     @ensure_user
     @alias("usr_itm")

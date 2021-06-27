@@ -1304,6 +1304,10 @@ class DBConnector:
             SELECT * FROM items
             WHERE category IS "Tradable"
                 AND premium IS ?
+                AND itemid NOT IN (
+                    SELECT itemid FROM inventory
+                    WHERE itemid IS NOT NULL
+                )
             GROUP BY name
             ORDER BY
                 CASE
@@ -1402,6 +1406,10 @@ class DBConnector:
             SELECT * FROM items
             WHERE category IS "Consumable"
                 AND premium is ?
+                AND itemid NOT IN (
+                    SELECT itemid FROM inventory
+                    WHERE itemid IS NOT NULL
+                )
             GROUP BY name
             ORDER BY itemid DESC
             LIMIT ?;
@@ -1433,6 +1441,10 @@ class DBConnector:
             SELECT * FROM items
             WHERE category IS "Gladiator"
                 AND premium is ?
+                AND itemid NOT IN (
+                    SELECT itemid FROM inventory
+                    WHERE itemid IS NOT NULL
+                )
             GROUP BY name
             ORDER BY itemid DESC
             LIMIT ?;

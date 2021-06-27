@@ -350,10 +350,10 @@ class TradeCommands(Commands):
         shop = Shop
         shop.refresh_tradables(self.database)
         try:
-            item = shop.get_item(self.database, itemid)
+            item = shop.get_item(self.database, itemid, force_new=True)
             if not item:
                 shop = PremiumShop
-                item = shop.get_item(self.database, itemid)
+                item = shop.get_item(self.database, itemid, force_new=True)
         except (ValueError, ZeroDivisionError):
             await message.channel.send(
                 embed=get_embed(
