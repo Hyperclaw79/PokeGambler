@@ -527,6 +527,7 @@ class AdminCommands(Commands):
         )
         await reply.add_reaction("👍")
 
+    @admin_only
     @ensure_item
     @alias("item-")
     async def cmd_delete_item(
