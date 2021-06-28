@@ -11,9 +11,12 @@ from abc import abstractmethod
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, TYPE_CHECKING, Type, Union
+from queue import Queue
+from typing import (
+    Dict, List, Optional,
+    TYPE_CHECKING, Type, Union
+)
 
-from discord import Member, Message
 from discord.errors import Forbidden, HTTPException
 
 from ..base.items import Item
@@ -21,7 +24,82 @@ from ..base.models import Boosts, Inventory, Loots, Profile
 from .dbconn import DBConnector
 
 if TYPE_CHECKING:
+    from discord import Member, Message
     from bot import PokeGambler
+
+
+class Listing(Queue):
+    """
+    A dynamically flowing Queue with the provision
+    for pinning items from removal.
+    """
+    def __init__(
+        self, items: Optional[List[ShopItem]] = None,
+        maxsize: Optional[int] = 5
+    ):
+        if not items:
+            items = []
+        super().__init__(
+            maxsize=max(maxsize, len(items))
+        )
+        self.register(items)
+
+    def __iter__(self) -> ShopItem:
+        """
+        Iterator with a LIFO order and lower precedence
+        for pinned items.
+        """
+        def __get_rank(item):
+            if any(
+                ch.lower() not in 'abcdef1234567890'
+                for ch in str(getattr(item, "itemid", "No-itemid"))
+            ):
+                return getattr(item, "price", -self.queue.index(item))
+            return -item.itemid
+        queue = sorted(
+            self.queue,
+            key=lambda item: (
+                [False, True].index(
+                    getattr(item, "pinned", False)
+                ),
+                __get_rank(item)
+            )
+        )
+        yield from queue
+
+    def __len__(self) -> int:
+        return len(self.queue)
+
+    def __str__(self) -> str:
+        return f"Listing({list(self)})"
+
+    def fetch(self) -> ShopItem:
+        """
+        Pops out an item in FIFO order.
+        """
+        return super().get_nowait()
+
+    def register(self, items: Union[ShopItem, List[ShopItem]]):
+        """
+        Adds an item/list of items to the queue.
+        """
+        if not items:
+            return
+        if not isinstance(items, list):
+            items = [items]
+        for item in items:
+            if not self.full():
+                super().put_nowait(item)
+                continue
+            removable = None
+            for existing_item in self.queue:
+                if not getattr(existing_item, "pinned", False):
+                    removable = existing_item
+                    break
+            if not removable:
+                return
+            self.queue.remove(removable)
+            super().put_nowait(item)
 
 
 @dataclass
@@ -253,7 +331,7 @@ class ShopCategory:
     name: str
     description: str
     emoji: str
-    items: List[Union[Title, BoostItem, TradebleItem]]
+    items: Listing
 
     def __str__(self) -> str:
         return f"『{self.emoji}』 {self.name}"
@@ -271,7 +349,7 @@ class Shop:
             Titles will automatically give you a role named as the title.
             """,
             "📜",
-            [
+            Listing([
                 Title(
                     "title_dlr",
                     "Dealers",
@@ -303,7 +381,7 @@ class Shop:
                     " for a lifetime.",
                     1_000_000
                 )
-            ]
+            ])
         ),
         "Boosts": ShopCategory(
             "Boosts",
@@ -315,7 +393,7 @@ class Shop:
             For permenant boosts, contact an admin to purchase PokeBonds.
             """,
             "🧬",
-            [
+            Listing([
                 BoostItem(
                     "boost_lt",
                     "Lucky Looter",
@@ -340,7 +418,7 @@ class Shop:
                     "Increase reward for QuickFlip minigame by 10%.",
                     200, "🎲"
                 )
-            ]
+            ])
         ),
         "Tradables": ShopCategory(
             "Tradables",
@@ -350,7 +428,7 @@ class Shop:
             Might even contain player created Items.
             """,
             "📦",
-            []
+            Listing()
         ),
         "Consumables": ShopCategory(
             "Consumables",
@@ -359,7 +437,7 @@ class Shop:
             They cannot be sold back to the shop.
             """,
             "🛒",
-            []
+            Listing()
         ),
         "Gladiators": ShopCategory(
             "Gladiators",
@@ -368,7 +446,7 @@ class Shop:
             You can buy them to make them fight in brutal gladiator fights.
             """,
             "💀",
-            []
+            Listing()
         )
     }
     alias_map: Dict[str, str] = {
@@ -450,22 +528,7 @@ class Shop:
                 for itm in cls.categories[category].items
             )
         ]
-        if len(cls.categories[category].items) + len(new_items) <= 5:
-            cls.categories[category].items.extend(new_items)
-            return
-        removables = [
-            item
-            for item in cls.categories[category].items[::-1]
-            if not item.pinned
-        ][:len(new_items)]
-        num_in_stock = len(cls.categories[category].items) - len(removables)
-        num_updatable = len(new_items) - num_in_stock
-        updates = new_items[::-1][:num_updatable][::-1]
-        for item in removables:
-            cls.categories[category].items.remove(item)
-        cls.categories[category].items = (
-            updates + cls.categories[category].items
-        )
+        cls.categories[category].items.register(new_items)
 
     @classmethod
     def refresh_tradables(cls: Type[Shop], database: DBConnector):
@@ -475,11 +538,11 @@ class Shop:
         item_types = ["Tradables", "Consumables", "Gladiators"]
         for item_type in item_types:
             # Check availability of existing items
-            cls.categories[item_type].items = [
-                item
-                for item in cls.categories[item_type].items
-                if database.get_item(item.itemid)
-            ]
+            for item in cls.categories[item_type].items:
+                if not database.get_item(item.itemid):
+                    cls.categories[item_type].items.queue.remove(
+                        item
+                    )
             items = [
                 TradebleItem(
                     item["itemid"], item["name"],
@@ -535,14 +598,14 @@ class PremiumShop(Shop):
             Titles will automatically give you a role named as the title.
             """,
             "📜",
-            [
+            Listing([
                 Title(
                     "title_pr",
                     "The Patron",
                     "Dedicated patron of PokeGambler.",
                     2000
                 )
-            ]
+            ])
         ),
         "Boosts": ShopCategory(
             "Boosts",
@@ -552,7 +615,7 @@ class PremiumShop(Shop):
             Buying new ones increases the effect.
             """,
             "🧬",
-            [
+            Listing([
                 PremiumBoostItem(
                     "boost_pr_lt",
                     "Lucky Looter",
@@ -580,7 +643,7 @@ class PremiumShop(Shop):
                     "minigame by 10%.",
                     200, "🎲", premium=True
                 )
-            ]
+            ])
         ),
         "Tradables": ShopCategory(
             "Tradables",
@@ -590,7 +653,7 @@ class PremiumShop(Shop):
             Might even contain player created Items.
             """,
             "📦",
-            []
+            Listing()
         ),
         "Consumables": ShopCategory(
             "Consumables",
@@ -599,7 +662,7 @@ class PremiumShop(Shop):
             They cannot be sold back to the shop.
             """,
             "🛒",
-            []
+            Listing()
         ),
         "Gladiators": ShopCategory(
             "Gladiators",
@@ -608,7 +671,7 @@ class PremiumShop(Shop):
             You can buy them to make them fight in brutal gladiator fights.
             """,
             "💀",
-            []
+            Listing()
         )
     }
     premium = True
