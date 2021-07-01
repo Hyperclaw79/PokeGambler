@@ -606,6 +606,60 @@ class TradeCommands(Commands):
             )
         )
 
+    @model(Profile)
+    async def cmd_redeem_chips(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """Convert Bonds to Chips.
+        $```scss
+        {command_prefix}redeem_chips amount
+        ```$
+
+        @Redeem your pokebonds as x10 pokechips.@
+
+        ~To redeem 500 chips:
+            ```
+            {command_prefix}redeem_chips 500
+            ```~
+        """
+        if (
+            not args
+            or not args[0].isdigit()
+            or int(args[0]) < 10
+            or int(args[0]) % 10  # Must be a multiple of 10, 0 -> False
+        ):
+            await message.channel.send(
+                embed=get_embed(
+                    "You need to enter the number of chips to redeem.",
+                    embed_type="error",
+                    title="Invalid Amount"
+                )
+            )
+            return
+        chips = int(args[0])
+        profile = Profile(self.database, message.author)
+        if profile.get()["pokebonds"] < chips // 10 :
+            await message.channel.send(
+                embed=get_embed(
+                    f"You cannot afford that many chips.\n"
+                    f"You'll need {chips // 10} {self.bond_emoji} for that.",
+                    embed_type="error",
+                    title="Insufficient Balance"
+                )
+            )
+            return
+        profile.debit(chips // 10, bonds=True)
+        profile.credit(chips)
+        await message.channel.send(
+            embed=get_embed(
+                f"Succesfully converted **{chips // 10}** {self.bond_emoji}"
+                f" into **{chips}** {self.chip_emoji}",
+                title="Redeem Succesfull"
+            )
+        )
+
     def __get_shop_page(
         self, shop: Type[Shop],
         catog_str: str, user: Member
