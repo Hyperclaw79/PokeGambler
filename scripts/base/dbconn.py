@@ -431,6 +431,33 @@ class DBConnector:
         )
         self.conn.commit()
 
+    def create_trades_table(self):
+        """
+        SQL endpoint for Trades table creation.
+        """
+        self.cursor.execute(
+            '''
+            CREATE TABLE
+            IF NOT EXISTS
+            trades(
+                traded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                traded_by TEXT,
+                traded_to TEXT,
+                given_chips INT DEFAULT "0",
+                taken_chips INT DEFAULT "0",
+                given_items LIST NULL,
+                taken_items LIST NULL,
+                FOREIGN KEY (traded_by)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL,
+                FOREIGN KEY (traded_to)
+                    REFERENCES profile (user_id)
+                    ON DELETE SET NULL
+            );
+            '''
+        )
+        self.conn.commit()
+
     def create_tables(self):
         """
         SQL endpoint for triggering multiple table creations.
@@ -572,6 +599,17 @@ class DBConnector:
         self.cursor.execute(
             '''
             DELETE FROM actions;
+            '''
+        )
+        self.conn.commit()
+
+    def purge_trades(self):
+        """
+        SQL endpoint for purging Trades table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM trades;
             '''
         )
         self.conn.commit()

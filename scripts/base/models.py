@@ -636,3 +636,30 @@ class DuelActionsModel(Model):
         self.created_by = str(user.id)
         self.action = action
         self.level = level
+
+
+class Trades(Model):
+    """
+    Wrapper for trades based DB actions
+    """
+
+    # pylint: disable=no-member
+
+    def __init__(
+        self, database: DBConnector, user: discord.Member,
+        traded_to: Optional[str] = None,
+        given_chips: int = None,
+        taken_chips: int = None,
+        given_items: List[int] = None,
+        taken_items: List[int] = None
+    ):
+        super().__init__(database, user, "trades")
+        self.traded_at = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        self.traded_by = str(user.id)
+        self.traded_to = str(traded_to)
+        self.given_chips = given_chips
+        self.taken_chips = taken_chips
+        self.given_items = given_items
+        self.taken_items = taken_items

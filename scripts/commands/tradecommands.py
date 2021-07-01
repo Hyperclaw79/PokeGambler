@@ -11,7 +11,8 @@ import re
 
 from ..base.items import Item, Chest
 from ..base.models import (
-    Inventory, Loots, Profile
+    Inventory, Loots,
+    Profile, Trades
 )
 from ..base.shop import (
     BoostItem, PremiumBoostItem,
@@ -511,7 +512,7 @@ class TradeCommands(Commands):
         )
 
     @dealer_only
-    @model(Profile)
+    @model([Profile, Trades])
     @alias(["transfer", "pay"])
     async def cmd_give(
         self, message: Message,
@@ -598,6 +599,10 @@ class TradeCommands(Commands):
             return
         author_prof.debit(amount)
         mention_prof.credit(amount)
+        Trades(
+            self.database, message.author,
+            str(mentions[0].id), amount
+        ).save()
         await message.channel.send(
             embed=get_embed(
                 f"Amount transferred: **{amount}** {self.chip_emoji}"
@@ -640,7 +645,7 @@ class TradeCommands(Commands):
             return
         chips = int(args[0])
         profile = Profile(self.database, message.author)
-        if profile.get()["pokebonds"] < chips // 10 :
+        if profile.get()["pokebonds"] < chips // 10:
             await message.channel.send(
                 embed=get_embed(
                     f"You cannot afford that many chips.\n"
