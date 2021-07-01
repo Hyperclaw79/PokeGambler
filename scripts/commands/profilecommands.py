@@ -15,8 +15,8 @@ import discord
 
 from ..base.items import Chest
 from ..base.models import (
-    Boosts, Inventory, Loots, Matches,
-    Minigame, Profile
+    Blacklist, Boosts, Inventory, Loots,
+    Matches, Minigame, Profile
 )
 from ..base.shop import BoostItem
 
@@ -93,8 +93,8 @@ class ProfileCommands(Commands):
         profilecard = self.pcg.get(
             name, avatar, balance,
             num_played, num_won, badges,
-            blacklisted=self.database.is_blacklisted(
-                str(user.id)
+            blacklisted=Blacklist.is_blacklisted(
+                self.database, str(user.id)
             )
         )
         discord_file = img2file(profilecard, "profilecard.jpg")
@@ -207,7 +207,9 @@ class ProfileCommands(Commands):
                 })
         else:
             sort_by = "num_wins" if not args else "balance"
-            leaderboard = self.database.get_leaderboard(sort_by=sort_by)
+            leaderboard = Profile.get_leaderboard(
+                self.database, sort_by=sort_by
+            )
         if not leaderboard:
             await message.channel.send(
                 embed=get_embed(
@@ -262,7 +264,7 @@ class ProfileCommands(Commands):
         """
         profile = await get_profile(self.database, message,  message.author)
         data = profile.get()
-        rank = self.database.get_rank(str(message.author.id))
+        rank = profile.get_rank()
         data["rank"] = rank or 0
         data["balance"] = f'{data["balance"]:,}'
         img = await self.lbg.get_rankcard(self.ctx, data, heading=True)

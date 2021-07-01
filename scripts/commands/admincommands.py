@@ -282,8 +282,8 @@ class AdminCommands(Commands):
             )
             return
         Blacklist(
-            self.database,
-            user, message.author,
+            self.database, user,
+            str(message.author.id),
             reason=kwargs.get("reason", None)
         ).save()
         await message.add_reaction("👍")
@@ -323,7 +323,7 @@ class AdminCommands(Commands):
                 )
             )
             return
-        if not self.database.is_blacklisted(args[0]):
+        if not Blacklist.is_blacklisted(self.database, args[0]):
             await message.channel.send(
                 embed=get_embed(
                     "User is not blacklisted.",
@@ -332,7 +332,10 @@ class AdminCommands(Commands):
                 )
             )
             return
-        Blacklist(self.database, user, message.author).pardon()
+        Blacklist(
+            self.database, user,
+            str(message.author.id)
+        ).pardon()
         await message.add_reaction("👍")
 
     @admin_only

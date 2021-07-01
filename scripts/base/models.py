@@ -262,6 +262,12 @@ class Profile(UnlockedModel):
                 won_chips=self.won_chips + amount
             )
 
+    def get_rank(self) -> int:
+        """
+        Wrapper for get_rank DB call.
+        """
+        return self.database.get_rank(self.user_id)
+
     @classmethod
     def get_all(
         cls: Type[Profile], database: DBConnector,
@@ -278,6 +284,17 @@ class Profile(UnlockedModel):
         Wrapper for Get Full Profile DB call.
         """
         return self.database.get_full_profile(self.user.id)
+
+    @classmethod
+    def get_leaderboard(
+        cls: Type[Profile],
+        database: DBConnector,
+        sort_by: str
+    ) -> List[Dict]:
+        """
+        Wrapper for get_leaderboard DB call.
+        """
+        return database.get_leaderboard(sort_by=sort_by)
 
 
 class CommandData(Model):
@@ -318,7 +335,8 @@ class Blacklist(Model):
 
     def __init__(
         self, database: DBConnector,
-        user: discord.Member, mod: discord.Member,
+        user: discord.Member,
+        mod: Optional[str] = "",
         reason: Optional[str] = ""
     ):
         super().__init__(database, user, "blacklists")
@@ -326,7 +344,7 @@ class Blacklist(Model):
         self.blacklisted_at = datetime.now().strftime(
             "%Y-%m-%d %H:%M:%S"
         )
-        self.blacklisted_by = str(mod.id)
+        self.blacklisted_by = mod
         self.reason = reason
 
     def save(self):
@@ -345,6 +363,17 @@ class Blacklist(Model):
         Pardons a blacklisted user.
         """
         self.database.pardon_user(self.user_id)
+
+    @classmethod
+    def is_blacklisted(
+        cls: Type[Blacklist],
+        database: DBConnector,
+        user_id: str
+    ) -> bool:
+        """
+        Wrapper for is_blacklisted DB call.
+        """
+        return database.is_blacklisted(user_id)
 
 
 class Matches(Model):
@@ -398,6 +427,17 @@ class Matches(Model):
         matches = len(items)
         wins = items.count(True)
         return (matches, wins)
+
+    @classmethod
+    def get_matches(
+        cls: Type[Matches],
+        database: DBConnector,
+        limit: Optional[int] = None
+    ) -> bool:
+        """
+        Wrapper for get_matches DB call.
+        """
+        return database.get_matches(limit=limit)
 
 
 class Inventory(Model):
@@ -636,6 +676,17 @@ class DuelActionsModel(Model):
         self.created_by = str(user.id)
         self.action = action
         self.level = level
+
+    @classmethod
+    def get_actions(
+        cls: Type[DuelActionsModel],
+        database: DBConnector,
+        user_id: Optional[str] = None
+    ) -> List[Dict]:
+        """
+        Wrapper for get_actions DB call.
+        """
+        return database.get_actions(user_id=user_id)
 
 
 class Trades(Model):

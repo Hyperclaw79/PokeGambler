@@ -15,7 +15,7 @@ import discord
 
 from ..base.items import Gladiator, Item
 from ..base.models import (
-    DuelActionsModel, Inventory, Profile, Duels
+    Blacklist, DuelActionsModel, Inventory, Profile, Duels
 )
 
 from ..helpers.checks import user_check
@@ -91,7 +91,7 @@ class DuelActions:
         """
         self.normal = []
         self.crit = []
-        actions = self.database.get_actions()
+        actions = DuelActionsModel.get_actions(self.database)
         for action in actions:
             if action["level"] == "Normal":
                 self.normal.append(action["action"])
@@ -166,7 +166,7 @@ class DuelCommands(Commands):
         user2 = mentions[0]
         na_checks = [
             user2.bot,
-            self.database.is_blacklisted(user2.id)
+            Blacklist.is_blacklisted(self.database, user2.id)
         ]
         if any(na_checks):
             reasons = [

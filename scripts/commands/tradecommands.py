@@ -11,7 +11,7 @@ import re
 
 from ..base.items import Item, Chest
 from ..base.models import (
-    Inventory, Loots,
+    Blacklist, Inventory, Loots,
     Profile, Trades
 )
 from ..base.shop import (
@@ -576,7 +576,7 @@ class TradeCommands(Commands):
                 )
             )
             return
-        if self.database.is_blacklisted(str(mentions[0].id)):
+        if Blacklist.is_blacklisted(self.database, str(mentions[0].id)):
             await message.channel.send(
                 embed=get_embed(
                     "That user is blacklisted and cannot receive any chips.",

@@ -366,6 +366,7 @@ class GambleCommands(Commands):
             file=img2file(board_img, f"{rolled}.jpg")
         )
 
+    @model(Matches)
     async def cmd_matches(
         self, message: Message,
         args: Optional[List] = None,
@@ -394,7 +395,7 @@ class GambleCommands(Commands):
             ```~
         """
         limit = int(args[0]) if args else 10
-        matches = self.database.get_matches(limit=limit)
+        matches = Matches.get_matches(self.database, limit=limit)
         embeds = []
         for match in matches:
             started_by = message.guild.get_member(
@@ -421,7 +422,7 @@ class GambleCommands(Commands):
             )
             emb.add_field(
                 name="Winner",
-                value=f"**```{winner}```**",
+                value=f"**```{winner if winner else 'Not in Server'}```**",
                 inline=True
             )
             emb.add_field(
@@ -445,7 +446,8 @@ class GambleCommands(Commands):
                     value="\u200B",
                     inline=True
                 )
-            emb.set_image(url=winner.avatar_url_as(size=256))
+            if winner:
+                emb.set_image(url=winner.avatar_url_as(size=256))
             embeds.append(emb)
         await self.paginate(message, embeds)
 
