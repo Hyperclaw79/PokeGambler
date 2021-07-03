@@ -8,6 +8,7 @@ from __future__ import annotations
 import random
 from datetime import datetime, timedelta
 from io import BytesIO
+import re
 from typing import Dict, List, Optional, TYPE_CHECKING
 
 from PIL import Image
@@ -25,12 +26,14 @@ from ..helpers.imageclasses import (
     ProfileCardGenerator, WalletGenerator
 )
 from ..helpers.utils import (
-    get_embed, get_formatted_time,
-    get_modules, img2file
+    dm_send, get_embed, get_formatted_time,
+    get_modules, img2file, wait_for
 )
+from ..helpers.checks import user_check
+
 from .basecommand import (
-    Commands, alias,
-    model, get_profile
+    Commands, alias, check_completion,
+    model, get_profile, needs_ticket
 )
 
 if TYPE_CHECKING:
@@ -90,12 +93,23 @@ class ProfileCommands(Commands):
         balance = f'{profile["balance"]:,}'
         num_played = str(profile["num_matches"])
         num_won = str(profile["num_wins"])
+        background = None
+        if profile.get("background", None):
+            bg_byio = BytesIO()
+            try:
+                async with self.ctx.sess.get(profile["background"]) as resp:
+                    data = await resp.read()
+                bg_byio.write(data)
+                bg_byio.seek(0)
+                background = Image.open(bg_byio).resize((960, 540))
+            except Exception:  # pylint: disable=broad-except
+                background = None
         profilecard = self.pcg.get(
             name, avatar, balance,
             num_played, num_won, badges,
             blacklisted=Blacklist.is_blacklisted(
                 self.database, str(user.id)
-            )
+            ), background=background
         )
         discord_file = img2file(profilecard, "profilecard.jpg")
         await message.channel.send(file=discord_file)
@@ -558,6 +572,82 @@ class ProfileCommands(Commands):
                 inline=False
             )
         await message.channel.send(embed=emb)
+
+    @needs_ticket("Background Change")
+    @check_completion
+    @model([Profile, Inventory])
+    @alias('bg')
+    async def cmd_background(self, message: Message, **kwargs):
+        """Change Profile Background.
+        $```scss
+        {command_prefix}background
+        ```$
+
+        @Change the background in your Profile card.
+        The Background Change ticket can be purchased
+        from the Consumables Shop.@
+        """
+        inp_msg = await dm_send(
+            message, message.author,
+            embed=get_embed(
+                "The image size should be greater than **960x540**.\n"
+                "Make sure it uses the *same aspect ratio* as well.\n"
+                "Supported Extension: `PNG` and `JPEG`\n"
+                "> Will rollback to default background "
+                "if link is not accessible any time.\n"
+                "⚠️Using inappropriate images will get you blacklisted.",
+                title="Enter the image url or upload it."
+            )
+        )
+        reply = await wait_for(
+            inp_msg.channel, self.ctx,
+            init_msg=inp_msg,
+            check=lambda msg: user_check(msg, message, inp_msg.channel),
+            timeout="inf"
+        )
+        url = await self.__background_get_url(message, reply)
+        Profile(self.database, message.author).update(
+            background=url
+        )
+        inv = Inventory(self.database, message.author)
+        tickets = kwargs["tickets"]
+        inv.delete([tickets[0]], quantity=1)
+        await dm_send(
+            message, message.author,
+            embed=get_embed(
+                "You can check your profile now.",
+                title="Succesfully updated Profile Background."
+            )
+        )
+
+    async def __background_get_url(self, message, reply):
+        if len(reply.attachments) > 0:
+            if reply.attachments[0].content_type not in (
+                "image/png", "image/jpeg"
+            ):
+                await dm_send(
+                    message, message.author,
+                    embed=get_embed(
+                        "Please make sure it's a png or a jpeg image.",
+                        embed_type="error",
+                        title="Invalid Image"
+                    )
+                )
+                return None
+            return reply.attachments[0].proxy_url
+        patt = r"(https?:\/\/.*\.(?:png|jp[e]?g)+\S*)"
+        matches = re.findall(patt, reply.content)
+        if not matches:
+            await dm_send(
+                message, message.author,
+                embed=get_embed(
+                    "Please make sure it's a png or a jpeg image.",
+                    embed_type="error",
+                    title="Invalid Image"
+                )
+            )
+            return None
+        return matches[0]
 
     def __get_minigame_lb(self, mg_name: str, user: Member) -> List[Dict]:
         def _commands(module):

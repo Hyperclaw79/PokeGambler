@@ -13,7 +13,7 @@ from typing import Callable, List, Optional, TYPE_CHECKING, Union
 import discord
 
 from ..base.items import Item
-from ..base.models import Model, Profile
+from ..base.models import Inventory, Model, Profile
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
     get_embed, is_admin,
@@ -318,6 +318,30 @@ def check_completion(func: Callable):
         self.ctx.pending_cmds[func.__name__] = [message.author.id]
         return with_calback(self, *args, message=message, **kwargs)
     return wrapped
+
+
+def needs_ticket(name: str):
+    '''
+    Checks if user has the tickets in inventory.
+    '''
+    def decorator(func: Callable):
+        @wraps(func)
+        def wrapped(self, message, *args, **kwargs):
+            inv = Inventory(self.database, message.author)
+            tickets = inv.from_name(name)
+            if not tickets:
+                return message.channel.send(
+                    embed=get_embed(
+                        "You do not have any renaming tickets.\n"
+                        "You can buy one from the Consumables Shop.",
+                        embed_type="error",
+                        title="Insufficient Tickets"
+                    )
+                )
+            kwargs["tickets"] = tickets
+            return func(self, *args, message=message, **kwargs)
+        return wrapped
+    return decorator
 
 
 class Commands(ABC):

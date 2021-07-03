@@ -212,7 +212,8 @@ class Profile(UnlockedModel):
             "is_dealer": "dealers" in [
                 role.name.lower()
                 for role in self.user.roles
-            ]
+            ],
+            "background": None
         }
         for key, val in init_dict.items():
             setattr(self, key, val)

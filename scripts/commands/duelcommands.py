@@ -26,7 +26,7 @@ from ..helpers.utils import (
 )
 from .basecommand import (
     Commands, alias, check_completion,
-    cooldown, model, no_thumb
+    cooldown, model, needs_ticket, no_thumb
 )
 
 if TYPE_CHECKING:
@@ -339,6 +339,7 @@ class DuelCommands(Commands):
         profile.debit(200, bonds=levels.index(choice))
         self.duelactions.refresh()
 
+    @needs_ticket("Gladiator Nickname Change")
     @check_completion
     @model(Inventory)
     async def cmd_gladnick(self, message: Message, **kwargs):
@@ -350,18 +351,6 @@ class DuelCommands(Commands):
         @You can rename your gladiator using a Gladiator Name Change ticket.
         The ticket can be purchased from the Consumables Shop.@
         """
-        inv = Inventory(self.database, message.author)
-        tickets = inv.from_name("Gladiator Nickname Change")
-        if not tickets:
-            await message.channel.send(
-                embed=get_embed(
-                    "You do not have any renaming tickets.\n"
-                    "You can buy one from the Consumables Shop.",
-                    embed_type="error",
-                    title="Insufficient Tickets"
-                )
-            )
-            return
         glad = await self.__duel_get_gladiator(message, message.author)
         if not glad:
             return
@@ -399,6 +388,8 @@ class DuelCommands(Commands):
             )
             return
         glad.rename(self.database, new_name)
+        inv = Inventory(self.database, message.author)
+        tickets = kwargs["tickets"]
         inv.delete([tickets[0]], quantity=1)
         await dm_send(
             message,

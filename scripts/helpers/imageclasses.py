@@ -82,6 +82,9 @@ class ProfileCardGenerator(AssetGenerator):
         self.profilecard = Image.open(
             os.path.join(asset_path, "basecards", "profilecard.jpg")
         )
+        self.profileframe = Image.open(
+            os.path.join(asset_path, "basecards", "profileframe.png")
+        )
         self.badges = {
             badge: Image.open(
                 os.path.join(
@@ -93,15 +96,25 @@ class ProfileCardGenerator(AssetGenerator):
         }
 
     def get(
-        self, name: str, avatar: Image,
+        self, name: str, avatar: Image.Image,
         balance: str, num_played: str, num_won: str,
         badges: Optional[List[Image.Image]] = None,
-        blacklisted: bool = False
+        blacklisted: bool = False,
+        background: Image.Image = None
     ) -> Image.Image:
 
         # pylint: disable=too-many-locals
 
-        profilecard = self.profilecard.copy()
+        if background:
+            profilecard = background.convert('RGBA')
+            profilecard.paste(
+                self.profileframe,
+                (0, 0),
+                self.profileframe
+            )
+            profilecard.convert('RGB')
+        else:
+            profilecard = self.profilecard.copy()
         profilecard.paste(
             avatar.resize((280, 280)).convert('RGB'),
             (603, 128)

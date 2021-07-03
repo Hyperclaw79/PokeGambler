@@ -174,7 +174,8 @@ class DBConnector:
                 num_wins INT DEFAULT "0" NOT NULL,
                 pokebonds INT DEFAULT "0" NOT NULL,
                 won_chips INT DEFAULT "0" NOT NULL,
-                is_dealer BOOLEAN DEFAULT "0" NOT NULL
+                is_dealer BOOLEAN DEFAULT "0" NOT NULL,
+                background TEXT DEFAULT NULL
             );
             '''
         )

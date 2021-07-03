@@ -205,7 +205,8 @@ def parse_command(prefix: str, msg: str) -> dict:
     )
     main_parsed_dict = re.search(
         main_sep_patt,
-        non_kwarg_str
+        non_kwarg_str,
+        re.IGNORECASE
     ).groupdict()
     if kwarg_str:
         main_parsed_dict["Kwargs"] = ''.join(kwarg_str)

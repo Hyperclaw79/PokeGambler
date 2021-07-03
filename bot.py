@@ -110,8 +110,8 @@ class PokeGambler(discord.Client):
                 f" @{user.nick}", ""
             )
         parsed = parse_command(
-            self.prefix.lower(),
-            cleaned_content.lower()
+            self.prefix,
+            cleaned_content
         )
         cmd = f'cmd_{parsed["Command"]}'
         args = parsed["Args"]
