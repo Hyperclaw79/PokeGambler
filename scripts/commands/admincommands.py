@@ -22,6 +22,7 @@ from ..helpers.utils import (
 )
 from ..base.models import Blacklist, Inventory, Profile
 from ..base.items import Item, Tradable
+from ..base.shop import Shop, PremiumShop
 from .basecommand import (
     Commands, admin_only, alias,
     ensure_user, get_profile, ensure_item
@@ -554,6 +555,51 @@ class AdminCommands(Commands):
         """
         item = kwargs.get("item")
         item.delete(self.database)
+        await message.add_reaction("👍")
+
+    @admin_only
+    @ensure_item
+    @alias("upd_itm")
+    async def cmd_update_item(
+        self, message: Message,
+        args: List[str] = None,
+        **kwargs
+    ):
+        """Updates an existing Item from the database.
+        $```scss
+        {command_prefix}delete_item itemid
+        ```$
+
+        @`🛡️ Admin Command`
+        Update any attribute of an existing item from the database.@
+
+        ~To make a Golden Cigar with ID 0000FFFF premium:
+            ```
+            {command_prefix}update_item 0000FFFF --premium True
+            ```~
+        """
+        item = kwargs.get("item")
+        updatables = {
+            key.lower(): val
+            for key, val in kwargs.items()
+            if key.lower() in dict(item)
+        }
+        if not updatables:
+            await message.channel.send(
+                embed=get_embed(
+                    "That's not a valid attribute.",
+                    embed_type="warning",
+                    title="Unable to Update."
+                )
+            )
+            return
+        item.update(
+            self.database,
+            **updatables
+        )
+        if issubclass(item.__class__, Tradable):
+            Shop.refresh_tradables(self.database)
+            PremiumShop.refresh_tradables(self.database)
         await message.add_reaction("👍")
 
     @admin_only

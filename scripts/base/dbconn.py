@@ -1190,6 +1190,25 @@ class DBConnector:
         self.conn.commit()
         return self.cursor.lastrowid
 
+    def update_item(self, name: str, **kwargs):
+        """
+        SQL endpoint for updating existing items.
+        """
+        items = ", ".join(
+            f"{key} = {self.__format_val(val)}"
+            for key, val in kwargs.items()
+        )
+
+        self.cursor.execute(
+            f'''
+            UPDATE items
+            SET {items}
+            WHERE name = ?;
+            ''',
+            (name, )
+        )
+        self.conn.commit()
+
     def bulk_save_items(self, data: List[Dict]):
         """
         Save a batch of items in a single transaction.

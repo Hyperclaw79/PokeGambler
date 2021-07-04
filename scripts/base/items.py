@@ -80,6 +80,19 @@ class Item(ABC):
         uid = database.save_item(**dict(self))
         setattr(self, "itemid", f"{uid:0>8X}")
 
+    def update(self, database: DBConnector, **kwargs):
+        """
+        Updates an existing item.
+        """
+        if not kwargs:
+            return
+        for key, val in kwargs.items():
+            setattr(self, key, val)
+        database.update_item(
+            self.name,
+            **kwargs
+        )
+
     def delete(self, database: DBConnector):
         """
         Deletes the Item from the database.
