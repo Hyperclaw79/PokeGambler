@@ -539,10 +539,12 @@ class Shop:
         for item_type in item_types:
             # Check availability of existing items
             for item in cls.categories[item_type].items:
-                if not database.get_item(item.itemid):
+                db_item = database.get_item(item.itemid)
+                if not db_item or db_item["premium"] is not cls.premium:
                     cls.categories[item_type].items.queue.remove(
                         item
                     )
+                    cls.ids_dict.pop(item.itemid, None)
             items = [
                 TradebleItem(
                     item["itemid"], item["name"],
