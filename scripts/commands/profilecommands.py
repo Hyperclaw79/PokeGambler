@@ -546,6 +546,7 @@ class ProfileCommands(Commands):
             return f"```css\n{desc_str}\n```"
         boosts = self.ctx.boost_dict.get(message.author.id, None)
         perm_boosts = Boosts(self.database, message.author).get()
+        perm_boosts.pop('user_id')
         if not (
             boosts or any(
                 bst > 1
