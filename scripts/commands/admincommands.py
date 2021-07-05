@@ -5,7 +5,6 @@ Administration Commands
 # pylint: disable=unused-argument
 
 from __future__ import annotations
-import asyncio
 from dataclasses import MISSING, fields
 import os
 import json
@@ -14,10 +13,9 @@ from typing import (
     Type, TYPE_CHECKING
 )
 
-import discord
 from ..helpers.checks import user_check
 from ..helpers.utils import (
-    dedent, get_embed, get_enum_embed,
+    get_embed, get_enum_embed,
     is_admin, is_owner, wait_for
 )
 from ..base.models import Blacklist, Inventory, Profile
@@ -371,69 +369,6 @@ class AdminCommands(Commands):
         msg = await chan.send(content=content)
         await msg.publish()
         await reply.add_reaction("👍")
-
-    @admin_only
-    async def cmd_autogambler(self, message: Message, **kwargs):
-        """Self-assign Gambler Role.
-        $```scss
-        {command_prefix}autogambler
-        ```$
-
-        @`🛡️ Admin Command`
-        Creates a self-assign message for Gamblers role,
-        in the announcement channel.@
-        """
-        async def role_assign(self, gamb_msg, chan):
-            # pylint: disable=inconsistent-return-statements
-            def rctn_check(rctn, usr):
-                if usr.id != self.ctx.user.id:
-                    checks = [
-                        rctn.emoji.name == "pokechip",
-                        rctn.message.id == gamb_msg.id,
-                        not usr.bot
-                    ]
-                    if all(checks):
-                        return True
-            gambler_role = [
-                role
-                for role in message.guild.roles
-                if role.name.lower() == "gamblers"
-            ][0]
-            while True:
-                _, user = await wait_for(
-                    chan, self.ctx, event="reaction_add",
-                    init_msg=gamb_msg,
-                    check=rctn_check,
-                    timeout="inf"
-                )
-                if gambler_role not in user.roles:
-                    await user.add_roles(gambler_role)
-        chan = message.guild.get_channel(
-            int(os.getenv("ANNOUNCEMENT_CHANNEL"))
-        )
-        content = f"""
-        React with {self.chip_emoji} to get the `Gamblers` role.
-        With this role, you can participate in the special gamble matches.
-        You'll also be pinged for random Treasure drops (TBI).
-        """
-        gamb_msg = await message.guild.get_channel(
-            int(os.getenv("ANNOUNCEMENT_CHANNEL"))
-        ).send(
-            content="Hey @everyone",
-            embed=get_embed(
-                dedent(content),
-                title="React for Gamblers Role"
-            )
-        )
-        await gamb_msg.add_reaction(self.chip_emoji)
-        await asyncio.sleep(2.0)
-        gamb_msg = discord.utils.find(
-            lambda msg: msg.id == gamb_msg.id,
-            self.ctx.cached_messages
-        )
-        self.ctx.loop.create_task(
-            role_assign(self, gamb_msg, chan)
-        )
 
     @admin_only
     @alias("item+")
