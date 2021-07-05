@@ -7,7 +7,9 @@ It also has some useful decorators for the commands.
 
 from __future__ import annotations
 from abc import ABC
+from datetime import datetime
 from functools import wraps
+import json
 from typing import Callable, List, Optional, TYPE_CHECKING, Union
 
 import discord
@@ -67,7 +69,32 @@ def admin_only(func: Callable):
             is_admin(message.author),
             is_owner(self.ctx, message.author)
         ]):
-            return func(self, *args, message=message, **kwargs)
+            async def func_with_callback(
+                self, *args, message=message, **kwargs
+            ):
+                await func(self, *args, message=message, **kwargs)
+                cmd_dump = json.dumps(
+                    {
+                        "Used By": message.author,
+                        "Used At": datetime.now().strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "Guild": message.guild,
+                        "Channel": message.channel,
+                        "Kwargs": kwargs
+                    },
+                    indent=3,
+                    default=str
+                )
+                await message.guild.get_channel(
+                    int(self.ctx.configs["admin_cmd_log_channel"])
+                ).send(
+                    embed=get_embed(
+                        f"```json\n{cmd_dump}\n```",
+                        title=func.__name__.replace("cmd_", self.ctx.prefix)
+                    )
+                )
+            return func_with_callback(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", self.ctx.prefix)
         return message.channel.send(
             embed=get_embed(
