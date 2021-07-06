@@ -425,9 +425,12 @@ class Commands(ABC):
         Convenience method for conditional pagination.
         """
         if files:
-            msg = await message.guild.get_channel(
+            asset_chan = message.guild.get_channel(
                 self.ctx.configs["img_upload_channel"]
-            ).send(file=files[0])
+            ) or self.ctx.get_channel(
+                self.ctx.configs["img_upload_channel"]
+            )
+            msg = await asset_chan.send(file=files[0])
             embeds[0].set_image(
                 url=msg.attachments[0].proxy_url
             )
