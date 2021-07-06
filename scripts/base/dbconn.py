@@ -86,7 +86,11 @@ sqlite3.register_converter(
     "LIST",
     lambda v: [
         resolve_type(elem)
-        for elem in v.decode().split(', ')
+        for elem in v.decode().replace(
+            ')', ''
+        ).replace(
+            '(', ''
+        ).split(', ')
     ]
 )
 sqlite3.register_adapter(dict, dict2str)
@@ -400,10 +404,10 @@ class DBConnector:
                 obtained_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
                 FOREIGN KEY (user_id)
                     REFERENCES profile (user_id)
-                    ON DELETE SET NULL,
+                    ON DELETE CASCADE,
                 FOREIGN KEY (itemid)
                     REFERENCES items (itemid)
-                    ON DELETE SET NULL
+                    ON DELETE CASCADE
             );
             '''
         )
@@ -432,28 +436,21 @@ class DBConnector:
         )
         self.conn.commit()
 
-    def create_trades_table(self):
+    def create_rewardboxes_table(self):
         """
-        SQL endpoint for Trades table creation.
+        SQL endpoint for Reward Boxes table creation.
         """
         self.cursor.execute(
             '''
             CREATE TABLE
             IF NOT EXISTS
-            trades(
-                traded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                traded_by TEXT,
-                traded_to TEXT,
-                given_chips INT DEFAULT "0",
-                taken_chips INT DEFAULT "0",
-                given_items LIST NULL,
-                taken_items LIST NULL,
-                FOREIGN KEY (traded_by)
-                    REFERENCES profile (user_id)
-                    ON DELETE SET NULL,
-                FOREIGN KEY (traded_to)
-                    REFERENCES profile (user_id)
-                    ON DELETE SET NULL
+            rewardboxes(
+                boxid INT NOT NULL,
+                chips INT NOT NULL,
+                items LIST NOT NULL,
+                FOREIGN KEY (boxid)
+                    REFERENCES items (itemid)
+                    ON DELETE CASCADE
             );
             '''
         )
@@ -611,6 +608,17 @@ class DBConnector:
         self.cursor.execute(
             '''
             DELETE FROM trades;
+            '''
+        )
+        self.conn.commit()
+
+    def purge_rewardboxes(self):
+        """
+        SQL endpoint for purging Reward Boxes table.
+        """
+        self.cursor.execute(
+            '''
+            DELETE FROM rewardboxes;
             '''
         )
         self.conn.commit()
@@ -1718,6 +1726,23 @@ class DBConnector:
             (name, itemid)
         )
         self.conn.commit()
+
+# Rewardboxes
+
+    def get_reward_items(self, boxid: int) -> Dict:
+        """
+        SQL endpoint for getting items and chips from a Reward Box.
+        """
+        self.cursor.execute(
+            '''
+            SELECT chips, items
+            FROM rewardboxes
+            WHERE boxid IS ?
+            ''',
+            (boxid, )
+        )
+        details = self._get_result()
+        return details or {}
 
 
 if __name__ == "__main__":

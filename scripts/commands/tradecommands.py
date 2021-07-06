@@ -6,10 +6,13 @@ Trade Commands Module
 
 from __future__ import annotations
 import asyncio
-from typing import List, Optional, TYPE_CHECKING, Type
+from typing import (
+    List, Optional, TYPE_CHECKING,
+    Type, Union, Dict
+)
 import re
 
-from ..base.items import Item, Chest
+from ..base.items import Item, Chest, Lootbag, Rewardbox
 from ..base.models import (
     Blacklist, Inventory, Loots,
     Profile, Trades
@@ -36,6 +39,11 @@ class TradeCommands(Commands):
     Shop related commands fall under this category as well.
     """
 
+    verbose_names: Dict[str, str] = {
+        'Rewardbox': 'Reward Boxe',
+        'Giftbox': 'Gift Boxe'
+    }
+
     @model([Loots, Profile, Chest, Inventory])
     @no_thumb
     async def cmd_open(
@@ -46,12 +54,12 @@ class TradeCommands(Commands):
 
         # pylint: disable=no-member
 
-        """Opens a PokeGambler treasure chest or a Lootbag.
+        """Opens a PokeGambler treasure chest, Lootbag or Reward Box.
         $```scss
         {command_prefix}open itemid/chest name
         ```$
 
-        @Opens a treasure chest or a Lootbag that you own.
+        @Opens a treasure chest, a Lootbag or a Reward Box that you own.
         There are 3 different chests and scale with your tier.
         Here's a drop table:
         ```py
@@ -66,13 +74,14 @@ class TradeCommands(Commands):
         Lootbags are similar to Chests but they will contain items for sure.
         They can either be Normal or Premium.
         Premium Lootbag will contain a guaranteed Premium Item.
-        All the items will be of a separate category.@
+        All the items will be of a separate category.
+        Reward Boxes are similar to Lootbags but the items are fixed.@
 
         ~To open a chest with ID 0000FFFF:
             ```
             {command_prefix}open 0000FFFF
             ```
-        To open a lootbag with ID 0000AAAA:
+        To open a lootbag/reward box with ID 0000AAAA:
             ```
             {command_prefix}open 0000AAAA
             ```
@@ -137,13 +146,14 @@ class TradeCommands(Commands):
             "Your personal inventory categorized according to item type.\n"
             "You can get the list of IDs for an item using "
             f"`{self.ctx.prefix}ids item_name`.\n"
-            "\n> Your net worth, excluding Chests, is "
+            "\n> Your inventory's net worth, excluding Chests, is "
             f"**{net_worth}** {self.chip_emoji}.",
             title=f"{message.author.name}'s Inventory"
         )
         for idx, (catog, items) in enumerate(catog_dict.items()):
+            catog_name = self.verbose_names.get(catog, catog)
             emb.add_field(
-                name=f"**{catog}s** ({len(items)})",
+                name=f"**{catog_name}s** ({len(items)})",
                 value="\n".join(
                     f"『{item['emoji']}』 **{item['name']}** x{item['count']}"
                     for item in items
@@ -740,7 +750,12 @@ class TradeCommands(Commands):
                     Item.from_id(self.database, itemid)
                     for itemid in chests
                 ]
-            elif "Lootbag" in lb_name:
+            elif any(
+                word in lb_name
+                for word in [
+                    "Lootbag", "Reward", "Gift"
+                ]
+            ):
                 bags = Inventory(
                     self.database, message.author
                 ).from_name(lb_name)
@@ -757,6 +772,8 @@ class TradeCommands(Commands):
                 ).from_id(itemid)
                 if openable:
                     openable = Item.from_id(self.database, itemid)
+                else:
+                    raise ValueError("Item not found in inventory.")
                 openables = [openable]
         except (ValueError, ZeroDivisionError):
             openables = []
@@ -764,11 +781,13 @@ class TradeCommands(Commands):
 
     async def __open_handle_rewards(
         self, message: Message,
-        openables: List[Chest]
+        openables: List[Union[Chest, Lootbag, Rewardbox]]
     ) -> str:
         chips = sum(
-            chest.chips
-            for chest in openables
+            openable.chips or openable.__class__.get_chips(
+                self.database, int(openable.itemid, 16)
+            )
+            for openable in openables
         )
         Profile(self.database, message.author).credit(chips)
         loot_model = Loots(self.database, message.author)
@@ -787,10 +806,16 @@ class TradeCommands(Commands):
                 res = openable.get_random_items(self.database)
                 if res:
                     items.extend(res)
+            elif openable.category == 'Rewardbox':
+                res = openable.__class__.get_items(
+                    self.database, int(openable.itemid, 16)
+                )
+                if res:
+                    items.extend(res)
         if items:
             item_str = '\n'.join(
-                f"**『{item.emoji}』 {item}**"
-                for item in items
+                f"**『{item.emoji}』 {item} x{items.count(item)}**"
+                for item in set(items)
             )
             content += f"\nAnd woah, you also got:\n{item_str}"
         inv = Inventory(self.database, message.author)

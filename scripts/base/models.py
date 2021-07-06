@@ -715,3 +715,21 @@ class Trades(Model):
         self.taken_chips = taken_chips
         self.given_items = given_items
         self.taken_items = taken_items
+
+
+class Rewardboxes(Model):
+    """
+    Wrapper for reward boxes based DB actions
+    """
+
+    # pylint: disable=no-member
+
+    def __init__(
+        self, database: DBConnector, user: discord.Member,
+        boxid: int, chips: Optional[int] = None,
+        items: Optional[List[int]] = None
+    ):
+        super().__init__(database, user, "rewardboxes")
+        self.boxid = boxid
+        self.chips = chips
+        self.items = items

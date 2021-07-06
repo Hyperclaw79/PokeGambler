@@ -19,11 +19,12 @@ from ..helpers.utils import (
     is_admin, is_owner, wait_for
 )
 from ..base.models import Blacklist, Inventory, Profile
-from ..base.items import Item, Tradable
+from ..base.items import Item, Rewardbox, Tradable
 from ..base.shop import Shop, PremiumShop
 from .basecommand import (
     Commands, admin_only, alias,
-    ensure_user, get_profile, ensure_item
+    ensure_user, get_profile, ensure_item,
+    no_thumb
 )
 
 if TYPE_CHECKING:
@@ -370,6 +371,7 @@ class AdminCommands(Commands):
         await msg.publish()
         await reply.add_reaction("👍")
 
+    @no_thumb
     @admin_only
     @alias("item+")
     async def cmd_create_item(self, message: Message, **kwargs):
@@ -381,7 +383,11 @@ class AdminCommands(Commands):
         @`🛡️ Admin Command`
         Creates a PokeGambler world [Item] and saves it in the database.
         :information_source: Chests cannot be created using this.
-        Owner(s) can create Premium items using the --premium kwarg.@
+        **Owner(s) can create Premium items using the --premium kwarg.**
+        *In case of Reward Boxes, the items should be a comma-separated*
+        *list of IDs in decimal, rather than hex codes.*
+        *For example, to add items with IDs 0A and FF, use:*
+            *10, 255*@
         """
 
         # pylint: disable=no-member
@@ -424,7 +430,12 @@ class AdminCommands(Commands):
             ])
         })
         if issubclass(catogclass, Tradable):
-            labels.update({"price": "int"})
+            labels.update({"price": int})
+        if catogclass is Rewardbox:
+            labels.update({
+                "chips": int,
+                "items": str
+            })
         for col, dtype in labels.items():
             inp_msg = await message.channel.send(
                 embed=get_embed(
@@ -437,7 +448,7 @@ class AdminCommands(Commands):
                 check=lambda msg: user_check(msg, message),
                 timeout="inf"
             )
-            if dtype == 'int':
+            if dtype == int:
                 if not reply.content.isdigit():
                     await message.channel.send(
                         embed=get_embed(
@@ -448,6 +459,11 @@ class AdminCommands(Commands):
                     )
                     return
                 details[col] = int(reply.content)
+            elif col == "items":
+                details[col] = [
+                    int(itemid.strip())
+                    for itemid in reply.content.split(',')
+                ]
             else:
                 details[col] = reply.content
             await inp_msg.delete()
@@ -569,7 +585,12 @@ class AdminCommands(Commands):
             return
         try:
             user_id = int(args[0])
-            itemid = int(args[1], 16)
+            new_item = Item.from_id(
+                self.database, int(args[1], 16),
+                force_new=True
+            )
+            new_item.save(self.database)
+            itemid = int(new_item.itemid, 16)
         except (ValueError, ZeroDivisionError):
             await message.channel.send(
                 embed=get_embed(

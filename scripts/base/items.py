@@ -72,6 +72,12 @@ class Item(ABC):
         )
         return f"{self.__class__.__name__}(\n    {attr_str}\n)"
 
+    def __hash__(self) -> int:
+        return int(self.itemid, 16)
+
+    def __eq__(self, other: Item) -> bool:
+        return self.itemid == other.itemid
+
     def save(self, database: DBConnector):
         """
         Saves the Item to the database.
@@ -196,6 +202,12 @@ class Item(ABC):
         if item["category"] == "Chest":
             return Chest.from_id(database, itemid)
         new_item = cls._new_item(item, force_new=force_new)
+        if new_item.category == "Rewardbox":
+            new_item.chips = Rewardbox.get_chips(database, itemid)
+            new_item.items = [
+                int(elem.itemid, 16)
+                for elem in Rewardbox.get_items(database, itemid)
+            ]
         if force_new:
             new_item.save(database)
         return new_item
@@ -270,7 +282,7 @@ class Item(ABC):
         return method(limit)
 
 
-@dataclass
+@dataclass(eq=False)
 class Treasure(Item):
     """
     Any non-buyable [Item] is considered a Treasure.
@@ -288,7 +300,7 @@ class Treasure(Item):
         self.sellable: bool = False
 
 
-@dataclass
+@dataclass(eq=False)
 class Tradable(Item):
     """
     Any sellable [Item] is a Tradeable.
@@ -306,7 +318,7 @@ class Tradable(Item):
         self.price: int = kwargs['price']
 
 
-@dataclass
+@dataclass(eq=False)
 class Collectible(Item):
     """
     Collectibles are sellable variants of [Treasure].
@@ -323,7 +335,7 @@ class Collectible(Item):
         self.buyable: bool = False
 
 
-@dataclass
+@dataclass(eq=False)
 class Consumable(Tradable):
     """
     Consumables can be bought from the shop but cannot be sold back.
@@ -513,7 +525,7 @@ class LegendaryChest(Chest):
 # endregion
 
 
-@dataclass
+@dataclass(eq=False)
 class Gladiator(Consumable):
     """
     Minions that can be bought and used in Gladiator match minigames.
@@ -531,7 +543,7 @@ class Gladiator(Consumable):
         database.rename_gladiator(int(self.itemid, 16), name)
 
 
-@dataclass
+@dataclass(eq=False)
 class Lootbag(Treasure):
     """
     Lootbags contain other items inside them.
@@ -602,3 +614,63 @@ class Lootbag(Treasure):
         if self.premium:
             limits = [500, 1000]
         return random.randint(*limits)
+
+
+@dataclass(eq=False)
+class Rewardbox(Treasure):
+    """
+    Similar to [Lootbag] but with Fixed items and chips.
+    """
+    def __init__(
+        self, chips: Optional[int] = None,
+        items: Optional[List[int]] = None,
+        **kwargs
+    ):
+        super().__init__(
+            category=kwargs.pop(
+                "category",
+                "Rewardbox"
+            ),
+            **kwargs
+        )
+        self.items = items
+        self.chips = chips
+
+    def save(self, database: DBConnector):
+        """
+        Override Save to update a rewardboxes table to store itemids.
+        """
+        # pylint: disable=import-outside-toplevel
+        from ..base.models import Rewardboxes
+
+        class DummyUser:
+            # pylint: disable=too-few-public-methods
+            """Temporary User class to prevent syntax errors"""
+            id: int = 0
+
+        super().save(database)
+        Rewardboxes(
+            database, DummyUser(),
+            int(self.itemid, 16),
+            self.chips,
+            self.items
+        ).save()
+
+    @classmethod
+    def get_items(cls, database: DBConnector, boxid: int) -> List[Item]:
+        """
+        Gets the Items stored in a Reward Box.
+        """
+        details = database.get_reward_items(boxid)
+        return [
+            Item.from_id(database, item)
+            for item in details["items"]
+        ]
+
+    @classmethod
+    def get_chips(cls, database: DBConnector, boxid: int) -> int:
+        """
+        Gets the Chips stored in a Reward Box.
+        """
+        details = database.get_reward_items(boxid)
+        return details.get("chips", 0)
