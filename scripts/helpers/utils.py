@@ -4,9 +4,11 @@ Compilation of Utility Functions
 
 from __future__ import annotations
 import asyncio
+import cProfile
+from io import BytesIO
 import random
 import re
-from io import BytesIO
+import time
 from typing import (
     Callable, Dict, Iterable, List,
     Optional, TYPE_CHECKING, Union
@@ -24,14 +26,48 @@ if TYPE_CHECKING:
     from bot import PokeGambler
     # pylint: disable=cyclic-import
     from ..commands.basecommand import Commands
+    from .logger import CustomLogger
 
-__all__ = [
-    'get_formatted_time', 'get_ascii',
-    'prettify_discord', 'get_embed',
-    'get_enum_embed', 'parse_command',
-    'wait_for', 'get_rand_headers',
-    'img2file', 'is_owner', 'is_admin', 'is_dealer'
-]
+
+class LineTimer:
+    """
+    A Context Manager to profile a set of lines of code.
+    """
+    def __init__(
+        self, logger: CustomLogger,
+        message: Optional[str] = None,
+        profile_it: Optional[bool] = False
+    ):
+        self.profile_it = profile_it
+        self.logger = logger
+        if profile_it:
+            self.profiler = cProfile.Profile(
+                subcalls=False,
+                builtins=False
+            )
+        else:
+            self.start_time = None
+        self.message = message or ''
+        if self.message:
+            self.message = f"{self.message}: "
+
+    def __enter__(self):
+        if self.profile_it:
+            self.profiler.enable()
+        else:
+            self.start_time = time.time()
+
+    # pylint: disable=unused-argument
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.profile_it:
+            self.profiler.disable()
+            self.profiler.print_stats(sort='cumtime')
+        else:
+            elapsed = time.time() - self.start_time
+            self.logger.pprint(
+                f"{self.message}{elapsed: 2.2f} secs\n",
+                color="yellow"
+            )
 
 
 def get_formatted_time(

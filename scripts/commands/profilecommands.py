@@ -26,7 +26,7 @@ from ..helpers.imageclasses import (
     ProfileCardGenerator, WalletGenerator
 )
 from ..helpers.utils import (
-    dm_send, get_embed, get_formatted_time,
+    LineTimer, dm_send, get_embed, get_formatted_time,
     get_modules, img2file, wait_for
 )
 from ..helpers.checks import user_check
@@ -179,87 +179,86 @@ class ProfileCommands(Commands):
             {command_prefix}lb flip
             ```~
         """
-        if args and not args[0].lower().startswith("bal"):
-            lbrd = self.__get_minigame_lb(
-                args[0].lower(),
-                message.author
-            )
-            if lbrd is None:
+        with LineTimer(self.logger, "Get Leaderboards"):
+            if args and not args[0].lower().startswith("bal"):
+                lbrd = self.__get_minigame_lb(
+                    args[0].lower(),
+                    message.author
+                )
+                if lbrd is None:
+                    await message.channel.send(
+                        embed=get_embed(
+                            "You can choose a minigame name or 'balance'.",
+                            embed_type="error",
+                            title="Invalid Input"
+                        )
+                    )
+                    return
+                leaderboard = []
+                lbrd = [
+                    (
+                        message.guild.get_member(int(res[0])), *res[1:]
+                    )
+                    for res in lbrd
+                    if message.guild.get_member(int(res[0]))
+                ]
+                for idx, res in enumerate(lbrd):
+                    rank = idx + 1
+                    earned = None
+                    if len(res) == 4:
+                        member, num_matches, num_wins, earned = res
+                    else:
+                        member, num_matches, num_wins = res
+                    profile = Profile(self.database, member).get()
+                    balance = earned or profile["balance"]
+                    name = profile["name"]
+                    leaderboard.append({
+                        "rank": rank,
+                        "user_id": member.id,
+                        "name": name,
+                        "num_matches": num_matches,
+                        "num_wins": num_wins,
+                        "balance": balance
+                    })
+            else:
+                sort_by = "num_wins" if not args else "balance"
+                leaderboard = Profile.get_leaderboard(
+                    self.database, sort_by=sort_by
+                )
+            if not leaderboard:
                 await message.channel.send(
                     embed=get_embed(
-                        "You can choose a minigame name or 'balance'.",
-                        embed_type="error",
-                        title="Invalid Input"
+                        "No matches were played yet.",
+                        embed_type="warning"
                     )
                 )
                 return
-            leaderboard = []
-            lbrd = [
-                (
-                    message.guild.get_member(int(res[0])), *res[1:]
+            leaderboard = [
+                usr
+                for usr in leaderboard
+                if message.guild.get_member(
+                    int(usr['user_id'])
                 )
-                for res in lbrd
-                if message.guild.get_member(int(res[0]))
-            ]
-            for idx, res in enumerate(lbrd):
-                rank = idx + 1
-                earned = None
-                if len(res) == 4:
-                    member, num_matches, num_wins, earned = res
-                else:
-                    member, num_matches, num_wins = res
-                profile = Profile(self.database, member).get()
-                balance = earned or profile["balance"]
-                name = profile["name"]
-                leaderboard.append({
-                    "rank": rank,
-                    "user_id": member.id,
-                    "name": name,
-                    "num_matches": num_matches,
-                    "num_wins": num_wins,
-                    "balance": balance
-                })
-        else:
-            sort_by = "num_wins" if not args else "balance"
-            leaderboard = Profile.get_leaderboard(
-                self.database, sort_by=sort_by
-            )
-        if not leaderboard:
-            await message.channel.send(
-                embed=get_embed(
-                    "No matches were played yet.",
-                    embed_type="warning"
-                )
-            )
-            return
-        leaderboard = [
-            usr
-            for usr in leaderboard
-            if message.guild.get_member(
-                int(usr['user_id'])
-            )
-        ][:20]
-        for idx, data in enumerate(leaderboard):
-            data["rank"] = idx + 1
-            data["balance"] = f'{data["balance"]:,}'
+            ][:20]
+            for idx, data in enumerate(leaderboard):
+                data["rank"] = idx + 1
+                data["balance"] = f'{data["balance"]:,}'
         embeds = []
         files = []
-        for i in range(0, len(leaderboard), 4):
-            batch_4 = leaderboard[i: i + 4]
-            img = await self.lbg.get(self.ctx, batch_4)
-            lb_fl = img2file(img, f"leaderboard{i}.jpg")
-            emb = discord.Embed(
-                title="",
-                description="",
-                color=discord.Colour.dark_theme()
-            )
-            embeds.append(emb)
-            files.append(lb_fl)
-            # await message.channel.send(
-            #     embed=emb,
-            #     file=lb_fl
-            # )
-        await self.paginate(message, embeds, files)
+        with LineTimer(self.logger, "Create Leaderboard Images"):
+            for i in range(0, len(leaderboard), 4):
+                batch_4 = leaderboard[i: i + 4]
+                img = await self.lbg.get(self.ctx, batch_4)
+                lb_fl = img2file(img, f"leaderboard{i}.jpg")
+                emb = discord.Embed(
+                    title="",
+                    description="",
+                    color=discord.Colour.dark_theme()
+                )
+                embeds.append(emb)
+                files.append(lb_fl)
+        with LineTimer(self.logger, "Leaderboard Pagination"):
+            await self.paginate(message, embeds, files)
 
     @alias("#")
     async def cmd_rank(self, message: Message, **kwargs):
@@ -276,14 +275,24 @@ class ProfileCommands(Commands):
             {command_prefix}rank
             ```~
         """
-        profile = await get_profile(self.database, message,  message.author)
-        data = profile.get()
-        rank = profile.get_rank()
-        data["rank"] = rank or 0
-        data["balance"] = f'{data["balance"]:,}'
-        img = await self.lbg.get_rankcard(self.ctx, data, heading=True)
-        discord_file = img2file(img, "rank.png", ext="PNG")
-        await message.channel.send(file=discord_file)
+        with LineTimer(self.logger, "Get Profile"):
+            profile = await get_profile(
+                self.database, message,
+                message.author
+            )
+            data = profile.get()
+            rank = profile.get_rank()
+            data["rank"] = rank or 0
+            data["balance"] = f'{data["balance"]:,}'
+        with LineTimer(self.logger, "Create Rank Image"):
+            img = await self.lbg.get_rankcard(self.ctx, data, heading=True)
+            discord_file = img2file(
+                img,
+                f"rank_{message.author}.png",
+                ext="PNG"
+            )
+        with LineTimer(self.logger, "Send Rank Image"):
+            await message.channel.send(file=discord_file)
 
     @alias("bdg")
     async def cmd_badges(self, message: Message, **kwargs):
