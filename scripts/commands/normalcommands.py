@@ -113,7 +113,7 @@ class NormalCommands(Commands):
         )
         for key, val in command_dict.items():
             if val:
-                embed.add_field(name=key, value=f"**```\n{val}\n```**")
+                embed.add_field(name=key, value=f"**```fix\n{val}\n```**")
         embed.set_footer(
             text="This command helped? You can help me too by donating at "
             "https://www.paypal.me/hyperclaw79.",
