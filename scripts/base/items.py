@@ -21,6 +21,8 @@ from typing import (
 from PIL import Image
 
 from ..base.dbconn import DBConnector
+
+# pylint: disable=cyclic-import
 from ..helpers.utils import dedent, get_embed
 
 if TYPE_CHECKING:
@@ -170,20 +172,21 @@ class Item(ABC):
 
     @classmethod
     def _new_item(
-        cls: Type[Item], item: Dict,
+        cls: Type[Item], existing_item: Dict,
         force_new: bool = False
     ) -> Item:
-        category = cls.get_category(item)
-        item.pop('category', None)
-        itemid = item.pop('itemid', None)
+        old_item = {**existing_item}
+        category = cls.get_category(old_item)
+        old_item.pop('category', None)
+        itemid = old_item.pop('itemid', None)
         new_item = type(
             "".join(
                 word.title()
-                for word in item.pop("name").split(" ")
+                for word in old_item.pop("name").split(" ")
             ),
             (category, ),
-            item
-        )(**item)
+            old_item
+        )(**old_item)
         if not force_new:
             new_item.itemid = f'{itemid:0>8X}'
         return new_item
@@ -224,6 +227,12 @@ class Item(ABC):
         if not item:
             return None
         new_item = cls._new_item(item, force_new=force_new)
+        if new_item.category == "Rewardbox":
+            new_item.chips = Rewardbox.get_chips(database, item["itemid"])
+            new_item.items = [
+                int(elem.itemid, 16)
+                for elem in Rewardbox.get_items(database, item["itemid"])
+            ]
         if force_new:
             new_item.save(database)
         return new_item

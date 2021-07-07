@@ -2,6 +2,7 @@
 The Main Module which serves as the brain of the code.
 """
 
+from collections import namedtuple
 import difflib
 import importlib
 import json
@@ -14,9 +15,11 @@ from typing import Callable
 import aiohttp
 import discord
 from discord import Message
+from discord.ext import tasks
 from dotenv import load_dotenv
 
-from scripts.base.models import CommandData
+from scripts.base.models import CommandData, Inventory, Profile
+from scripts.base.items import Item
 
 from scripts.base.cardgen import CardGambler
 from scripts.base.dbconn import DBConnector
@@ -63,6 +66,7 @@ class PokeGambler(discord.Client):
         self.loot_cd = {}
         self.boost_dict = {}
         self.pending_cmds = {}
+        self.nitro_rewarded = False
         # Classes
         self.database = DBConnector(self.db_path)
         self.logger = CustomLogger(
@@ -199,6 +203,52 @@ class PokeGambler(discord.Client):
             self.cooldown_cmds[method].pop(message.author)
         return False
 
+    @tasks.loop(hours=24)
+    async def __reward_nitro_boosters(self):
+        day = datetime.utcnow().day
+        if day > 8 and self.nitro_rewarded:
+            self.nitro_rewarded = False
+        elif day == 8 and not self.nitro_rewarded:
+            DummyMessage = namedtuple('Message', ['channel'])
+            official_server = self.get_guild(self.official_server)
+            boosters = official_server.premium_subscribers
+            # BETA: Remove owner from boosters.
+            boosters.append(
+                official_server.get_member(
+                    self.owner_id
+                )
+            )
+            for booster in boosters:
+                # Ensure booster has a Profile.
+                _ = Profile(self.database, booster)
+                nitro_box = Item.from_name(
+                    self.database,
+                    "Nitro Booster Reward Box",
+                    force_new=True
+                )
+                # pylint: disable=no-member
+                Inventory(self.database, booster).save(
+                    int(nitro_box.itemid, 16)
+                )
+                chan = discord.utils.get(
+                    official_server.channels,
+                    name='general',
+                    category__name='PokéGambler'
+                )
+                message = DummyMessage(channel=chan)
+                await dm_send(
+                    message, booster,
+                    content=f"Hey {booster.name},",
+                    embed=get_embed(
+                        f"Thanks for Boosting『**{official_server}**』this month"
+                        f"!\nA『**{nitro_box}**』is added to your inventory.",
+                        title="Monthly Server Booster Reward",
+                        footer=f"ItemID: {nitro_box.itemid}",
+                        image=nitro_box.asset_url
+                    )
+                )
+            self.nitro_rewarded = True
+
     def load_commands(
         self, module_type: str,
         reload_module: bool = False
@@ -230,6 +280,7 @@ class PokeGambler(discord.Client):
         self.channel_mode = self.configs["default_channelmode"]
         self.owner_id = int(self.configs['owner_id'])
         self.prefix = self.configs['command_prefix']
+        self.official_server = self.configs['official_server']
 
 # Bot Base
 
@@ -401,3 +452,5 @@ class PokeGambler(discord.Client):
         )
         await self.change_presence(activity=game)
         await online_now(self)
+        # pylint: disable=no-member
+        self.__reward_nitro_boosters.start()
