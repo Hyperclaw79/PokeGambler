@@ -26,7 +26,8 @@ from scripts.base.dbconn import DBConnector
 from scripts.helpers.logger import CustomLogger
 # pylint: disable=cyclic-import
 from scripts.helpers.utils import (
-    dm_send, get_ascii, get_commands, get_formatted_time, get_modules,
+    SqlLogger, dm_send, get_ascii, get_commands,
+    get_formatted_time, get_modules,
     prettify_discord, get_embed, parse_command,
     get_rand_headers, is_owner, online_now
 )
@@ -35,7 +36,7 @@ from scripts.helpers.utils import (
 load_dotenv()
 
 
-class PokeGambler(discord.Client):
+class PokeGambler(discord.AutoShardedClient):
     """PokeGambler: A Discord Bot using pokemon themed cards for gambling.
     Subclass of discord.Client which serves as the base for PokeGambler bot.
     """
@@ -51,6 +52,7 @@ class PokeGambler(discord.Client):
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
         self.config_path = kwargs["config_path"]
+        self.sql_log_path = kwargs["sql_log_path"]
         for var in ["DISCORD_WEBHOOK_TOKEN", "DISCORD_WEBHOOK_CHANNEL"]:
             setattr(self, var, os.getenv(var))
         self.update_configs()
@@ -249,6 +251,28 @@ class PokeGambler(discord.Client):
                 )
             self.nitro_rewarded = True
 
+    async def __pre_command_checks(self, message):
+        on_cooldown = await self.__handle_cd(message)
+        if on_cooldown:
+            return False
+        if self.database.is_blacklisted(
+            str(message.author.id)
+        ) or message.author.bot:
+            await message.add_reaction("🚫")
+            return False
+        if self.owner_mode and not is_owner(self, message.author):
+            await message.channel.send(
+                    embed=get_embed(
+                        "PokeGambler is currently in **owner mode**.\n"
+                        "Only the bot owner can use the commands.\n"
+                        "Please try again later.",
+                        embed_type="warning",
+                        title="Owner Mode is active."
+                    )
+                )
+            return False
+        return True
+
     def load_commands(
         self, module_type: str,
         reload_module: bool = False
@@ -300,24 +324,8 @@ class PokeGambler(discord.Client):
         if message.content.lower().startswith(
             self.prefix.lower()
         ):
-            on_cooldown = await self.__handle_cd(message)
-            if on_cooldown:
-                return
-            if self.database.is_blacklisted(
-                str(message.author.id)
-            ) or message.author.bot:
-                await message.add_reaction("🚫")
-                return
-            if self.owner_mode and not is_owner(self, message.author):
-                await message.channel.send(
-                    embed=get_embed(
-                        "PokeGambler is currently in **owner mode**.\n"
-                        "Only the bot owner can use the commands.\n"
-                        "Please try again later.",
-                        embed_type="warning",
-                        title="Owner Mode is active."
-                    )
-                )
+            proceed = await self.__pre_command_checks(message)
+            if not proceed:
                 return
             res = self.__get_method(message)
             method, cmd, args, option_dict, closest = res
@@ -357,7 +365,11 @@ class PokeGambler(discord.Client):
                 task = method(**kwargs)
                 # Decorators can return None
                 if task:
-                    await task
+                    cmd_name = method.__name__.replace("cmd_", "")
+                    with SqlLogger(
+                        self, f'{cmd_name} - {message.author}'
+                    ):
+                        await task
             except Exception:  # pylint: disable=broad-except
                 tb_obj = sys.exc_info()[2]
                 tb_obj = traceback.format_exc()

@@ -70,6 +70,38 @@ class LineTimer:
             )
 
 
+class SqlLogger:
+    """
+    Temporarily, changes the Trace Callback of Sqlite DBConnector.
+    Gets triggered only for Commands.
+    """
+    def __init__(
+        self, ctx: PokeGambler,
+        heading: Optional[str] = None
+    ):
+        self.ctx = ctx
+        self.heading = heading
+        self.conn = ctx.database.conn
+
+    def __log_sql(self, statement):
+        """
+        Logs the SQL statements executed during a command.
+        """
+        if self.heading:
+            with open(self.ctx.sql_log_path, "a") as sql_log:
+                sql_log.write(f"[{self.heading}]\n")
+            self.heading = None
+        with open(self.ctx.sql_log_path, "a") as sql_log:
+            sql_log.write(f"{statement}\n")
+
+    def __enter__(self):
+        self.conn.set_trace_callback(self.__log_sql)
+
+    # pylint: disable=unused-argument
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.conn.set_trace_callback(None)
+
+
 def get_formatted_time(
     tot_secs: int,
     show_hours: bool = True,

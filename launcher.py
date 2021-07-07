@@ -21,7 +21,8 @@ if __name__ == "__main__":
             "config_path": "config.json",
             "db_path": "pokegambler.db",
             "assets_path": "assets",
-            "error_log_path": "errors.log"
+            "error_log_path": "errors.log",
+            "sql_log_path": "sql_transactions.log"
         }
         for key, val in default_dict.items():
             parser.add_argument(
