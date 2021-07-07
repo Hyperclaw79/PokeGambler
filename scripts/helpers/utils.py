@@ -246,7 +246,7 @@ def parse_command(prefix: str, msg: str) -> dict:
     ).groupdict()
     if kwarg_str:
         main_parsed_dict["Kwargs"] = ''.join(kwarg_str)
-    parsed["Command"] = main_parsed_dict["Command"]
+    parsed["Command"] = main_parsed_dict["Command"].lower()
     if main_parsed_dict["Args"]:
         parsed["Args"] = [
             arg
