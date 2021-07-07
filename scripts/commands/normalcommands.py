@@ -13,8 +13,8 @@ import discord
 
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
-    get_embed, get_modules, dedent,
-    is_owner, is_admin, is_dealer
+    get_commands, get_embed, get_modules,
+    dedent, showable_command
 )
 from .basecommand import alias, Commands
 
@@ -54,35 +54,6 @@ class NormalCommands(Commands):
             {command_prefix}commands --module profile
             ```~
         """
-        def get_commands(module, args):
-            role = args[0] if args else None
-            return '\n'.join(
-                sorted(
-                    [
-                        cmd.replace("cmd_", self.ctx.prefix)
-                        for cmd in dir(module)
-                        if all([
-                            cmd.startswith("cmd_"),
-                            self.__showable_command(
-                                getattr(module, cmd),
-                                message.author
-                            ),
-                            cmd not in getattr(module, "alias", []),
-                            any([
-                                role is None,
-                                all([
-                                    role is not None,
-                                    getattr(
-                                        getattr(module, cmd),
-                                        f"{role}_only", False
-                                    )
-                                ])
-                            ])
-                        ])
-                    ],
-                    key=len
-                )
-            )
         modules = get_modules(self.ctx)
         if kwargs.get("module", None):
             modules = [
@@ -95,7 +66,7 @@ class NormalCommands(Commands):
         command_dict = {
             module.__class__.__name__.replace(
                 "Commands", " Commands"
-            ): get_commands(module, args)
+            ): get_commands(self.ctx, message.author, module, args)
             for module in modules
         }
         if set(command_dict.values()) == {''}:
@@ -156,8 +127,9 @@ class NormalCommands(Commands):
                     [
                         module.enabled,
                         attr.startswith("cmd_"),
-                        self.__showable_command(
-                            getattr(module, attr), message.author
+                        showable_command(
+                            self.ctx, getattr(module, attr),
+                            message.author
                         ),
                     ]
                 )
@@ -394,25 +366,3 @@ class NormalCommands(Commands):
                 "amazonaws.com/thumbs/160/facebook/105/money-bag_1f4b0.png"
             )
         return emb
-
-    def __showable_command(self, cmd: Callable, user: Member):
-        def has_access(cmd, user):
-            if is_owner(self.ctx, user):
-                return True
-            if is_admin(user):
-                return not getattr(cmd, "owner_only", False)
-            if is_dealer(user):
-                return not any([
-                    getattr(cmd, "owner_only", False),
-                    getattr(cmd, "admin_only", False)
-                ])
-            return not any([
-                getattr(cmd, "owner_only", False),
-                getattr(cmd, "admin_only", False),
-                getattr(cmd, "dealer_only", False)
-            ])
-        return all([
-            cmd.__doc__,
-            not getattr(cmd, "disabled", False),
-            has_access(cmd, user)
-        ])

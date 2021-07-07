@@ -424,3 +424,70 @@ async def dm_send(
             embed=embed
         )
     return msg
+
+
+def showable_command(
+    ctx: PokeGambler,
+    cmd: Callable, user: Member
+):
+    """
+    Checks if a command is accessible to a user based on roles.
+    """
+    def has_access(cmd, user):
+        if is_owner(ctx, user):
+            return True
+        if is_admin(user):
+            return not getattr(cmd, "owner_only", False)
+        if is_dealer(user):
+            return not any([
+                getattr(cmd, "owner_only", False),
+                getattr(cmd, "admin_only", False)
+            ])
+        return not any([
+            getattr(cmd, "owner_only", False),
+            getattr(cmd, "admin_only", False),
+            getattr(cmd, "dealer_only", False)
+        ])
+    return all([
+        cmd.__doc__,
+        not getattr(cmd, "disabled", False),
+        has_access(cmd, user)
+    ])
+
+
+def get_commands(
+    ctx: PokeGambler, user: Member, module: Commands,
+    args: Optional[List[str]] = None,
+):
+    """
+    Get a list of all showable commands for a given Module.
+    """
+    role = args[0] if args else None
+    return '\n'.join(
+        sorted(
+            [
+                cmd.replace("cmd_", ctx.prefix)
+                for cmd in dir(module)
+                if all([
+                    cmd.startswith("cmd_"),
+                    showable_command(
+                        ctx,
+                        getattr(module, cmd),
+                        user
+                    ),
+                    cmd not in getattr(module, "alias", []),
+                    any([
+                        role is None,
+                        all([
+                            role is not None,
+                            getattr(
+                                getattr(module, cmd),
+                                f"{role}_only", False
+                            )
+                        ])
+                    ])
+                ])
+            ],
+            key=len
+        )
+    )

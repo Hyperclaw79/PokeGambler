@@ -2,6 +2,7 @@
 The Main Module which serves as the brain of the code.
 """
 
+import difflib
 import importlib
 import json
 import os
@@ -22,7 +23,7 @@ from scripts.base.dbconn import DBConnector
 from scripts.helpers.logger import CustomLogger
 # pylint: disable=cyclic-import
 from scripts.helpers.utils import (
-    dm_send, get_ascii, get_formatted_time,
+    dm_send, get_ascii, get_commands, get_formatted_time, get_modules,
     prettify_discord, get_embed, parse_command,
     get_rand_headers, is_owner, online_now
 )
@@ -117,23 +118,31 @@ class PokeGambler(discord.Client):
         args = parsed["Args"]
         option_dict = parsed["Kwargs"]
         method = None
-        for com in [
-            getattr(self, comtype)
-            for comtype in sorted(
-                dir(self),
-                key=lambda x:x.startswith("custom"),
-                reverse=True
-            )
-            if all([
-                comtype.endswith('commands'),
-                comtype != "load_commands"
-            ])
-        ]:
+        all_cmds = []
+        all_aliases = []
+        for com in get_modules(self):
             if com.enabled:
                 method = getattr(com, cmd, None)
                 if method:
-                    return method, cmd, args, option_dict
-        return method, cmd, args, option_dict
+                    return method, cmd, args, option_dict, cmd
+                all_cmds.extend([
+                    cmd_name.replace(self.prefix, '')
+                    for cmd_name in get_commands(
+                        self, message.author, com
+                    ).splitlines()
+                ])
+                all_aliases.extend([
+                    alias.replace("cmd_", "")
+                    for alias in com.alias
+                ])
+        all_cmd_names = all_cmds + all_aliases
+        closest = difflib.get_close_matches(
+            cmd.replace('cmd_', ''),
+            all_cmd_names,
+            n=1
+        )
+        closest = closest[0] if closest else None
+        return method, cmd, args, option_dict, closest
 
     async def __no_dm_cmds(self, message: Message):
         if message.content.lower().startswith(
@@ -225,6 +234,7 @@ class PokeGambler(discord.Client):
 # Bot Base
 
     # pylint: disable=too-many-return-statements, too-many-branches
+    # pylint: disable=too-many-locals
     async def on_message(self, message: Message):
         """
         On_message event from Discord API.
@@ -259,12 +269,15 @@ class PokeGambler(discord.Client):
                 )
                 return
             res = self.__get_method(message)
-            method, cmd, args, option_dict = res
+            method, cmd, args, option_dict, closest = res
             if not method:
                 cmd_name = cmd.replace('cmd_', self.prefix)
+                cmd_err_msg = f"Command `{cmd_name}` does not exist!"
+                if closest:
+                    cmd_err_msg += f"\nDid you mean `{closest}`?"
                 await message.channel.send(
                     embed=get_embed(
-                        f"Command `{cmd_name}` does not exist!",
+                        cmd_err_msg,
                         embed_type="error",
                         title="Invalid Command"
                     )
