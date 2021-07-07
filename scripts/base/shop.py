@@ -16,11 +16,16 @@ from typing import (
     Dict, List, Optional,
     TYPE_CHECKING, Type, Union
 )
+import discord
 
 from discord.errors import Forbidden, HTTPException
 
 from ..base.items import Item
-from ..base.models import Boosts, Inventory, Loots, Profile
+from ..base.models import (
+    Boosts, Inventory,
+    Loots, Profile
+)
+from ..helpers.utils import get_embed
 from .dbconn import DBConnector
 
 if TYPE_CHECKING:
@@ -120,6 +125,7 @@ class ShopItem:
     sellable: field(default_factory=bool) = True
     premium: field(default_factory=bool) = False
     max_stack: field(default_factory=int) = 0
+    color: field(default_factory=int) = 0
 
     def __str__(self) -> str:
         if not self.emoji:
@@ -182,26 +188,57 @@ class Title(ShopItem):
         """
         Automatically adds the titled role to the user.
         """
+        if self.name in (
+            role.name.title()
+            for role in message.author.roles
+        ):
+            return str(
+                "**You already have this title"
+                " bestowed upon you.**"
+            )
         roles = [
             role
             for role in message.guild.roles
             if role.name.lower() == self.name.lower()
         ]
         if not roles:
-            raise ValueError(f"Role {self.name} does not exist!")
+            try:
+                roles = [
+                    await message.guild.create_role(
+                        name=self.name.title(),
+                        color=self.color,
+                        hoist=True
+                    )
+                ]
+            except discord.Forbidden:
+                return str(
+                    "**Need [Manage Server] permission to "
+                    "create title roles.**"
+                )
         role = roles[0]
+        change_nick = True
         try:
             await message.author.add_roles(role)
             new_nick = message.author.nick or message.author.name
             for title in Shop.categories["Titles"].items:
                 if title.name in new_nick:
-                    new_nick = new_nick.replace(f"『{title.name}』", '')
+                    if title.price < self.price:
+                        new_nick = new_nick.replace(f"『{title.name}』", '')
+                    else:
+                        change_nick = False
             try:
-                await message.author.edit(
-                    nick=f"『{role.name}』{new_nick}"
-                )
+                if change_nick:
+                    await message.author.edit(
+                        nick=f"『{role.name}』{new_nick}"
+                    )
             except HTTPException:
-                pass
+                await message.channel.send(
+                    embed=get_embed(
+                        f"Unable to edit {message.author.name}'s nickname.",
+                        embed_type="warning",
+                        title="Unexpected Error"
+                    )
+                )
             self.debit_player(database, message.author)
             return "success"
         except Forbidden:
@@ -354,32 +391,37 @@ class Shop:
                     "title_dlr",
                     "Dealers",
                     "Get access to the gamble command and other perks.",
-                    20_000
+                    20_000,
+                    color=16765440
                 ),
                 Title(
                     "title_cnm",
                     "Commoner No More",
                     "You're wealthier than the casuals.",
-                    20_000
+                    20_000,
+                    color=16757504
                 ),
                 Title(
                     "title_wealthy",
                     "The Wealthy",
                     "You're climbing the ladder towards richness.",
-                    50_000
+                    50_000,
+                    color=13729044
                 ),
                 Title(
                     "title_duke",
                     "Duke",
                     "You literally own a kingdom at this point.",
-                    150_000
+                    150_000,
+                    color=16722176
                 ),
                 Title(
                     "title_insane",
                     "Insane",
                     "Dude what the hell?! That's way more than enough chips"
                     " for a lifetime.",
-                    1_000_000
+                    1_000_000,
+                    color=13504512
                 )
             ])
         ),
@@ -605,7 +647,8 @@ class PremiumShop(Shop):
                     "title_pr",
                     "The Patron",
                     "Dedicated patron of PokeGambler.",
-                    2000
+                    2000,
+                    color=14103594
                 )
             ])
         ),
