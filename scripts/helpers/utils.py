@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import cProfile
 from io import BytesIO
+import json
 import random
 import re
 import time
@@ -77,28 +78,33 @@ class SqlLogger:
     """
     def __init__(
         self, ctx: PokeGambler,
-        heading: Optional[str] = None
+        meta: Optional[Dict[str, str]] = None
     ):
         self.ctx = ctx
-        self.heading = heading
+        self.meta = meta or {}
         self.conn = ctx.database.conn
+        self.log = ''
 
     def __log_sql(self, statement):
         """
         Logs the SQL statements executed during a command.
         """
-        if self.heading:
-            with open(self.ctx.sql_log_path, "a") as sql_log:
-                sql_log.write(f"[{self.heading}]\n")
-            self.heading = None
-        with open(self.ctx.sql_log_path, "a") as sql_log:
-            sql_log.write(f"{statement}\n")
+        self.log += f"{statement}\n"
 
     def __enter__(self):
         self.conn.set_trace_callback(self.__log_sql)
 
     # pylint: disable=unused-argument
     def __exit__(self, exc_type, exc_value, traceback):
+        # sourcery skip: remove-redundant-pass
+        self.meta.update({
+            "Query": self.log
+        })
+        if self.log:
+            with open(self.ctx.sql_log_path, "a") as sql_log:
+                sql_log.write(
+                    f"{json.dumps(self.meta, default=str)}\n"
+                )
         self.conn.set_trace_callback(None)
 
 

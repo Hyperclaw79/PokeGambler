@@ -367,7 +367,12 @@ class PokeGambler(discord.AutoShardedClient):
                 if task:
                     cmd_name = method.__name__.replace("cmd_", "")
                     with SqlLogger(
-                        self, f'{cmd_name} - {message.author}'
+                        self, {
+                            "Command": cmd_name,
+                            "User": str(message.author),
+                            "User_id": message.author.id,
+                            "Timestamp": datetime.utcnow()
+                        }
                     ):
                         await task
             except Exception:  # pylint: disable=broad-except
