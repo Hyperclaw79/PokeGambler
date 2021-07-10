@@ -15,7 +15,7 @@ from typing import Callable, List, Optional, TYPE_CHECKING, Union
 import discord
 
 from ..base.items import Item
-from ..base.models import Inventory, Model, Profile
+from ..base.models import Inventory, Model, Profiles
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
     get_embed, is_admin,
@@ -25,7 +25,6 @@ from ..helpers.utils import (
 if TYPE_CHECKING:
     from discord import Embed, Message, Member, File
     from bot import PokeGambler
-    from ..base.dbconn import DBConnector
 
 __all__ = [
     'owner_only', 'admin_only', 'dealer_only',
@@ -39,6 +38,7 @@ def owner_only(func: Callable):
     Only the owners can access these commands.
     '''
     func.__dict__["owner_only"] = True
+
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
         if is_owner(self.ctx, message.author):
@@ -51,7 +51,8 @@ def owner_only(func: Callable):
         )
         return message.channel.send(
             embed=get_embed(
-                f'Command `{func_name}` can only be used by the owner.',
+                f'Command `{func_name}` can only be used by '
+                'the owners of PokeGambler.',
                 embed_type="error"
             )
         )
@@ -63,10 +64,14 @@ def admin_only(func: Callable):
     Only the admins can access these commands.
     '''
     func.__dict__["admin_only"] = True
+
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
         if any([
-            is_admin(message.author),
+            all([
+                is_admin(message.author),
+                message.guild.id == self.ctx.official_server
+            ]),
             is_owner(self.ctx, message.author)
         ]):
             async def func_with_callback(
@@ -87,7 +92,7 @@ def admin_only(func: Callable):
                     default=str
                 )
                 await message.guild.get_channel(
-                    int(self.ctx.configs["admin_cmd_log_channel"])
+                    self.ctx.admin_cmd_log_channel
                 ).send(
                     embed=get_embed(
                         f"```json\n{cmd_dump}\n```",
@@ -98,7 +103,8 @@ def admin_only(func: Callable):
         func_name = func.__name__.replace("cmd_", self.ctx.prefix)
         return message.channel.send(
             embed=get_embed(
-                f'Command `{func_name}` can only be used by admins.',
+                f'Command `{func_name}` can only be used by '
+                'Pokegambler Admins.',
                 embed_type="error"
             )
         )
@@ -110,14 +116,19 @@ def dealer_only(func: Callable):
     Only the dealers can access these commands.
     '''
     func.__dict__["dealer_only"] = True
+
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        if is_dealer(message.author):
+        if all([
+            is_dealer(message.author),
+            message.guild.id == self.ctx.official_server
+        ]):
             return func(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", self.ctx.prefix)
         return message.channel.send(
             embed=get_embed(
-                f'Command `{func_name}` can only be used by dealers.',
+                f'Command `{func_name}` can only be used by '
+                'Pokegambler Dealers.',
                 embed_type="error"
             )
         )
@@ -264,19 +275,7 @@ def ensure_item(func: Callable):
                     title="No Item ID"
                 )
             )
-        try:
-            itemid = int(args[0], 16)
-            kwargs["args"] = args
-            args = []
-        except (ValueError, ZeroDivisionError):
-            return message.channel.send(
-                embed=get_embed(
-                    "That doesn't seems like a valid Item ID.",
-                    embed_type="error",
-                    title="Invalid Item ID"
-                )
-            )
-        item = Item.from_id(self.database, itemid)
+        item = Item.from_id(args[0])
         if not item:
             return message.channel.send(
                 embed=get_embed(
@@ -286,6 +285,8 @@ def ensure_item(func: Callable):
                 )
             )
         kwargs["item"] = item
+        kwargs["args"] = args
+        args = []
         return func(self, *args, message=message, **kwargs)
     return wrapped
 
@@ -354,7 +355,7 @@ def needs_ticket(name: str):
     def decorator(func: Callable):
         @wraps(func)
         def wrapped(self, message, *args, **kwargs):
-            inv = Inventory(self.database, message.author)
+            inv = Inventory(message.author)
             tickets = inv.from_name(name)
             if not tickets:
                 return message.channel.send(
@@ -381,7 +382,6 @@ class Commands(ABC):
         *args, **kwargs
     ):
         self.ctx = ctx
-        self.database = ctx.database
         self.logger = ctx.logger
         self.enabled = kwargs.get('enabled', True)
         self.alias = []
@@ -426,9 +426,9 @@ class Commands(ABC):
         """
         if files:
             asset_chan = message.guild.get_channel(
-                self.ctx.configs["img_upload_channel"]
+                self.ctx.img_upload_channel
             ) or self.ctx.get_channel(
-                self.ctx.configs["img_upload_channel"]
+                self.ctx.img_upload_channel
             )
             msg = await asset_chan.send(file=files[0])
             embeds[0].set_image(
@@ -448,10 +448,7 @@ class Commands(ABC):
             await pager.run()
 
 
-async def get_profile(
-    database: DBConnector,
-    message: Message, user: Member
-):
+async def get_profile(message: Message, user: Member):
     """
     Retrieves the Profile for a user (creates for new users).
     If the user is not found in the guild, returns None.
@@ -477,7 +474,7 @@ async def get_profile(
                 )
             )
             return None
-        return Profile(database, user)
+        return Profiles(user)
     except discord.HTTPException:
         await message.channel.send(
             embed=get_embed(

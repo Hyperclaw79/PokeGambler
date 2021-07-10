@@ -6,8 +6,6 @@ __pycache__/
 
 run.bat
 errors.log
-pokegambler.db
-config.json
 
 localcommands.py
 

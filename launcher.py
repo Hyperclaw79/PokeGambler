@@ -18,11 +18,8 @@ if __name__ == "__main__":
     else:
         parser = argparse.ArgumentParser()
         default_dict = {
-            "config_path": "config.json",
-            "db_path": "pokegambler.db",
             "assets_path": "assets",
-            "error_log_path": "errors.log",
-            "sql_log_path": "sql_transactions.log"
+            "error_log_path": "errors.log"
         }
         for key, val in default_dict.items():
             parser.add_argument(

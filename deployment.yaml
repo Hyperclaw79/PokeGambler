@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pokegambler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pokegambler
+  template:
+    metadata:
+      labels:
+        app: pokegambler
+    spec:
+      containers:
+      - name: app
+        image: gcr.io/PROJECT_ID/IMAGE:TAG
+        imagePullPolicy: Always
+        envFrom:
+        - secretRef:
+            name: pokegambler-config

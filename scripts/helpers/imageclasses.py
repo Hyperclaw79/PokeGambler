@@ -10,7 +10,6 @@ from abc import ABC, abstractmethod
 from io import BytesIO
 from typing import Dict, List, Optional, Tuple
 
-import numpy as np
 from PIL import (
     Image, ImageDraw,
     ImageEnhance, ImageFont
@@ -506,8 +505,9 @@ class GladitorMatchHandler(AssetGenerator):
         Returns a random amount of damage.
         """
         return int(
-            np.clip(
-                random.gauss(50, 100), 25, 300
+            min(
+                max(random.gauss(50, 100), 25),
+                300
             )
         )
 

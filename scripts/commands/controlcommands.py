@@ -5,6 +5,7 @@ Control Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
+from datetime import datetime
 from io import BytesIO
 import json
 import subprocess
@@ -13,6 +14,7 @@ from typing import List, Optional, TYPE_CHECKING
 
 import discord
 
+from ..base.models import CommandData, DB_CLIENT
 from ..helpers.checks import user_check
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
@@ -20,7 +22,7 @@ from ..helpers.utils import (
     get_modules, wait_for
 )
 from .basecommand import (
-    owner_only, no_log, alias,
+    maintenance, owner_only, no_log, alias,
     Commands
 )
 
@@ -33,6 +35,8 @@ class ControlCommands(Commands):
     Commands that control/interact with other commands.
     Examples: Togglers, Command Lister, Restart, Channel
     '''
+
+    @maintenance
     @owner_only
     @no_log
     async def cmd_restart(self, message, **kwargs):
@@ -193,7 +197,7 @@ class ControlCommands(Commands):
             cmd.replace("commands", "")
             for cmd in dir(self.ctx)
             if cmd.endswith("commands") and cmd != "load_commands"
-        ] + ["config"]
+        ]
         if module not in possible_modules:
             embed = get_enum_embed(
                 possible_modules,
@@ -213,21 +217,17 @@ class ControlCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Hot reload commands or configs.
+        """Hot reload commands.
         $```scss
         {command_prefix}reload module_name
         ```$
 
         @`👑 Owner Command`
-        For hot reloading changes in a commands module/configs.@
+        For hot reloading changes in a commands module.@
 
         ~To reload changes in normalcommands:
             ```
             {command_prefix}reload normal
-            ```
-        To reload changes in Configs:
-            ```
-            {command_prefix}reload config
             ```~
         """
         if not args:
@@ -237,7 +237,7 @@ class ControlCommands(Commands):
             cmd.replace("commands", "")
             for cmd in dir(self.ctx)
             if cmd.endswith("commands") and cmd != "load_commands"
-        ] + ["config"]
+        ]
         if module not in possible_modules:
             embed = get_enum_embed(
                 possible_modules,
@@ -245,10 +245,7 @@ class ControlCommands(Commands):
             )
             await message.channel.send(embed=embed)
         else:
-            if module == "config":
-                self.ctx.update_configs()
-            else:
-                self.ctx.load_commands(module, reload_module=True)
+            self.ctx.load_commands(module, reload_module=True)
             await message.channel.send(
                 embed=get_embed(f"Successfully reloaded {module}.")
             )
@@ -412,7 +409,7 @@ class ControlCommands(Commands):
         limit = 5
         if args:
             limit = int(args[0])
-        history = self.database.get_command_history(limit=limit, **kwargs)
+        history = CommandData.history(limit=limit, **kwargs)
         if not history:
             await message.channel.send(
                 embed=get_embed(
@@ -489,9 +486,9 @@ class ControlCommands(Commands):
         Purges the tables in the database.
         If no table name is given, purges all the tables.@
 
-        ~To purge the profile table:
+        ~To purge the profiles table:
             ```
-            {command_prefix}prg_tbl profile
+            {command_prefix}prg_tbl profiles
             ```
         ~To purge all the tables:
             ```
@@ -499,10 +496,8 @@ class ControlCommands(Commands):
             ```~
         """
         if args:
-            purge = getattr(self.database, f"purge_{args[0]}", None)
-            if purge:
-                purge()
-            else:
+            dropped = DB_CLIENT.drop_collection(args[0])
+            if not dropped['ok']:
                 await message.channel.send(
                     embed=get_embed(
                         f"The {args[0]} table does not exist in the database.",
@@ -512,9 +507,11 @@ class ControlCommands(Commands):
                 )
                 return
         else:
-            self.database.purge_tables()
+            for collection in DB_CLIENT.list_collection_names():
+                DB_CLIENT.drop_collection(collection)
         await message.add_reaction("👍")
 
+    @maintenance
     @owner_only
     @no_log
     @alias('logs')
@@ -578,6 +575,7 @@ class ControlCommands(Commands):
             return
         await self.paginate(message, embeds)
 
+    @maintenance
     @owner_only
     @no_log
     async def cmd_clean_logs(self, message: Message, **kwargs):
@@ -620,9 +618,12 @@ class ControlCommands(Commands):
             {command_prefix}export_items --pretty 3
             ```~
         """
-        items = self.database.get_all_items()
+        # pylint: disable=import-outside-toplevel
+        from ..base.items import Item
+
+        items = Item.get_unique_items()
         for item in items:
-            item.pop("itemid")
+            item.pop("created_on", None)
         jsonified = json.dumps(
             items,
             indent=kwargs.get("pretty", None),
@@ -665,5 +666,7 @@ class ControlCommands(Commands):
         )
         data_bytes = await user_inp.attachments[0].read()
         data = json.loads(data_bytes.decode())
-        self.database.bulk_save_items(data)
-        await message.add_reaction("👍")
+        for item in data:
+            item["created_on"] = datetime.now()
+        DB_CLIENT.items.insert_many(data)
+        await user_inp.add_reaction("👍")

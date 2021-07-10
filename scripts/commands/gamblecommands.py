@@ -16,7 +16,7 @@ import discord
 
 from ..base.models import (
     Boosts, Flips, Loots, Matches,
-    Moles, Profile
+    Moles, Profiles
 )
 from ..helpers.checks import user_check, user_rctn
 from ..helpers.imageclasses import BoardGenerator
@@ -64,7 +64,7 @@ class GambleCommands(Commands):
         self.boardgen = BoardGenerator(self.ctx.assets_path)
 
     @dealer_only
-    @model([Profile, Matches, Loots])
+    @model([Profiles, Matches, Loots])
     @alias(["deal", "roll"])
     async def cmd_gamble(
         self, message: Message,
@@ -146,7 +146,7 @@ class GambleCommands(Commands):
             profiles, lower_wins, fee
         )
         Matches(
-            self.database, message.author,
+            message.author,
             started_by=str(message.author.id),
             participants=list(profiles),
             winner=str(winner.id),
@@ -156,8 +156,8 @@ class GambleCommands(Commands):
         ).save()
         await self.__cleanup(gamble_channel, delay=30.0)
 
-    @model([Flips, Profile])
-    @alias(["flip", "chipflip"])
+    @model([Flips, Profiles])
+    @alias(["flip", "chipflip", "flips"])
     @check_completion
     async def cmd_quickflip(
         self, message: Message,
@@ -182,7 +182,7 @@ class GambleCommands(Commands):
             {command_prefix}flip 1000
             ```~
         """
-        profile = Profile(self.database, message.author)
+        profile = Profiles(message.author)
         amount = await self.__input_handler(
             message, args, profile, default=50,
             min_chips=50, max_chips=9999
@@ -233,7 +233,7 @@ class GambleCommands(Commands):
         if choice == idx:
             amt_mult = 1 + (
                 0.1 * Boosts(
-                    self.database, message.author
+                    message.author
                 ).get()["flipster"]
             )
             boosts = self.ctx.boost_dict.get(message.author.id, None)
@@ -252,14 +252,14 @@ class GambleCommands(Commands):
             profile.debit(amount)
             won = False
         Flips(
-            self.database, message.author,
+            message.author,
             amount, won
         ).save()
         emb = get_embed(msg, title=title, image=img, color=color)
         await opt_msg.edit(embed=emb)
 
-    @model([Moles, Profile])
-    @alias(["mole", "whack"])
+    @model([Moles, Profiles])
+    @alias(["mole", "whack", "moles"])
     @no_thumb
     @check_completion
     async def cmd_whackamole(self, message: Message, **kwargs):
@@ -310,7 +310,7 @@ class GambleCommands(Commands):
         valids = self.boardgen.get_valids(level)
         cost = [50, 100, 150, 200, 250][level]
         multiplier = [3, 4, 10, 50, 100][level]
-        profile = Profile(self.database, message.author)
+        profile = Profiles(message.author)
         if profile.get("balance") < cost:
             await self.__handle_low_bal(message.author, message.channel)
             await message.add_reaction("❌")
@@ -354,7 +354,7 @@ class GambleCommands(Commands):
             profile.debit(cost)
             won = False
         Moles(
-            self.database, message.author,
+            message.author,
             cost, level, won
         ).save()
         await message.channel.send(
@@ -395,7 +395,7 @@ class GambleCommands(Commands):
             ```~
         """
         limit = int(args[0]) if args else 10
-        matches = Matches.get_matches(self.database, limit=limit)
+        matches = Matches.get_matches(limit=limit)
         embeds = []
         for match in matches:
             started_by = message.guild.get_member(
@@ -404,7 +404,7 @@ class GambleCommands(Commands):
             played_at = match["played_at"]
             pot = match["deal_cost"] * len(match['participants'])
             parts = "\n".join(
-                str(message.guild.get_member(plyr))
+                str(message.guild.get_member(int(plyr)))
                 for plyr in match["participants"]
             )
             parts = f"```py\n{parts}\n```"
@@ -454,7 +454,7 @@ class GambleCommands(Commands):
     def __charge_player(self, dealed_deck, fee):
         profiles = {}
         for player, _ in dealed_deck.items():
-            profiles[str(player.id)] = profile = Profile(self.database, player)
+            profiles[str(player.id)] = profile = Profiles(player)
             data = profile.get()
             bal = data["balance"]
             num_matches = data["num_matches"]
@@ -599,7 +599,7 @@ class GambleCommands(Commands):
                     ]),
                     timeout=(30 - (datetime.now() - now).total_seconds())
                 )
-                bal = Profile(self.database, usr).get("balance")
+                bal = Profiles(usr).get("balance")
                 if bal < fee:
                     await self.__handle_low_bal(usr, gamble_channel)
                     continue
@@ -678,7 +678,7 @@ class GambleCommands(Commands):
         bal += incr
         num_wins += 1
         if num_wins in [25, 100]:
-            loot_table = Loots(self.database, winner)
+            loot_table = Loots(winner)
             if num_wins == 25:
                 loot_table.update(tier=2)
             else:

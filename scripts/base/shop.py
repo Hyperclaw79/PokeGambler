@@ -23,10 +23,9 @@ from discord.errors import Forbidden, HTTPException
 from ..base.items import Item
 from ..base.models import (
     Boosts, Inventory,
-    Loots, Profile
+    Loots, Profiles
 )
 from ..helpers.utils import get_embed
-from .dbconn import DBConnector
 
 if TYPE_CHECKING:
     from discord import Member, Message
@@ -55,20 +54,24 @@ class Listing(Queue):
         for pinned items.
         """
         def __get_rank(item):
-            if any(
-                ch.lower() not in 'abcdef1234567890'
-                for ch in str(getattr(item, "itemid", "No-itemid"))
-            ):
-                return getattr(item, "price", -self.queue.index(item))
-            return -item.itemid
+            price = item.price
+            return (
+                getattr(
+                    item, "created_on",
+                    self.queue.index(item)
+                ),
+                price
+            )
+
         queue = sorted(
             self.queue,
             key=lambda item: (
-                [False, True].index(
+                [True, False].index(
                     getattr(item, "pinned", False)
                 ),
                 __get_rank(item)
-            )
+            ),
+            reverse=True
         )
         yield from queue
 
@@ -133,8 +136,7 @@ class ShopItem:
         return f"{self.name} 『{self.emoji}』"
 
     def debit_player(
-        self, database: DBConnector,
-        user: Member, quantity: int = 1,
+        self, user: Member, quantity: int = 1,
         premium: bool = False
     ):
         """
@@ -145,7 +147,7 @@ class ShopItem:
         if premium:
             amount //= 10
             bonds = True
-        Profile(database, user).debit(
+        Profiles(user).debit(
             amount=amount, bonds=bonds
         )
 
@@ -161,18 +163,16 @@ class TradebleItem(ShopItem):
     This class represents a shop version of [Tradable].
     """
     def buy(
-        self, database: DBConnector,
-        message: Message, quantity: int,
-        **kwargs
+        self, message: Message,
+        quantity: int, **kwargs
     ):
         """
         Buys the Item and places in user's inventory.
         """
-        inventory = Inventory(database, message.author)
+        inventory = Inventory(message.author)
         for _ in range(quantity):
             inventory.save(self.itemid)
         self.debit_player(
-            database=database,
             user=message.author,
             quantity=quantity,
             premium=self.premium
@@ -184,7 +184,7 @@ class Title(ShopItem):
     """
     This class represents a purchasable Title.
     """
-    async def buy(self, database: DBConnector, message: Message, **kwargs):
+    async def buy(self, message: Message, **kwargs):
         """
         Automatically adds the titled role to the user.
         """
@@ -239,7 +239,7 @@ class Title(ShopItem):
                         title="Unexpected Error"
                     )
                 )
-            self.debit_player(database, message.author)
+            self.debit_player(message.author)
             return "success"
         except Forbidden:
             return str(
@@ -281,7 +281,7 @@ class BoostItem(ShopItem):
         }
 
     async def buy(
-        self, ctx: PokeGambler, database: DBConnector,
+        self, ctx: PokeGambler,
         message: Message, quantity: int = 1,
         **kwargs
     ):
@@ -289,7 +289,7 @@ class BoostItem(ShopItem):
         Applies the relevant temporary boost to the user.
         """
         user = message.author
-        tier = Loots(database, user).tier
+        tier = Loots(user).tier
         if (
             user.id not in ctx.boost_dict
             or ctx.boost_dict[user.id][self.itemid]["stack"] == 0
@@ -299,7 +299,7 @@ class BoostItem(ShopItem):
             )
         elif any([
             ctx.boost_dict[user.id][self.itemid]["stack"] == 5,
-            self._check_lootlust(ctx, database, user, quantity)
+            self._check_lootlust(ctx, user, quantity)
         ]):
             return (
                 "You've maxed out to 5 stacks for this boost."
@@ -309,19 +309,19 @@ class BoostItem(ShopItem):
             )
         else:
             ctx.boost_dict[user.id][self.itemid]["stack"] += quantity
-        Profile(database, user).debit(
+        Profiles(user).debit(
             amount=((self.price * (10 ** (tier - 1))) * quantity)
         )
         return "success"
 
     def _check_lootlust(
-        self, ctx: PokeGambler, database: DBConnector,
+        self, ctx: PokeGambler,
         user: Member, quantity: int
     ):
         if self.itemid not in ["boost_lt_cd", "boost_pr_lt_cd"]:
             return False
         units = [
-            Boosts(database, user).get()["loot_lust"],
+            Boosts(user).get()["loot_lust"],
             quantity,
             ctx.boost_dict.get(
                 user.id,
@@ -336,24 +336,24 @@ class PremiumBoostItem(BoostItem):
     Permanent Boosts purchasable from Premium Shop
     """
     def buy(
-        self, ctx: PokeGambler, database: DBConnector,
+        self, ctx: PokeGambler,
         message: Message, quantity: int = 1,
         **kwargs
     ):
         user = message.author
-        if self._check_lootlust(ctx, database, user, quantity):
+        if self._check_lootlust(ctx, user, quantity):
             return (
                 "You've maxed out to 5 stacks for this boost."
                 if quantity == 1
                 else "You can't puchase that many "
                 "as it exceeds max stack of 5."
             )
-        tier = Loots(database, user).tier
-        boost = Boosts(database, user)
+        tier = Loots(user).tier
+        boost = Boosts(user)
         boost_name = self.name.lower().replace(' ', '_')
         curr = boost.get()[boost_name]
         boost.update(**{boost_name: curr + quantity})
-        Profile(database, user).debit(
+        Profiles(user).debit(
             amount=((self.price * (10 ** (tier - 2))) * quantity),
             bonds=True
         )
@@ -525,9 +525,8 @@ class Shop:
 
     @classmethod
     def get_item(
-        cls: Type[Shop],
-        database: DBConnector,
-        itemid: str, force_new: bool = False
+        cls: Type[Shop], itemid: str,
+        force_new: bool = False
     ) -> ShopItem:
         """
         Returns the item registered in Shop based on itemID.
@@ -539,13 +538,11 @@ class Shop:
             for ch in itemid
         ):
             return None
-        item = Item.from_id(database, int(itemid, 16), force_new=force_new)
-        if cls._premium_cond(item.premium):  # pylint: disable=no-member
+        item = Item.from_id(itemid, force_new=force_new)
+        # pylint: disable=no-member
+        if cls._premium_cond(item.premium):
             return None
-        return TradebleItem(
-            itemid=int(item.itemid, 16),
-            **dict(item)
-        )
+        return TradebleItem(**dict(item))
 
     @classmethod
     def add_category(cls: Type[Shop], category: ShopCategory):
@@ -573,7 +570,7 @@ class Shop:
         cls.categories[category].items.register(new_items)
 
     @classmethod
-    def refresh_tradables(cls: Type[Shop], database: DBConnector):
+    def refresh_tradables(cls: Type[Shop]):
         """
         Similar to Shop.update_category, but exclusive for Tradables.
         """
@@ -581,8 +578,9 @@ class Shop:
         for item_type in item_types:
             # Check availability of existing items
             for item in cls.categories[item_type].items:
-                db_item = database.get_item(item.itemid)
-                if not db_item or db_item["premium"] is not cls.premium:
+                db_item = Item.from_id(item.itemid)
+                # pylint: disable=no-member
+                if not db_item or db_item.premium is not cls.premium:
                     cls.categories[item_type].items.queue.remove(
                         item
                     )
@@ -595,35 +593,36 @@ class Shop:
                     pinned="permanent" in item["description"].lower(),
                     premium=item["premium"]
                 )
-                for item in getattr(
-                    database,
-                    f"get_{item_type.lower()}"
-                )(limit=5, premium=cls.premium)
+                for item in Item.list_items(
+                    category=item_type[::-1].replace('s', '', 1)[::-1],
+                    limit=5,
+                    premium=cls.premium
+                )
             ]
             cls.update_category(item_type, items)
 
     @classmethod
     def validate(
-        cls: Type[Shop], database: DBConnector,
-        user: Member, item: ShopItem, quantity: int = 1
+        cls: Type[Shop], user: Member,
+        item: ShopItem, quantity: int = 1
     ) -> str:
         """
         Validates if an item is purchasable and affordable by the user.
         """
         if (
             isinstance(item, TradebleItem)
-            and not Item.from_id(database, item.itemid)
+            and not Item.from_id(item.itemid)
         ):
             return "Item does not exist anymore."
         price = item.price
         if item.__class__ in [BoostItem, PremiumBoostItem]:
-            price *= 10 ** (Loots(database, user).tier - 1)
+            price *= 10 ** (Loots(user).tier - 1)
         curr_attr = "balance"
         if item.premium:
             curr_attr = "pokebonds"
             price //= 10
         if getattr(
-            Profile(database, user),
+            Profiles(user),
             curr_attr
          ) < price * quantity:
             return "You have Insufficient Balance."
