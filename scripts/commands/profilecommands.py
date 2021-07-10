@@ -17,7 +17,7 @@ import discord
 from ..base.items import Chest
 from ..base.models import (
     Blacklist, Boosts, Inventory, Loots,
-    Matches, Minigame, Profile
+    Matches, Minigame, Profiles
 )
 from ..base.shop import BoostItem
 
@@ -81,7 +81,7 @@ class ProfileCommands(Commands):
             user = kwargs["mentions"][0]
         else:
             user = message.author
-        profile = await get_profile(self.database, message, user)
+        profile = await get_profile(message, user)
         if not profile:
             return
         badges = profile.get_badges()
@@ -108,7 +108,7 @@ class ProfileCommands(Commands):
             name, avatar, balance,
             num_played, num_won, badges,
             blacklisted=Blacklist.is_blacklisted(
-                self.database, str(user.id)
+                str(user.id)
             ), background=background
         )
         discord_file = img2file(profilecard, "profilecard.jpg")
@@ -130,7 +130,7 @@ class ProfileCommands(Commands):
         """
         user = message.author
         profile = (
-            await get_profile(self.database, message,  message.author)
+            await get_profile(message,  message.author)
         ).get()
         data = {
             key: (
@@ -196,35 +196,40 @@ class ProfileCommands(Commands):
                     return
                 leaderboard = []
                 lbrd = [
-                    (
-                        message.guild.get_member(int(res[0])), *res[1:]
-                    )
-                    for res in lbrd
-                    if message.guild.get_member(int(res[0]))
+                    {
+                        "member": message.guild.get_member(int(res["_id"])),
+                        **res,
+                        "rank": idx + 1
+                    }
+                    for idx, res in enumerate(lbrd)
+                    if message.guild.get_member(int(res["_id"]))
                 ]
-                for idx, res in enumerate(lbrd):
-                    rank = idx + 1
-                    earned = None
-                    if len(res) == 4:
-                        member, num_matches, num_wins, earned = res
-                    else:
-                        member, num_matches, num_wins = res
-                    profile = Profile(self.database, member).get()
-                    balance = earned or profile["balance"]
+                for res in lbrd:
+                    profile = Profiles(res["member"]).get()
+                    balance = res.get("earned", 0) or profile["balance"]
                     name = profile["name"]
                     leaderboard.append({
-                        "rank": rank,
-                        "user_id": member.id,
+                        "rank": res["rank"],
+                        "user_id": res["_id"],
                         "name": name,
-                        "num_matches": num_matches,
-                        "num_wins": num_wins,
+                        "num_matches": res["num_matches"],
+                        "num_wins": res["num_wins"],
                         "balance": balance
                     })
             else:
-                sort_by = "num_wins" if not args else "balance"
-                leaderboard = Profile.get_leaderboard(
-                    self.database, sort_by=sort_by
+                sort_by = [
+                    "num_wins", "num_matches"
+                ] if not args else ["balance"]
+                leaderboard = Profiles.get_leaderboard(
+                    sort_by=sort_by
                 )
+            leaderboard = [
+                usr
+                for usr in leaderboard
+                if message.guild.get_member(
+                    int(usr['user_id'])
+                )
+            ]
             if not leaderboard:
                 await message.channel.send(
                     embed=get_embed(
@@ -233,13 +238,7 @@ class ProfileCommands(Commands):
                     )
                 )
                 return
-            leaderboard = [
-                usr
-                for usr in leaderboard
-                if message.guild.get_member(
-                    int(usr['user_id'])
-                )
-            ][:20]
+            leaderboard = leaderboard[:20]
             for idx, data in enumerate(leaderboard):
                 data["rank"] = idx + 1
                 data["balance"] = f'{data["balance"]:,}'
@@ -277,11 +276,11 @@ class ProfileCommands(Commands):
         """
         with LineTimer(self.logger, "Get Profile"):
             profile = await get_profile(
-                self.database, message,
+                message,
                 message.author
             )
-            data = profile.get()
             rank = profile.get_rank()
+            data = profile.get()
             data["rank"] = rank or 0
             data["balance"] = f'{data["balance"]:,}'
         with LineTimer(self.logger, "Create Rank Image"):
@@ -308,7 +307,7 @@ class ProfileCommands(Commands):
             {command_prefix}badges
             ```~
         """
-        profile = await get_profile(self.database, message,  message.author)
+        profile = await get_profile(message,  message.author)
         badges = profile.get_badges()
         badgestrip = self.bdgen.get(badges)
         discord_file = img2file(badgestrip, "badges.png", ext="PNG")
@@ -328,14 +327,14 @@ class ProfileCommands(Commands):
             ```~
         """
         match_stats = Matches(
-            self.database, message.author
+            message.author
         ).get_stats()
         stat_dict = {
             "Gamble Matches": f"Played: {match_stats[0]}\n"
             f"Won: {match_stats[1]}"
         }
         for minigame_cls in Minigame.__subclasses__():
-            minigame = minigame_cls(self.database, message.author)
+            minigame = minigame_cls(message.author)
             stat_dict[
                 minigame_cls.__name__
             ] = f"Played: {minigame.num_plays}\n" + \
@@ -352,7 +351,7 @@ class ProfileCommands(Commands):
             )
         await message.channel.send(embed=emb)
 
-    @model([Loots, Profile, Chest, Inventory])
+    @model([Loots, Profiles, Chest, Inventory])
     @alias('lt')
     async def cmd_loot(self, message: Message, **kwargs):
         """Stable source of Pokechips.
@@ -369,7 +368,7 @@ class ProfileCommands(Commands):
         """
         on_cooldown = self.ctx.loot_cd.get(message.author, None)
         perm_boosts = Boosts(
-            self.database, message.author
+            message.author
         ).get()
         loot_mult = 1 + (perm_boosts["lucky_looter"] * 0.05)
         cd_reducer = perm_boosts["loot_lust"]
@@ -403,8 +402,8 @@ class ProfileCommands(Commands):
             )
             return
         self.ctx.loot_cd[message.author] = datetime.now()
-        profile = Profile(self.database, message.author)
-        loot_model = Loots(self.database, message.author)
+        profile = Profiles(message.author)
+        loot_model = Loots(message.author)
         loot_info = loot_model.get()
         earned = loot_info["earned"]
         tier = loot_info["tier"]
@@ -419,10 +418,8 @@ class ProfileCommands(Commands):
         proc = random.uniform(0, 1.0)
         if proc <= tr_mult:
             chest = Chest.get_chest(tier=tier)
-            chest.save(self.database)
-            Inventory(self.database, message.author).save(
-                int(chest.itemid, 16)
-            )
+            chest.save()
+            Inventory(message.author).save(chest.itemid)
             embed = get_embed(
                 f"Woah! You got lucky and found a **{chest}**.\n"
                 "It's been added to your inventory.",
@@ -438,7 +435,7 @@ class ProfileCommands(Commands):
             embed=embed
         )
 
-    @model([Loots, Profile, Chest, Inventory])
+    @model([Loots, Profiles, Chest, Inventory])
     @alias('dl')
     async def cmd_daily(self, message: Message, **kwargs):
         """Daily source of Pokechips.
@@ -455,9 +452,9 @@ class ProfileCommands(Commands):
         You can maintain a daily streak. Get 1K chips for every 5 day streak.
         `BETA boost is current active: x2 chips`@
         """
-        profile = Profile(self.database, message.author)
-        loot_model = Loots(self.database, message.author)
-        boost_model = Boosts(self.database, message.author)
+        profile = Profiles(message.author)
+        loot_model = Loots(message.author)
+        boost_model = Boosts(message.author)
         loot_info = loot_model.get()
         boost_info = boost_model.get()
         boost = boost_info["lucky_looter"] + 1
@@ -501,11 +498,8 @@ class ProfileCommands(Commands):
             loot += 100 * (daily_streak / 5)
         loot *= 2  # BETA x2 Bonus
         chest = Chest.get_chest(tier=tier)
-        chest.description += f"\n[Daily for {message.author.id}]"
-        chest.save(self.database)
-        Inventory(self.database, message.author).save(
-            int(chest.itemid, 16)
-        )
+        chest.save()
+        Inventory(message.author).save(chest.itemid)
         embed = get_embed(
             f"Here's your daily **{chest}**.\n"
             f"Claim the chest with `{self.ctx.prefix}open {chest.itemid}`.",
@@ -517,9 +511,7 @@ class ProfileCommands(Commands):
         loot_model.update(
             earned=(earned + loot),
             daily_streak=daily_streak,
-            daily_claimed_on=datetime.today().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+            daily_claimed_on=datetime.today()
         )
         await message.channel.send(
             f"**Daily loot of {int(loot)} <a:blinker:843844481220083783> "
@@ -554,7 +546,7 @@ class ProfileCommands(Commands):
             desc_str += f"\nExpires in: {expires_in}"
             return f"```css\n{desc_str}\n```"
         boosts = self.ctx.boost_dict.get(message.author.id, None)
-        perm_boosts = Boosts(self.database, message.author).get()
+        perm_boosts = Boosts(message.author).get()
         perm_boosts.pop('user_id')
         if not (
             boosts or any(
@@ -585,7 +577,7 @@ class ProfileCommands(Commands):
 
     @needs_ticket("Background Change")
     @check_completion
-    @model([Profile, Inventory])
+    @model([Profiles, Inventory])
     @alias('bg')
     async def cmd_background(self, message: Message, **kwargs):
         """Change Profile Background.
@@ -616,12 +608,12 @@ class ProfileCommands(Commands):
             timeout="inf"
         )
         url = await self.__background_get_url(message, reply)
-        Profile(self.database, message.author).update(
+        Profiles(message.author).update(
             background=url
         )
-        inv = Inventory(self.database, message.author)
+        inv = Inventory(message.author)
         tickets = kwargs["tickets"]
-        inv.delete([tickets[0]], quantity=1)
+        inv.delete(tickets[0], quantity=1)
         await dm_send(
             message, message.author,
             embed=get_embed(
@@ -679,7 +671,8 @@ class ProfileCommands(Commands):
         def _get_lb(modules, mg_name, user):
             leaderboard = None
             for module in modules:
-                if mg_name in _aliases(module) + _commands(module):
+                possibilities = _aliases(module) + _commands(module)
+                if mg_name in possibilities:
                     command = getattr(module, f"cmd_{mg_name}")
                     models = getattr(command, "models", [])
                     if not models:
@@ -687,7 +680,7 @@ class ProfileCommands(Commands):
                     for model_ in models:
                         if issubclass(model_, Minigame):
                             leaderboard = model_(
-                                self.database, user
+                                user
                             ).get_lb()
                             return leaderboard
             return leaderboard

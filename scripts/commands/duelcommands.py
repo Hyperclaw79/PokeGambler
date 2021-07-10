@@ -15,7 +15,7 @@ import discord
 
 from ..base.items import Gladiator, Item
 from ..base.models import (
-    Blacklist, DuelActionsModel, Inventory, Profile, Duels
+    Blacklist, DuelActionsModel, Inventory, Profiles, Duels
 )
 
 from ..helpers.checks import user_check
@@ -32,21 +32,22 @@ from .basecommand import (
 if TYPE_CHECKING:
     from bot import PokeGambler
     from discord import Message, Member
-    from ..base.dbconn import DBConnector
 
 
 class DuelActions:
     """
     Holder class for different types of duel attacks.
     """
-    def __init__(
-        self, ctx: PokeGambler,
-        database: DBConnector
-    ) -> None:
+    def __init__(self, ctx: PokeGambler):
         self.ctx = ctx
-        self.database = database
-        actions = database.get_actions()
-        if not actions:
+        self.normal = []
+        self.crit = []
+        for action in DuelActionsModel.get_actions():
+            if action["level"] == "Normal":
+                self.normal.append(action["action"])
+            else:
+                self.crit.append(action["action"])
+        if not self.normal or not self.crit:
             self.normal = [
                 "<g1> kicks <g2> to the ground.",
                 "<g1> pokes <g2> in the eye.",
@@ -73,17 +74,9 @@ class DuelActions:
             }.items():
                 for action in val:
                     DuelActionsModel(
-                        self.database, owner,
+                        owner,
                         action, key
                     ).save()
-        else:
-            self.normal = []
-            self.crit = []
-            for action in actions:
-                if action["level"] == "Normal":
-                    self.normal.append(action["action"])
-                else:
-                    self.crit.append(action["action"])
 
     def refresh(self):
         """
@@ -91,8 +84,7 @@ class DuelActions:
         """
         self.normal = []
         self.crit = []
-        actions = DuelActionsModel.get_actions(self.database)
-        for action in actions:
+        for action in DuelActionsModel.get_actions():
             if action["level"] == "Normal":
                 self.normal.append(action["action"])
             else:
@@ -116,10 +108,10 @@ class DuelCommands(Commands):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.duelactions = DuelActions(self.ctx, self.database)
+        self.duelactions = DuelActions(self.ctx)
 
     @cooldown(300)
-    @model([Duels, Profile, Inventory, Item])
+    @model([Duels, Profiles, Inventory, Item])
     @alias(["fight", "gladiator", "battle"])
     async def cmd_duel(
         self, message: Message,
@@ -156,7 +148,7 @@ class DuelCommands(Commands):
                 )
             )
             return
-        user_profile = Profile(self.database, message.author)
+        user_profile = Profiles(message.author)
         amount = await self.__duel_get_cost(message, user_profile, args)
         if not amount:
             return
@@ -166,7 +158,7 @@ class DuelCommands(Commands):
         user2 = mentions[0]
         na_checks = [
             user2.bot,
-            Blacklist.is_blacklisted(self.database, user2.id)
+            Blacklist.is_blacklisted(user2.id)
         ]
         if any(na_checks):
             reasons = [
@@ -187,7 +179,7 @@ class DuelCommands(Commands):
         confirmed = await self.__duel_confirmation(message, user2, amount)
         if not confirmed:
             return
-        other_profile = Profile(self.database, user2)
+        other_profile = Profiles(user2)
         gladiator2 = await self.__duel_get_gladiator(
             message, user2, notify=False
         )
@@ -214,7 +206,7 @@ class DuelCommands(Commands):
             )
 
     @alias("action+")
-    @model([DuelActionsModel, Profile])
+    @model([DuelActionsModel, Profiles])
     @check_completion
     @no_thumb
     async def cmd_create_action(self, message: Message, **kwargs):
@@ -268,7 +260,7 @@ class DuelCommands(Commands):
                 )
             )
             return
-        profile = Profile(self.database, message.author)
+        profile = Profiles(message.author)
         if profile.get(
             charges[levels.index(choice)]
         ) < 200:
@@ -326,7 +318,7 @@ class DuelCommands(Commands):
                 placeholder
             )
         DuelActionsModel(
-            self.database, message.author,
+            message.author,
             action[:100], choice
         ).save()
         await message.channel.send(
@@ -387,10 +379,10 @@ class DuelCommands(Commands):
                 )
             )
             return
-        glad.rename(self.database, new_name)
-        inv = Inventory(self.database, message.author)
+        glad.rename(new_name)
+        inv = Inventory(message.author)
         tickets = kwargs["tickets"]
-        inv.delete([tickets[0]], quantity=1)
+        inv.delete(tickets[0], quantity=1)
         await dm_send(
             message,
             message.author,
@@ -415,7 +407,7 @@ class DuelCommands(Commands):
 
     async def __duel_get_cost(
         self, message: Message,
-        user_profile: Profile,
+        user_profile: Profiles,
         args: Optional[List] = None
     ) -> int:
         if args and args[0].isdigit() and int(args[0]) > 50:
@@ -448,8 +440,8 @@ class DuelCommands(Commands):
         self, message: Message, user: Member,
         notify: bool = True
     ) -> Gladiator:
-        inv = Inventory(self.database, user)
-        glads, _ = inv.get(True, category='Gladiator')
+        inv = Inventory(user)
+        glads, _ = inv.get(category='Gladiator')
         if not glads:
             if notify:
                 await dm_send(
@@ -464,8 +456,8 @@ class DuelCommands(Commands):
             return None
         available = []
         for glad in glads['Gladiator']:
-            itemid = int(inv.get_ids(name=glad['name'])[0], 16)
-            gld = Item.from_id(self.database, itemid)
+            itemid = inv.from_name(name=glad['name'])[0]
+            gld = Item.from_id(itemid)
             available.append(gld)
         if len(available) > 1:
             emb = get_enum_embed(
@@ -562,7 +554,7 @@ class DuelCommands(Commands):
     @staticmethod
     async def __duel_proceed(
         message: Message, user: Member,
-        profile: Profile, gladiator: Gladiator,
+        profile: Profiles, gladiator: Gladiator,
         cost: int
     ) -> bool:
         if profile.get("balance") < cost:
@@ -608,7 +600,7 @@ class DuelCommands(Commands):
     async def __duel_play(
         self, message: Message,
         glads: List[Gladiator],
-        profiles: List[Profile],
+        profiles: List[Profiles],
         amount: int
     ):
         dmg_dict = {
@@ -666,7 +658,7 @@ class DuelCommands(Commands):
         winner.credit(amount)
         other.debit(amount)
         Duels(
-            self.database, players[0], glads[0].name,
+            players[0], glads[0].name,
             str(players[1].id), glads[1].name, str(winner.user.id),
             amount
         ).save()

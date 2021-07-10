@@ -5,7 +5,6 @@ The Main Module which serves as the brain of the code.
 from collections import namedtuple
 import difflib
 import importlib
-import json
 import os
 import sys
 import traceback
@@ -18,15 +17,16 @@ from discord import Message
 from discord.ext import tasks
 from dotenv import load_dotenv
 
-from scripts.base.models import CommandData, Inventory, Profile
+from scripts.base.models import (
+    Blacklist, CommandData, Inventory, Profiles
+)
 from scripts.base.items import Item
 
 from scripts.base.cardgen import CardGambler
-from scripts.base.dbconn import DBConnector
 from scripts.helpers.logger import CustomLogger
 # pylint: disable=cyclic-import
 from scripts.helpers.utils import (
-    SqlLogger, dm_send, get_ascii, get_commands,
+    dm_send, get_ascii, get_commands,
     get_formatted_time, get_modules,
     prettify_discord, get_embed, parse_command,
     get_rand_headers, is_owner, online_now
@@ -48,14 +48,11 @@ class PokeGambler(discord.AutoShardedClient):
         intents.presences = False
         super().__init__(intents=intents)
         self.version = "v0.9.0"
-        self.db_path = kwargs["db_path"]
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
-        self.config_path = kwargs["config_path"]
-        self.sql_log_path = kwargs["sql_log_path"]
         for var in ["DISCORD_WEBHOOK_TOKEN", "DISCORD_WEBHOOK_CHANNEL"]:
             setattr(self, var, os.getenv(var))
-        self.update_configs()
+        self.__update_configs()
         # Defaults
         self.active_channels = []
         self.ready = False
@@ -70,12 +67,10 @@ class PokeGambler(discord.AutoShardedClient):
         self.pending_cmds = {}
         self.nitro_rewarded = False
         # Classes
-        self.database = DBConnector(self.db_path)
         self.logger = CustomLogger(
             self.error_log_path
         )
         self.dealer = CardGambler(self.assets_path)
-        self.database.create_tables()
         # Commands
         for module in os.listdir("scripts/commands"):
             if module.endswith("commands.py"):
@@ -85,19 +80,19 @@ class PokeGambler(discord.AutoShardedClient):
     def __bl_wl_check(self, message: Message):
         blacklist_checks = [
             self.channel_mode == "blacklist",
-            message.channel.id in self.configs["blacklist_channels"]
+            message.channel.id in getattr(self, "blacklist_channels")
         ]
         whitelist_checks = [
             self.channel_mode == "whitelist",
-            message.channel.id not in self.configs["whitelist_channels"]
+            message.channel.id not in getattr(self, "whitelist_channels")
         ]
         blackguild_checks = [
             self.guild_mode == "blacklist",
-            message.guild.id in self.configs["blacklist_guilds"]
+            message.guild.id in getattr(self, "blacklist_guilds")
         ]
         whiteguild_checks = [
             self.guild_mode == "whitelist",
-            message.guild.id not in self.configs["whitelist_guilds"]
+            message.guild.id not in getattr(self, "whitelist_guilds")
         ]
         return_checks = [
             all(blacklist_checks),
@@ -172,7 +167,7 @@ class PokeGambler(discord.AutoShardedClient):
         on_cooldown = self.cooldown_users.get(message.author, None)
         if on_cooldown and (
             datetime.now() - self.cooldown_users[message.author]
-        ).total_seconds() < self.configs["cooldown_time"]:
+        ).total_seconds() < self.cooldown_time:
             await message.add_reaction("⌛")
             return True
         self.cooldown_users[message.author] = datetime.now()
@@ -208,10 +203,11 @@ class PokeGambler(discord.AutoShardedClient):
     @tasks.loop(hours=24)
     async def __reward_nitro_boosters(self):
         day = datetime.utcnow().day
-        if day > 8 and self.nitro_rewarded:
+        if day > 5 and self.nitro_rewarded:
             self.nitro_rewarded = False
-        elif day == 8 and not self.nitro_rewarded:
+        elif day == 5 and not self.nitro_rewarded:
             DummyMessage = namedtuple('Message', ['channel'])
+            # pylint: disable=no-member
             official_server = self.get_guild(self.official_server)
             boosters = official_server.premium_subscribers
             # BETA: Remove owner from boosters.
@@ -221,17 +217,14 @@ class PokeGambler(discord.AutoShardedClient):
                 )
             )
             for booster in boosters:
-                # Ensure booster has a Profile.
-                _ = Profile(self.database, booster)
+                # Ensure booster has a Profiles.
+                _ = Profiles(booster)
                 nitro_box = Item.from_name(
-                    self.database,
                     "Nitro Booster Reward Box",
                     force_new=True
                 )
                 # pylint: disable=no-member
-                Inventory(self.database, booster).save(
-                    int(nitro_box.itemid, 16)
-                )
+                Inventory(booster).save(nitro_box.itemid)
                 chan = discord.utils.get(
                     official_server.channels,
                     name='general',
@@ -255,7 +248,7 @@ class PokeGambler(discord.AutoShardedClient):
         on_cooldown = await self.__handle_cd(message)
         if on_cooldown:
             return False
-        if self.database.is_blacklisted(
+        if Blacklist.is_blacklisted(
             str(message.author.id)
         ) or message.author.bot:
             await message.add_reaction("🚫")
@@ -293,22 +286,41 @@ class PokeGambler(discord.AutoShardedClient):
         setattr(self, f"{module_type}commands", cmd_obj)
         return cmd_obj
 
-    def update_configs(self):
+    def __update_configs(self):
         """
         For dynamic config updates.
         """
-        # pylint: disable=invalid-name
-        with open(self.config_path, encoding='utf-8') as f:
-            self.configs = json.load(f)
-        self.guild_mode = self.configs["default_guildmode"]
-        self.channel_mode = self.configs["default_channelmode"]
-        self.owner_id = int(self.configs['owner_id'])
-        self.prefix = self.configs['command_prefix']
-        self.official_server = self.configs['official_server']
+        self.guild_mode = os.getenv(
+            "DEFAULT_GUILDMODE",
+            "blacklist"
+        )
+        self.channel_mode = os.getenv(
+            "DEFAULT_CHANNELMODE",
+            "blacklist"
+        )
+        self.prefix = os.getenv('COMMAND_PREFIX', '->')
+        self.cooldown_time = int(os.getenv('COOLDOWN_TIME', "5"))
+        for cfg_id in (
+            "owner_id", "official_server",
+            "admin_cmd_log_channel",
+            "img_upload_channel"
+        ):
+            setattr(self, cfg_id, int(os.getenv(cfg_id.upper())))
+        for itbl in (
+            "blacklist_guilds", "whitelist_guilds",
+            "blacklist_channels", "whitelist_channels",
+            "allowed_users"
+        ):
+            val = []
+            if os.getenv(itbl.upper(), None):
+                val = [
+                    int(itbl_id.strip())
+                    for itbl_id in os.environ[itbl.upper()].split(', ')
+                ]
+            setattr(self, itbl, val)
 
 # Bot Base
 
-    # pylint: disable=too-many-return-statements, too-many-branches
     # pylint: disable=too-many-locals
     async def on_message(self, message: Message):
         """
@@ -358,7 +370,7 @@ class PokeGambler(discord.AutoShardedClient):
             try:
                 if "no_log" not in dir(method):
                     cmd_data = CommandData(
-                        self.database, message.author, message,
+                        message.author, message,
                         cmd.replace("cmd_", ""), args, option_dict
                     )
                     cmd_data.save()
@@ -366,15 +378,7 @@ class PokeGambler(discord.AutoShardedClient):
                 # Decorators can return None
                 if task:
                     cmd_name = method.__name__.replace("cmd_", "")
-                    with SqlLogger(
-                        self, {
-                            "Command": cmd_name,
-                            "User": str(message.author),
-                            "User_id": message.author.id,
-                            "Timestamp": datetime.utcnow()
-                        }
-                    ):
-                        await task
+                    await task
             except Exception:  # pylint: disable=broad-except
                 tb_obj = sys.exc_info()[2]
                 tb_obj = traceback.format_exc()
@@ -387,13 +391,14 @@ class PokeGambler(discord.AutoShardedClient):
 # Connectors
 
     def run(self, *args, **kwargs):
-        super().run(os.getenv('token'), *args, **kwargs)
+        super().run(os.getenv('TOKEN'), *args, **kwargs)
 
     async def on_ready(self):
         """
         On_ready event from Discord API.
         """
         if not getattr(self, "owner", False):
+            # pylint: disable=no-member
             self.owner = self.get_user(self.owner_id)
         headers = get_rand_headers()
         self.sess = aiohttp.ClientSession(loop=self.loop, headers=headers)
@@ -401,7 +406,7 @@ class PokeGambler(discord.AutoShardedClient):
             itbl: prettify_discord(
                 self,
                 **{
-                    "iterable": self.configs[itbl],
+                    "iterable": getattr(self, itbl),
                     "mode": itbl.split("_")[1].rstrip("s")
                 }
             )
@@ -441,12 +446,13 @@ class PokeGambler(discord.AutoShardedClient):
             color=["green", "bold"],
             timestamp=False
         )
+        # pylint: disable=no-member
         print(
             f"\t{self.logger.wrap('Owner:', color='blue')} "
             f"{self.owner} ({self.owner_id})\n\n"
             f"\t{self.logger.wrap('Bot Name:', color='blue')} {self.user}\n\n"
             f"\t{self.logger.wrap('Command Prefix:', color='blue')} "
-            f"{self.configs['command_prefix']}\n\n"
+            f"{self.prefix}\n\n"
             f"\t{self.logger.wrap('Blacklisted Channels', color='blue')}\n"
             "\t~~~~~~~~~~~~~~~~~~~~\n"
             f"\t{pretty['blacklist_channels']}\n\n"
@@ -460,9 +466,9 @@ class PokeGambler(discord.AutoShardedClient):
             "\t~~~~~~~~~~~~~~~~~~~\n"
             f"\t{pretty['whitelist_guilds']}\n\n"
             f"\t{self.logger.wrap('Default Channel Mode:', color='blue')} "
-            f"{self.configs['default_channelmode']}\n\n"
+            f"{self.channel_mode}\n\n"
             f"\t{self.logger.wrap('Default Guild Mode:', color='blue')} "
-            f"{self.configs['default_guildmode']}\n\n"
+            f"{self.guild_mode}\n\n"
         )
         game = discord.Game(
             f"with the strings of fate. | Check: {self.prefix}info"

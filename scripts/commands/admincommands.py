@@ -13,12 +13,14 @@ from typing import (
     Type, TYPE_CHECKING
 )
 
+from dotenv import load_dotenv
+
 from ..helpers.checks import user_check
 from ..helpers.utils import (
     get_embed, get_enum_embed,
     is_admin, is_owner, wait_for
 )
-from ..base.models import Blacklist, Inventory, Profile
+from ..base.models import Blacklist, Inventory, Profiles
 from ..base.items import Item, Rewardbox, Tradable
 from ..base.shop import Shop, PremiumShop
 from .basecommand import (
@@ -29,6 +31,8 @@ from .basecommand import (
 
 if TYPE_CHECKING:
     from discord import Message
+
+load_dotenv()
 
 
 class AdminCommands(Commands):
@@ -79,7 +83,7 @@ class AdminCommands(Commands):
                 )
             )
             return
-        profile = await get_profile(self.database, message, user_id)
+        profile = await get_profile(message, user_id)
         if not profile:
             return
         profile.update(balance=balance)
@@ -132,7 +136,7 @@ class AdminCommands(Commands):
                 )
             )
             return
-        profile = await get_profile(self.database, message, user_id)
+        profile = await get_profile(message, user_id)
         if not profile:
             return
         bonds = kwargs.get("purchased", False)
@@ -161,7 +165,7 @@ class AdminCommands(Commands):
             ```~
         """
         user_id = int(args[0])
-        profile = await get_profile(self.database, message, user_id)
+        profile = await get_profile(message, user_id)
         if not profile:
             return
         data = profile.full_info
@@ -192,7 +196,7 @@ class AdminCommands(Commands):
             ```~
         """
         user_id = int(args[0])
-        profile = await get_profile(self.database, message, user_id)
+        profile = await get_profile(message, user_id)
         profile.reset()
         await message.add_reaction("👍")
 
@@ -219,7 +223,7 @@ class AdminCommands(Commands):
         """
         user_id = int(args[0])
         kwargs.pop("mentions", [])
-        profile = await get_profile(self.database, message, user_id)
+        profile = await get_profile(message, user_id)
         if not profile:
             return
         try:
@@ -281,8 +285,8 @@ class AdminCommands(Commands):
                 )
             )
             return
-        Blacklist(
-            self.database, user,
+        await Blacklist(
+            user,
             str(message.author.id),
             reason=kwargs.get("reason", None)
         ).save()
@@ -323,7 +327,7 @@ class AdminCommands(Commands):
                 )
             )
             return
-        if not Blacklist.is_blacklisted(self.database, args[0]):
+        if not Blacklist.is_blacklisted(args[0]):
             await message.channel.send(
                 embed=get_embed(
                     "User is not blacklisted.",
@@ -333,7 +337,7 @@ class AdminCommands(Commands):
             )
             return
         Blacklist(
-            self.database, user,
+            user,
             str(message.author.id)
         ).pardon()
         await message.add_reaction("👍")
@@ -385,9 +389,7 @@ class AdminCommands(Commands):
         :information_source: Chests cannot be created using this.
         **Owner(s) can create Premium items using the --premium kwarg.**
         *In case of Reward Boxes, the items should be a comma-separated*
-        *list of IDs in decimal, rather than hex codes.*
-        *For example, to add items with IDs 0A and FF, use:*
-            *10, 255*@
+        *list of IDs.*
         """
 
         # pylint: disable=no-member
@@ -461,7 +463,7 @@ class AdminCommands(Commands):
                 details[col] = int(reply.content)
             elif col == "items":
                 details[col] = [
-                    int(itemid.strip())
+                    itemid.strip()
                     for itemid in reply.content.split(',')
                 ]
             else:
@@ -472,7 +474,7 @@ class AdminCommands(Commands):
         item = self.__item_factory(
             category=catogclass, **details
         )
-        item.save(self.database)
+        item.save()
         await message.channel.send(
             embed=get_embed(
                 f"Item **{item.name}** with ID _{item.itemid}_ has been "
@@ -505,7 +507,7 @@ class AdminCommands(Commands):
             ```~
         """
         item = kwargs.get("item")
-        item.delete(self.database)
+        item.delete()
         await message.add_reaction("👍")
 
     @admin_only
@@ -544,13 +546,10 @@ class AdminCommands(Commands):
                 )
             )
             return
-        item.update(
-            self.database,
-            **updatables
-        )
+        item.update(**updatables)
         if issubclass(item.__class__, Tradable):
-            Shop.refresh_tradables(self.database)
-            PremiumShop.refresh_tradables(self.database)
+            Shop.refresh_tradables()
+            PremiumShop.refresh_tradables()
         await message.add_reaction("👍")
 
     @admin_only
@@ -586,11 +585,13 @@ class AdminCommands(Commands):
         try:
             user_id = int(args[0])
             new_item = Item.from_id(
-                self.database, int(args[1], 16),
+                args[1],
                 force_new=True
             )
-            new_item.save(self.database)
-            itemid = int(new_item.itemid, 16)
+            if not new_item:
+                raise ValueError
+            # pylint: disable=no-member
+            itemid = new_item.itemid
         except (ValueError, ZeroDivisionError):
             await message.channel.send(
                 embed=get_embed(
@@ -601,7 +602,7 @@ class AdminCommands(Commands):
             )
             return
         user = message.guild.get_member(user_id)
-        inv = Inventory(self.database, user)
+        inv = Inventory(user)
         inv.save(itemid)
         await message.add_reaction("👍")
 
@@ -626,16 +627,14 @@ class AdminCommands(Commands):
             {command_prefix}item_all 0000FFFF
             ```~
         """
-        itemid = int(args[0], 16)
-        ids = Profile.get_all(self.database, ids_only=True)
+        ids = Profiles.get_all(ids_only=True)
         for uid in ids:
+            if not uid:
+                continue
             user = message.guild.get_member(int(uid))
             if not user:
                 continue
-            Inventory(
-                self.database,
-                user
-            ).save(itemid)
+            Inventory(user).save(args[0])
         await message.add_reaction("👍")
 
     @staticmethod

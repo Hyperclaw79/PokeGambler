@@ -77,7 +77,7 @@ class Paginator:
                     and not self.embeds[self.cursor].image.url
                 ):
                     msg = await self.base.guild.get_channel(
-                        self.ctx.configs["img_upload_channel"]
+                        self.ctx.img_upload_channel
                     ).send(file=self.files[self.cursor])
                     self.embeds[self.cursor].set_image(
                         url=msg.attachments[0].proxy_url
@@ -113,7 +113,7 @@ class Paginator:
                     and not self.embeds[self.cursor].image.url
                 ):
                     msg = await self.base.guild.get_channel(
-                        self.ctx.configs["img_upload_channel"]
+                        self.ctx.img_upload_channel
                     ).send(file=self.files[self.cursor])
                     self.embeds[self.cursor].set_image(
                         url=msg.attachments[0].proxy_url

@@ -15,7 +15,7 @@ import re
 from ..base.items import Item, Chest, Lootbag, Rewardbox
 from ..base.models import (
     Blacklist, Inventory, Loots,
-    Profile, Trades
+    Profiles, Trades
 )
 from ..base.shop import (
     BoostItem, PremiumBoostItem,
@@ -44,7 +44,7 @@ class TradeCommands(Commands):
         'Giftbox': 'Gift Boxe'
     }
 
-    @model([Loots, Profile, Chest, Inventory])
+    @model([Loots, Profiles, Chest, Inventory])
     @no_thumb
     async def cmd_open(
         self, message: Message,
@@ -140,8 +140,8 @@ class TradeCommands(Commands):
 
         @Check your personal inventory for collected Chests, Treasures, etc.@
         """
-        inv = Inventory(self.database, message.author)
-        catog_dict, net_worth = inv.get(counts_only=True)
+        inv = Inventory(message.author)
+        catog_dict, net_worth = inv.get()
         emb = get_embed(
             "Your personal inventory categorized according to item type.\n"
             "You can get the list of IDs for an item using "
@@ -152,11 +152,22 @@ class TradeCommands(Commands):
         )
         for idx, (catog, items) in enumerate(catog_dict.items()):
             catog_name = self.verbose_names.get(catog, catog)
+            unique_items = []
+            for item in items:
+                if item['name'] not in (
+                    itm['name']
+                    for itm in unique_items
+                ):
+                    item['count'] = [
+                        itm['name']
+                        for itm in items
+                    ].count(item['name'])
+                    unique_items.append(item)
             emb.add_field(
                 name=f"**{catog_name}s** ({len(items)})",
                 value="\n".join(
                     f"『{item['emoji']}』 **{item['name']}** x{item['count']}"
-                    for item in items
+                    for item in unique_items
                 ),
                 inline=True
             )
@@ -190,8 +201,8 @@ class TradeCommands(Commands):
             return
         item_name = " ".join(arg.title() for arg in args)
         ids = Inventory(
-            self.database, message.author
-        ).get_ids(item_name)
+            message.author
+        ).from_name(item_name)
         if not ids:
             await message.channel.send(
                 embed=get_embed(
@@ -258,10 +269,7 @@ class TradeCommands(Commands):
         shop = Shop
         if kwargs.get('premium'):
             shop = PremiumShop
-            if Profile(
-                self.database,
-                message.author
-            ).get()["pokebonds"] == 0:
+            if Profiles(message.author).get()["pokebonds"] == 0:
                 await message.channel.send(
                     embed=get_embed(
                         "This option is available only to users"
@@ -286,7 +294,7 @@ class TradeCommands(Commands):
             return
         embeds = []
         if not args:
-            shop.refresh_tradables(self.database)
+            shop.refresh_tradables()
             categories = {
                 key: catog
                 for key, catog in sorted(
@@ -359,12 +367,12 @@ class TradeCommands(Commands):
         itemid = args[0].lower()
         quantity = int(kwargs.get('quantity', 1))
         shop = Shop
-        shop.refresh_tradables(self.database)
+        shop.refresh_tradables()
         try:
-            item = shop.get_item(self.database, itemid, force_new=True)
+            item = shop.get_item(itemid, force_new=True)
             if not item:
                 shop = PremiumShop
-                item = shop.get_item(self.database, itemid, force_new=True)
+                item = shop.get_item(itemid, force_new=True)
         except (ValueError, ZeroDivisionError):
             await message.channel.send(
                 embed=get_embed(
@@ -384,7 +392,7 @@ class TradeCommands(Commands):
                 )
             )
             return
-        status = shop.validate(self.database, message.author, item, quantity)
+        status = shop.validate(message.author, item, quantity)
         if status != "proceed":
             await message.channel.send(
                 embed=get_embed(
@@ -395,7 +403,6 @@ class TradeCommands(Commands):
             )
             return
         task = item.buy(
-            database=self.database,
             message=message,
             quantity=quantity,
             ctx=self.ctx
@@ -415,7 +422,7 @@ class TradeCommands(Commands):
             return
         spent = item.price * quantity
         if item.__class__ in [BoostItem, PremiumBoostItem]:
-            tier = Loots(self.database, message.author).tier
+            tier = Loots(message.author).tier
             spent *= (10 ** (tier - 1))
         curr = self.chip_emoji
         if item.premium:
@@ -436,7 +443,7 @@ class TradeCommands(Commands):
             )
         )
 
-    @model([Profile, Item])
+    @model([Profiles, Item])
     async def cmd_sell(
         self, message: Message,
         args: Optional[List] = None,
@@ -462,10 +469,10 @@ class TradeCommands(Commands):
         """
         if not args:
             return
-        inventory = Inventory(self.database, message.author)
+        inventory = Inventory(message.author)
         try:
-            itemid = int(args[0], 16)
-            item = inventory.from_id(itemid)
+            itemid = args[0]
+            item = inventory.from_id(args[0])
             if not item:
                 await message.channel.send(
                     embed=get_embed(
@@ -475,7 +482,7 @@ class TradeCommands(Commands):
                     )
                 )
                 return
-            new_item = Item.from_id(self.database, itemid)
+            new_item = Item.from_id(itemid)
             # pylint: disable=no-member
             if not new_item.sellable:
                 await message.channel.send(
@@ -486,12 +493,12 @@ class TradeCommands(Commands):
                     )
                 )
                 return
-            deleted = inventory.delete([itemid], 1)
+            deleted = inventory.delete(itemid, 1)
         except ValueError:  # Item Name
             quantity = int(kwargs.get('quantity', 1))
             name = args[0].title()
-            new_item = Item.from_name(self.database, name)
-            deleted = inventory.delete(name, quantity)
+            new_item = Item.from_name(name)
+            deleted = inventory.delete(name, quantity, is_name=True)
         if deleted == 0:
             await message.channel.send(
                 embed=get_embed(
@@ -508,10 +515,10 @@ class TradeCommands(Commands):
             gained //= 10
             curr = self.bond_emoji
             bonds = True
-        Profile(self.database, message.author).credit(
+        Profiles(message.author).credit(
             gained, bonds=bonds
         )
-        Shop.refresh_tradables(self.database)
+        Shop.refresh_tradables()
         await message.channel.send(
             embed=get_embed(
                 f"Succesfully sold `{deleted}` of your listed item(s).\n"
@@ -522,7 +529,7 @@ class TradeCommands(Commands):
         )
 
     @dealer_only
-    @model([Profile, Trades])
+    @model([Profiles, Trades])
     @alias(["transfer", "pay"])
     async def cmd_give(
         self, message: Message,
@@ -586,7 +593,7 @@ class TradeCommands(Commands):
                 )
             )
             return
-        if Blacklist.is_blacklisted(self.database, str(mentions[0].id)):
+        if Blacklist.is_blacklisted(str(mentions[0].id)):
             await message.channel.send(
                 embed=get_embed(
                     "That user is blacklisted and cannot receive any chips.",
@@ -595,8 +602,8 @@ class TradeCommands(Commands):
                 )
             )
             return
-        author_prof = Profile(self.database, message.author)
-        mention_prof = Profile(self.database, mentions[0])
+        author_prof = Profiles(message.author)
+        mention_prof = Profiles(mentions[0])
         amount = int(args[0])
         if author_prof.get("balance") < amount:
             await message.channel.send(
@@ -610,7 +617,7 @@ class TradeCommands(Commands):
         author_prof.debit(amount)
         mention_prof.credit(amount)
         Trades(
-            self.database, message.author,
+            message.author,
             str(mentions[0].id), amount
         ).save()
         await message.channel.send(
@@ -621,7 +628,7 @@ class TradeCommands(Commands):
             )
         )
 
-    @model(Profile)
+    @model(Profiles)
     async def cmd_redeem_chips(
         self, message: Message,
         args: Optional[List] = None,
@@ -654,7 +661,7 @@ class TradeCommands(Commands):
             )
             return
         chips = int(args[0])
-        profile = Profile(self.database, message.author)
+        profile = Profiles(message.author)
         if profile.get()["pokebonds"] < chips // 10:
             await message.channel.send(
                 embed=get_embed(
@@ -682,11 +689,11 @@ class TradeCommands(Commands):
         shopname = re.sub('([A-Z]+)', r' \1', shop.__name__).strip()
         categories = shop.categories
         catog = categories[shop.alias_map[catog_str]]
-        user_tier = Loots(self.database, user).tier
+        user_tier = Loots(user).tier
         if shop.alias_map[catog_str] in [
             "Tradables", "Consumables", "Gladiators"
         ]:
-            shop.refresh_tradables(self.database)
+            shop.refresh_tradables()
         if len(catog.items) < 1:
             emb = get_embed(
                     f"`{catog.name} {shopname}` seems to be empty right now.\n"
@@ -697,7 +704,7 @@ class TradeCommands(Commands):
                     f"twemoji/master/assets/72x72/{ord(catog.emoji):x}.png"
                 )
         else:
-            profile = Profile(self.database, user)
+            profile = Profiles(user)
             balance = (
                 f"`{profile.get('pokebonds'):,}` {self.bond_emoji}"
                 if shop is PremiumShop
@@ -730,8 +737,9 @@ class TradeCommands(Commands):
             emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
         return emb
 
+    @staticmethod
     def __open_get_openables(
-        self, message: Message,
+        message: Message,
         args: List[str]
     ) -> List[Item]:
         try:
@@ -742,12 +750,12 @@ class TradeCommands(Commands):
                 for chest in Chest.__subclasses__()
             ):
                 chests = Inventory(
-                    self.database, message.author
+                    message.author
                 ).from_name(f"{chest_name} Chest")
                 if not chests:
                     raise ValueError(f"No {chest_name} Chests in Inventory.")
                 openables = [
-                    Item.from_id(self.database, itemid)
+                    Item.from_id(itemid)
                     for itemid in chests
                 ]
             elif any(
@@ -757,21 +765,20 @@ class TradeCommands(Commands):
                 ]
             ):
                 bags = Inventory(
-                    self.database, message.author
+                    message.author
                 ).from_name(lb_name)
                 if not bags:
                     raise ValueError(f"No {lb_name} in Inventory.")
                 openables = [
-                    Item.from_id(self.database, itemid)
+                    Item.from_id(itemid)
                     for itemid in bags
                 ]
             else:
-                itemid = int(args[0], 16)
                 openable = Inventory(
-                    self.database, message.author
-                ).from_id(itemid)
+                    message.author
+                ).from_id(args[0])
                 if openable:
-                    openable = Item.from_id(self.database, itemid)
+                    openable = Item.from_id(openable["itemid"])
                 else:
                     raise ValueError("Item not found in inventory.")
                 openables = [openable]
@@ -784,13 +791,11 @@ class TradeCommands(Commands):
         openables: List[Union[Chest, Lootbag, Rewardbox]]
     ) -> str:
         chips = sum(
-            openable.chips or openable.__class__.get_chips(
-                self.database, int(openable.itemid, 16)
-            )
+            openable.chips
             for openable in openables
         )
-        Profile(self.database, message.author).credit(chips)
-        loot_model = Loots(self.database, message.author)
+        Profiles(message.author).credit(chips)
+        loot_model = Loots(message.author)
         earned = loot_model.get()["earned"]
         loot_model.update(
             earned=(earned + chips)
@@ -799,17 +804,15 @@ class TradeCommands(Commands):
         items = []
         for openable in openables:
             if openable.name == "Legendary Chest":
-                item = openable.get_random_collectible(self.database)
+                item = openable.get_random_collectible()
                 if item:
                     items.append(item)
             elif openable.category == 'Lootbag':
-                res = openable.get_random_items(self.database)
+                res = openable.get_random_items()
                 if res:
                     items.extend(res)
             elif openable.category == 'Rewardbox':
-                res = openable.__class__.get_items(
-                    self.database, int(openable.itemid, 16)
-                )
+                res = Rewardbox.get_items(openable.itemid)
                 if res:
                     items.extend(res)
         if items:
@@ -818,13 +821,11 @@ class TradeCommands(Commands):
                 for item in set(items)
             )
             content += f"\nAnd woah, you also got:\n{item_str}"
-        inv = Inventory(self.database, message.author)
+        inv = Inventory(message.author)
         for item in items:
-            inv.save(
-                int(item.itemid, 16)
-            )
+            inv.save(item.itemid)
         inv.delete([
-            int(openable.itemid, 16)
+            openable.itemid
             for openable in openables
         ])
         quant_str = ''

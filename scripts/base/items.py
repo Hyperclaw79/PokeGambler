@@ -6,21 +6,23 @@ This module contains all the items in the Pokegambler world.
 # pylint: disable=too-many-instance-attributes
 
 from __future__ import annotations
+import os
 import random
 import re
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from functools import total_ordering
-from inspect import ismethod
+from hashlib import md5
 from io import BytesIO
 from typing import (
     Dict, List, Optional,
     Tuple, Type, TYPE_CHECKING, Union
 )
 
+from dotenv import load_dotenv
 from PIL import Image
-
-from ..base.dbconn import DBConnector
+from pymongo import MongoClient
 
 # pylint: disable=cyclic-import
 from ..helpers.utils import dedent, get_embed
@@ -29,9 +31,14 @@ if TYPE_CHECKING:
     from aiohttp import ClientSession
     from discord import Embed
 
-# region BaseClasses
+load_dotenv()
+
+DB_CLIENT = MongoClient(
+    os.getenv("MONGO_CLUSTER_STRING")
+).pokegambler
 
 
+# region Base Classes
 @dataclass
 class Item(ABC):
     """
@@ -45,13 +52,24 @@ class Item(ABC):
     sellable: bool = True
     price: Optional[int] = None
     premium: bool = False
+    created_on: field(
+        default_factory=datetime
+    ) = datetime.now()
+    # MongoDB Client
+    mongo = DB_CLIENT.items
 
-    def __iter__(self) -> Tuple:
-        for attr in (
-            "name", "description", "category",
+    def __post_init__(self):
+        self.itemid = md5(
+            str(datetime.utcnow()).encode()
+        ).hexdigest()[:8]
+        self.attrs = (
+            "itemid", "name", "description", "category",
             "asset_url", "emoji", "buyable",
             "sellable", "price", "premium"
-        ):
+        )
+
+    def __iter__(self) -> Tuple:
+        for attr in self.attrs:
             yield (attr, getattr(self, attr))
 
     def __str__(self) -> str:
@@ -65,12 +83,7 @@ class Item(ABC):
     def __repr__(self) -> str:
         attr_str = ',\n    '.join(
             f"{attr}={getattr(self, attr)}"
-            for attr in dir(self)
-            if (
-                not attr.startswith("_")
-                and not ismethod(getattr(self, attr))
-                and getattr(self, attr)
-            )
+            for attr in self.attrs
         )
         return f"{self.__class__.__name__}(\n    {attr_str}\n)"
 
@@ -80,15 +93,17 @@ class Item(ABC):
     def __eq__(self, other: Item) -> bool:
         return self.itemid == other.itemid
 
-    def save(self, database: DBConnector):
+    def save(self):
         """
-        Saves the Item to the database.
+        Saves the Item to the Collection.
         Sets the itemid of the Item after saving.
         """
-        uid = database.save_item(**dict(self))
-        setattr(self, "itemid", f"{uid:0>8X}")
+        attrs = dict(self)
+        attrs["_id"] = attrs.pop("itemid")
+        attrs["created_on"] = datetime.now()
+        self.mongo.insert_one(attrs)
 
-    def update(self, database: DBConnector, **kwargs):
+    def update(self, **kwargs):
         """
         Updates an existing item.
         """
@@ -96,21 +111,16 @@ class Item(ABC):
             return
         for key, val in kwargs.items():
             setattr(self, key, val)
-        database.update_item(
-            self.name,
-            **kwargs
+        self.mongo.update_many(
+            {'name': self.name},
+            {'$set': kwargs}
         )
 
-    def delete(self, database: DBConnector):
+    def delete(self):
         """
-        Deletes the Item from the database.
+        Deletes the Item from the Collection.
         """
-        if not hasattr(self, "itemid"):
-            raise AttributeError(
-                f"{self.name} is not yet saved in the database."
-            )
-        uid = int(self.itemid, 16)
-        database.delete_item(uid)
+        self.mongo.delete_one({"_id": self.itemid})
 
     @property
     def name(self) -> str:
@@ -137,13 +147,16 @@ class Item(ABC):
             image=self.asset_url,
             footer=f"Item Id: {self.itemid}"
         )
-        fields = ["category", "buyable", "sellable"]
+        fields = [
+            "category", "buyable",
+            "sellable", "premium"
+        ]
         if self.category == "Tradable":
             fields.append("price")
-        for field in fields:
+        for field_ in fields:
             emb.add_field(
-                name=field,
-                value=f"**`{getattr(self, field)}`**",
+                name=field_.title(),
+                value=f"**`{getattr(self, field_)}`**",
                 inline=True
             )
         return emb
@@ -160,15 +173,12 @@ class Item(ABC):
         return Image.open(byio)
 
     @classmethod
-    def get(
-        cls: Type[Item], database: DBConnector,
-        itemid: int
-    ) -> Union[Dict, None]:
+    def get(cls: Type[Item], itemid: str) -> Union[Dict, None]:
         """
         Get an Item with an ID as a dictionary.
         Returns None if item not in the DB.
         """
-        return database.get_item(itemid)
+        return cls.mongo.find_one({"_id": itemid})
 
     @classmethod
     def _new_item(
@@ -178,7 +188,9 @@ class Item(ABC):
         old_item = {**existing_item}
         category = cls.get_category(old_item)
         old_item.pop('category', None)
-        itemid = old_item.pop('itemid', None)
+        itemid = old_item.pop('_id', None)
+        if not itemid:
+            itemid = old_item.pop('itemid', None)
         new_item = type(
             "".join(
                 word.title()
@@ -187,55 +199,39 @@ class Item(ABC):
             (category, ),
             old_item
         )(**old_item)
-        if not force_new:
-            new_item.itemid = f'{itemid:0>8X}'
+        if force_new:
+            new_item.save()
+        elif itemid:
+            new_item.itemid = itemid
+        else:
+            new_item.__post_init__()
         return new_item
 
     @classmethod
     def from_id(
-        cls: Type[Item], database: DBConnector,
-        itemid: int, force_new: bool = False
+        cls: Type[Item], itemid: int,
+        force_new: bool = False
     ) -> Item:
         """
         Returns a item of specified ID or None.
         """
-        item = database.get_item(itemid)
+        item = cls.get(itemid)
         if not item:
             return None
-        if item["category"] == "Chest":
-            return Chest.from_id(database, itemid)
-        new_item = cls._new_item(item, force_new=force_new)
-        if new_item.category == "Rewardbox":
-            new_item.chips = Rewardbox.get_chips(database, itemid)
-            new_item.items = [
-                int(elem.itemid, 16)
-                for elem in Rewardbox.get_items(database, itemid)
-            ]
-        if force_new:
-            new_item.save(database)
-        return new_item
+        return cls._new_item(item, force_new=force_new)
 
     @classmethod
     def from_name(
-        cls: Type[Item], database: DBConnector,
-        name: str, force_new: bool = False
+        cls: Type[Item], name: str,
+        force_new: bool = False
     ) -> Item:
         """
         Returns a item of specified name or None.
         """
-        item = database.get_item_from_name(name)
+        item = cls.mongo.find_one({"name": name})
         if not item:
             return None
-        new_item = cls._new_item(item, force_new=force_new)
-        if new_item.category == "Rewardbox":
-            new_item.chips = Rewardbox.get_chips(database, item["itemid"])
-            new_item.items = [
-                int(elem.itemid, 16)
-                for elem in Rewardbox.get_items(database, item["itemid"])
-            ]
-        if force_new:
-            new_item.save(database)
-        return new_item
+        return cls._new_item(item, force_new=force_new)
 
     @classmethod
     def get_category(cls: Type[Item], item: Dict) -> Type[Item]:
@@ -259,36 +255,69 @@ class Item(ABC):
                             result.add(child)
                         path.append(child)
             return result
-        category = item["category"]
-        if category == "Chest":
-            category = Chest
-        else:
-            category = [
-                catog
-                for catog in cls.__subclasses__()
-                if catog.__name__ == category
-            ]
-            if not category:
-                category = catog_crawl(cls, item["category"].title())
-            category = next(iter(category))
+        category = [
+            catog
+            for catog in cls.__subclasses__()
+            if catog.__name__ == item["category"]
+        ]
+        if not category:
+            category = catog_crawl(cls, item["category"].title())
+        category = next(iter(category))
         return category
 
     @classmethod
     def list_items(
         cls: Type[Item],
-        database: DBConnector,
         category: str = "Tradable",
-        limit: int = 5
+        limit: int = 5,
+        premium: Optional[bool] = None
     ) -> List:
         """
         Unified Wrapper for the SQL endpoints,
         which fetches items of specified category.
         """
-        method_type = f"get_{category.lower()}s"
-        method = getattr(database, method_type, None)
-        if not method:
-            return []
-        return method(limit)
+        filter_ = {'category': category.title()}
+        if premium is not None:
+            filter_['premium'] = premium
+        pipeline = [
+            {"$match": filter_},
+            {
+                "$group": {
+                    "_id": "$name",
+                    "items": {"$first": "$$ROOT"}
+                }
+            },
+            {"$replaceRoot": {"newRoot": "$items"}},
+            {"$limit": limit}
+        ]
+        items = list(
+            cls.mongo.aggregate(pipeline)
+        )
+        modded_items = []
+        for item in items:
+            item["itemid"] = item.pop("_id")
+            modded_items.append(item)
+        return modded_items
+
+    @classmethod
+    def get_unique_items(cls) -> List[Dict]:
+        """
+        Gets all items with a unique name.
+        """
+        return list(cls.mongo.aggregate([
+            {
+                "$match": {
+                    "category": {"$ne": "Chest"}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$name",
+                    "items": {"$first": "$$ROOT"}
+                }
+            },
+            {"$replaceRoot": {"newRoot": "$items"}}
+        ]))
 
 
 @dataclass(eq=False)
@@ -361,9 +390,8 @@ class Consumable(Tradable):
 
 # endregion
 
+
 # region Chests
-
-
 @total_ordering
 class Chest(Treasure):
     """
@@ -382,6 +410,7 @@ class Chest(Treasure):
         )
         self.category = "Chest"
         self.tier: int = tier
+        self.attrs += ('tier', )
 
     def __eq__(self, other: Chest):
         return self.chips == other.chips
@@ -409,30 +438,6 @@ class Chest(Treasure):
         chests = [CommonChest, GoldChest, LegendaryChest]
         return chests[tier - 1]()
 
-    # pylint: disable=arguments-differ
-    @classmethod
-    def from_id(
-        cls: Type[Chest],
-        database: DBConnector,
-        itemid: int
-    ) -> Chest:
-        """
-        Returns a chest of specified ID or None.
-        """
-        item = database.get_item(itemid)
-        if not item:
-            return None
-        name = item["name"].replace(" ", '')
-        chests = [
-            chest
-            for chest in cls.__subclasses__()
-            if chest.__name__ == name
-        ]
-        chest = chests[0]()
-        chest.itemid = f'{item["itemid"]:0>8X}'
-        chest.description = item["description"]
-        return chest
-
     @classmethod
     def get_random_chest(cls: Type[Chest]) -> Chest:
         """
@@ -446,7 +451,7 @@ class Chest(Treasure):
         )[0]
         return chest_class()
 
-    def get_random_collectible(self, database: DBConnector) -> Collectible:
+    def get_random_collectible(self) -> Collectible:
         """
         Get a random [Collectible] with chance based on chest tier.
         Common Chest - 0%
@@ -457,11 +462,11 @@ class Chest(Treasure):
         proc = random.uniform(0.1, 0.99)
         if proc >= chance:
             return None
-        collectibles = database.get_collectibles(limit=20)
+        collectibles = Item.list_items("Collectible", limit=20)
         if not collectibles:
             return None
         col_dict = random.choice(collectibles)
-        return Item.from_id(database, col_dict["itemid"])
+        return Item.from_id(col_dict["itemid"])
 
 
 class CommonChest(Chest):
@@ -534,22 +539,22 @@ class LegendaryChest(Chest):
 # endregion
 
 
+# region Inherited Classes
 @dataclass(eq=False)
 class Gladiator(Consumable):
     """
     Minions that can be bought and used in Gladiator match minigames.
-    They can be considered as a [Consumable] but do not stack.
     """
     def __init__(self, **kwargs):
         kwargs.pop('category', None)
         super().__init__(category="Gladiator", **kwargs)
 
-    def rename(self, database: DBConnector, name: str):
+    def rename(self, name: str):
         """
         Wrapper for Gladiator rename DB call.
         """
         self.name = name
-        database.rename_gladiator(int(self.itemid, 16), name)
+        self.update(name=name)
 
 
 @dataclass(eq=False)
@@ -568,47 +573,76 @@ class Lootbag(Treasure):
         )
 
     def get_random_items(
-        self, database: DBConnector,
-        categories: Optional[List[str]] = None,
+        self, categories: Optional[List[str]] = None,
         count: Optional[int] = 3
     ) -> Item:
         """
         Retrieves a random existing item of chosen category.
         Returns at most 3 items by default.
         """
-        items = database.get_items(
-            categories=categories,
-            limit=20,
-            include_premium=self.premium
-        )
-        if not items:
-            return None
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$name",
+                    "items": {
+                        "$last": "$$ROOT"
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$items.category",
+                    "items": {
+                        "$push": "$items"
+                    }
+                }
+            }
+        ]
+        matches = {
+            "category": {
+                "$nin": ["Chest", "Lootbag", "Rewardbox"]
+            }
+        }
+        if categories:
+            matches["category"] = {
+                "$in": categories
+            }
+        if not self.premium:
+            matches["premium"] = False
+        if matches:
+            pipeline.insert(0, {"$match": matches})
+        results = list(self.mongo.aggregate(pipeline))
+        random.shuffle(results)
         rand_items = []
         premium_added = False
-        while len(rand_items) <= count and len(items) > 0:
-            if self.premium and not premium_added:
-                itm_dict = random.choices(
-                    items, k=1, weights=[
-                        int(item["premium"])
-                        for item in items
-                    ]
-                )[0]
-                premium_added = True
-            else:
-                itm_dict = random.choices(
-                    items, k=1, weights=[
-                        -int(item["premium"])
-                        for item in items
-                    ]
-                )[0]
-            items.remove(itm_dict)
-            if itm_dict["category"] not in (
-                itm["category"]
-                for itm in rand_items
-            ):
-                rand_items.append(itm_dict)
+        num_misses = 0
+        while len(rand_items) <= count:
+            for catog in results:
+                try:
+                    if self.premium and not premium_added:
+                        itm_dict = random.choices(
+                            catog["items"], k=1, weights=[
+                                int(item["premium"])
+                                for item in catog["items"]
+                            ]
+                        )[0]
+                        premium_added = True
+                    else:
+                        itm_dict = random.choices(
+                            catog["items"], k=1, weights=[
+                                -int(item["premium"])
+                                for item in catog["items"]
+                            ]
+                        )[0]
+                    rand_items.append(itm_dict)
+                    catog["items"].remove(itm_dict)
+                except IndexError:
+                    if num_misses < len(results):
+                        num_misses += 1
+                        continue
+                    break
         return [
-            Item.from_id(database, itm_dict["itemid"])
+            Item.from_id(itm_dict["_id"])
             for itm_dict in rand_items
         ]
 
@@ -644,42 +678,16 @@ class Rewardbox(Treasure):
         )
         self.items = items
         self.chips = chips
-
-    def save(self, database: DBConnector):
-        """
-        Override Save to update a rewardboxes table to store itemids.
-        """
-        # pylint: disable=import-outside-toplevel
-        from ..base.models import Rewardboxes
-
-        class DummyUser:
-            # pylint: disable=too-few-public-methods
-            """Temporary User class to prevent syntax errors"""
-            id: int = 0
-
-        super().save(database)
-        Rewardboxes(
-            database, DummyUser(),
-            int(self.itemid, 16),
-            self.chips,
-            self.items
-        ).save()
+        self.attrs += ("chips", "items")
 
     @classmethod
-    def get_items(cls, database: DBConnector, boxid: int) -> List[Item]:
+    def get_items(cls, boxid: int) -> List[Item]:
         """
         Gets the Items stored in a Reward Box.
         """
-        details = database.get_reward_items(boxid)
         return [
-            Item.from_id(database, item)
-            for item in details["items"]
+            Item.from_id(item)
+            for item in Item.from_id(boxid).items
         ]
 
-    @classmethod
-    def get_chips(cls, database: DBConnector, boxid: int) -> int:
-        """
-        Gets the Chips stored in a Reward Box.
-        """
-        details = database.get_reward_items(boxid)
-        return details.get("chips", 0)
+# endregion

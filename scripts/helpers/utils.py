@@ -6,7 +6,6 @@ from __future__ import annotations
 import asyncio
 import cProfile
 from io import BytesIO
-import json
 import random
 import re
 import time
@@ -69,43 +68,6 @@ class LineTimer:
                 f"{self.message}{elapsed: 2.2f} secs\n",
                 color="yellow"
             )
-
-
-class SqlLogger:
-    """
-    Temporarily, changes the Trace Callback of Sqlite DBConnector.
-    Gets triggered only for Commands.
-    """
-    def __init__(
-        self, ctx: PokeGambler,
-        meta: Optional[Dict[str, str]] = None
-    ):
-        self.ctx = ctx
-        self.meta = meta or {}
-        self.conn = ctx.database.conn
-        self.log = ''
-
-    def __log_sql(self, statement):
-        """
-        Logs the SQL statements executed during a command.
-        """
-        self.log += f"{statement}\n"
-
-    def __enter__(self):
-        self.conn.set_trace_callback(self.__log_sql)
-
-    # pylint: disable=unused-argument
-    def __exit__(self, exc_type, exc_value, traceback):
-        # sourcery skip: remove-redundant-pass
-        self.meta.update({
-            "Query": self.log
-        })
-        if self.log:
-            with open(self.ctx.sql_log_path, "a") as sql_log:
-                sql_log.write(
-                    f"{json.dumps(self.meta, default=str)}\n"
-                )
-        self.conn.set_trace_callback(None)
 
 
 def get_formatted_time(
@@ -375,10 +337,10 @@ def is_owner(ctx: PokeGambler, user: Member) -> bool:
     """
     Checks if user is bot owner.
     """
-    return user.id in [
-        ctx.configs["allowed_users"],
+    return user.id in (
+        ctx.allowed_users,
         ctx.owner_id
-    ]
+    )
 
 
 def is_admin(user: Member) -> bool:
