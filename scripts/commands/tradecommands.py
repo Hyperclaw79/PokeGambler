@@ -467,6 +467,7 @@ class TradeCommands(Commands):
             {command_prefix}sell Gear --quantity 10
             ```~
         """
+        # pylint: disable=no-member
         if not args:
             return
         inventory = Inventory(message.author)
@@ -483,7 +484,6 @@ class TradeCommands(Commands):
                 )
                 return
             new_item = Item.from_id(itemid)
-            # pylint: disable=no-member
             if not new_item.sellable:
                 await message.channel.send(
                     embed=get_embed(

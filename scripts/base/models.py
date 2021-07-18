@@ -640,7 +640,7 @@ class Inventory(Model):
         super().__init__(user)
         self.user_id = str(self.user.id)
 
-    # pylint: disable=arguments-differ
+    # pylint: disable=arguments-differ,arguments-renamed
     def get(
         self, category: Optional[str] = None
     ) -> Tuple[Dict[str, List], int]:
