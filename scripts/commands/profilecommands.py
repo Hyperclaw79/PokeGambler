@@ -528,7 +528,7 @@ class ProfileCommands(Commands):
 
         @Check your active purchased boosts.@
         """
-        def __get_desc(boost):
+        def get_desc(boost):
             prm_bst = perm_boosts[boost['name'].lower().replace(' ', '_')]
             total = boost['stack'] + prm_bst
             desc_str = f"{boost['description']}\nStack: {total}"
@@ -570,7 +570,7 @@ class ProfileCommands(Commands):
         for val in boosts.values():
             emb.add_field(
                 name=val["name"],
-                value=__get_desc(val),
+                value=get_desc(val),
                 inline=False
             )
         await message.channel.send(embed=emb)

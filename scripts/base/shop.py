@@ -53,7 +53,7 @@ class Listing(Queue):
         Iterator with a LIFO order and lower precedence
         for pinned items.
         """
-        def __get_rank(item):
+        def get_rank(item):
             price = item.price
             return (
                 getattr(
@@ -69,7 +69,7 @@ class Listing(Queue):
                 [True, False].index(
                     getattr(item, "pinned", False)
                 ),
-                __get_rank(item)
+                get_rank(item)
             ),
             reverse=True
         )
