@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pokegambler-beta
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pokegambler-beta
+  template:
+    metadata:
+      labels:
+        app: pokegambler-beta
+    spec:
+      containers:
+      - name: app
+        image: gcr.io/pokegambler/pokegambler:beta
+        imagePullPolicy: Always
+        envFrom:
+        - secretRef:
+            name: pokegambler-beta

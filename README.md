@@ -1,6 +1,6 @@
 # PokéGambler
 ![Python Version](https://img.shields.io/badge/Python-v3.7%2B-blue)
-[![Beta Build](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build-beta.yml/badge.svg)](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build-beta.yml)
+[![Build](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build.yml/badge.svg)](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build.yml)
 [![Discord](https://img.shields.io/discord/361522003355631617?logo=discord)](https://discord.gg/g4TmVyfwj4)
 
 PokeGambler uses pokemon themed playing cards for entertaining gambling matches.

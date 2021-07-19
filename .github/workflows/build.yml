@@ -1,0 +1,156 @@
+# This workflow will Docker Build the app and push to GitHub and Google Cloud's Container Repositories.
+# Then it will push the latest build to Google Kubernates Engine.
+
+name: Build
+
+on: [push, workflow_dispatch]
+
+jobs:
+  Build_and_Push:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Set Tag to Latest
+      if: endsWith(github.ref, '/main')
+      run: |
+        echo "TAG=latest" >> $GITHUB_ENV
+        echo "SECRET_VERSION=latest" >> $GITHUB_ENV
+
+    - name: Set TAG to Beta
+      if: "!(endsWith(github.ref, '/main'))"
+      run: |
+       echo "TAG=beta" >> $GITHUB_ENV
+       echo "SECRET_VERSION=1" >> $GITHUB_ENV
+
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.ref }}
+
+    - name: Login to GHCR
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCLOUD_AUTH }}
+
+    - name: Authorize Docker push
+      run: gcloud auth configure-docker
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Cache Docker layers
+      uses: actions/cache@v2
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+
+    - name: Build and push
+      id: docker_build
+      uses: docker/build-push-action@v2
+      with:
+          push: true
+          tags: |
+            ghcr.io/hyperclaw79/pokegambler:${{ env.TAG }}
+            gcr.io/pokegambler/pokegambler:${{ env.TAG }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+
+    - name: Image digest
+      run: echo ${{ steps.docker_build.outputs.digest }}
+
+    - name: Move cache
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  GKE_Deploy:
+    runs-on: ubuntu-latest
+    needs: [Build_and_Push]
+    steps:
+
+    - name: Set Tag to Latest
+      if: endsWith(github.ref, '/main')
+      run: |
+        echo "TAG=latest" >> $GITHUB_ENV
+        echo "SECRET_VERSION=latest" >> $GITHUB_ENV
+
+    - name: Set TAG to Beta
+      if: "!(endsWith(github.ref, '/main'))"
+      run: |
+       echo "TAG=beta" >> $GITHUB_ENV
+       echo "SECRET_VERSION=1" >> $GITHUB_ENV
+
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.ref }}
+
+    - name: Setup Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCLOUD_AUTH }}
+        export_default_credentials: true
+
+    - name: Authorize Docker push
+      run: gcloud auth configure-docker
+
+    - name: Get GKE Credentials
+      uses: google-github-actions/get-gke-credentials@main
+      with:
+        cluster_name: pokegambler-cluster
+        location: us-central1
+
+    - name: Get Secrets from GSM
+      uses: google-github-actions/get-secretmanager-secrets@main
+      id: secrets
+      with:
+        secrets: |-
+          ADMIN_CMD_LOG_CHANNEL:pokegambler/ADMIN_CMD_LOG_CHANNEL/${{ env.SECRET_VERSION }}
+          ALLOWED_USERS:pokegambler/ALLOWED_USERS/${{ env.SECRET_VERSION }}
+          ANNOUNCEMENT_CHANNEL:pokegambler/ANNOUNCEMENT_CHANNEL/${{ env.SECRET_VERSION }}
+          DEFAULT_GUILDMODE:pokegambler/DEFAULT_GUILDMODE/${{ env.SECRET_VERSION }}
+          DISCORD_WEBHOOK_CHANNEL:pokegambler/DISCORD_WEBHOOK_CHANNEL/${{ env.SECRET_VERSION }}
+          DISCORD_WEBHOOK_TOKEN:pokegambler/DISCORD_WEBHOOK_TOKEN/${{ env.SECRET_VERSION }}
+          IMG_UPLOAD_CHANNEL:pokegambler/IMG_UPLOAD_CHANNEL/${{ env.SECRET_VERSION }}
+          MONGO_CLUSTER_STRING:pokegambler/MONGO_CLUSTER_STRING/${{ env.SECRET_VERSION }}
+          OFFICIAL_SERVER:pokegambler/OFFICIAL_SERVER/${{ env.SECRET_VERSION }}
+          OWNER_ID:pokegambler/OWNER_ID/${{ env.SECRET_VERSION }}
+          TOKEN:pokegambler/TOKEN/${{ env.SECRET_VERSION }}
+          WHITELIST_GUILDS:pokegambler/WHITELIST_GUILDS/${{ env.SECRET_VERSION }}
+
+    - name: Set up Kustomize
+      run: |-
+        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+        chmod u+x ./kustomize
+
+    - name: Prepare Secret
+      run: |-
+        cd deployments/${{ env.TAG }}
+        kubectl delete secret pokegambler-${{ env.TAG }} --ignore-not-found
+        kubectl create secret generic pokegambler-${{ env.TAG }} \
+          --from-literal=TOKEN=${{ steps.secrets.outputs.TOKEN }} \
+          --from-literal=DISCORD_WEBHOOK_CHANNEL=${{ steps.secrets.outputs.DISCORD_WEBHOOK_CHANNEL }} \
+          --from-literal=DISCORD_WEBHOOK_TOKEN=${{ steps.secrets.outputs.DISCORD_WEBHOOK_TOKEN }} \
+          --from-literal=ANNOUNCEMENT_CHANNEL=${{ steps.secrets.outputs.ANNOUNCEMENT_CHANNEL }} \
+          --from-literal=OWNER_ID=${{ steps.secrets.outputs.OWNER_ID }} \
+          --from-literal=WHITELIST_GUILDS=${{ steps.secrets.outputs.WHITELIST_GUILDS }} \
+          --from-literal=DEFAULT_GUILDMODE=${{ steps.secrets.outputs.DEFAULT_GUILDMODE }} \
+          --from-literal=IMG_UPLOAD_CHANNEL=${{ steps.secrets.outputs.IMG_UPLOAD_CHANNEL }} \
+          --from-literal=ADMIN_CMD_LOG_CHANNEL=${{ steps.secrets.outputs.ADMIN_CMD_LOG_CHANNEL }} \
+          --from-literal=OFFICIAL_SERVER=${{ steps.secrets.outputs.OFFICIAL_SERVER }} \
+          --from-literal=MONGO_CLUSTER_STRING=${{ steps.secrets.outputs.MONGO_CLUSTER_STRING }}
+
+    - name: Deploy to GKE
+      run: |-
+        ./kustomize build deployments/${{ env.TAG }} | kubectl apply -f -
+        kubectl rollout status deployment/pokegambler-${{ env.TAG }}
+        kubectl get services -o wide
