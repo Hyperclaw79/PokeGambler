@@ -104,7 +104,6 @@ jobs:
           --from-literal=DISCORD_WEBHOOK_TOKEN=${{ secrets.DISCORD_WEBHOOK_TOKEN }} \
           --from-literal=ANNOUNCEMENT_CHANNEL=${{ secrets.ANNOUNCEMENT_CHANNEL }} \
           --from-literal=MONGO_CLUSTER_STRING=${{ secrets.MONGO_CLUSTER_STRING }} \
-          --from-literal=OWNER_ID=${{ secrets.OWNER_ID }} \
           --from-literal=DEFAULT_CHANNELMODE=${{ secrets.DEFAULT_CHANNELMODE }} \
           --from-literal=WHITELIST_GUILDS=${{ secrets.WHITELIST_GUILDS }} \
           --from-literal=DEFAULT_GUILDMODE=${{ secrets.DEFAULT_GUILDMODE }} \
