@@ -97,6 +97,7 @@ jobs:
 
     - name: Deploy to GKE
       run: |-
+        kubectl delete secret pokegambler-config
         kubectl create secret generic pokegambler-config \
           --from-literal=TOKEN=${{ secrets.TOKEN }} \
           --from-literal=DISCORD_WEBHOOK_CHANNEL=${{ secrets.DISCORD_WEBHOOK_CHANNEL }} \
