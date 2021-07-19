@@ -14,7 +14,7 @@ jobs:
       run: |
         echo "TAG=latest" >> $GITHUB_ENV
     - name: Set env to beta
-      if: !(endsWith(github.ref, '/main'))
+      if: "!(endsWith(github.ref, '/main'))"
       run: |
        echo "TAG=beta" >> $GITHUB_ENV
     - name: Check TAG
