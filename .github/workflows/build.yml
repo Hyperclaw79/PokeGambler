@@ -1,0 +1,21 @@
+name: Build
+
+on: [push, workflow_dispatch]
+
+env:
+  BRANCH: ${GITHUB_REF##*/}
+
+jobs:
+  Set_Env_Vars:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set env to latest
+      if: endsWith(github.ref, '/main')
+      run: |
+        echo "TAG=latest" >> $GITHUB_ENV
+    - name: Set env to beta
+      if: !(endsWith(github.ref, '/main'))
+      run: |
+       echo "TAG=beta" >> $GITHUB_ENV
+    - name: Check TAG
+      run: echo $GITHUB_ENV
