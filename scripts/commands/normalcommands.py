@@ -5,7 +5,6 @@ Normal Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
-import os
 import re
 from typing import Callable, List, Optional, TYPE_CHECKING
 
@@ -55,7 +54,7 @@ class NormalCommands(Commands):
             ```~
         """
         modules = get_modules(self.ctx)
-        if kwargs.get("module", None):
+        if kwargs.get("module"):
             modules = [
                 mod
                 for mod in modules
@@ -169,36 +168,6 @@ class NormalCommands(Commands):
         if len(embeds) > 1:
             pager = Paginator(self.ctx, message, base, embeds)
             await pager.run(content='**PokeGambler Commands List:**\n')
-
-    @alias('$')
-    async def cmd_donate(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """Feel free to buy me a cup of coffee, thanks!
-        $```scss
-        {command_prefix}donate [amount in USD]
-        ```$
-
-        @Opens a donation window on your browser where you can support me.@
-        """
-        amt = 10
-        if len(args) > 0 and args[0].isdigit():
-            amt = int(args[0])
-        emb = discord.Embed(
-            title="**Thank you very much for you generosity.**",
-            color=16766720,
-            url=f"https://www.paypal.com/paypalme2/hyperclaw79/{amt}"
-        )
-        emb.set_image(
-            url="https://cdn.discordapp.com/attachments/840469669332516904/"
-            "840469820180529202/pokegambler_logo.png"
-        )
-        await message.channel.send(embed=emb)
-        _ = os.system(
-            f'start https://www.paypal.com/paypalme2/hyperclaw79/{amt}'
-        )
 
     # pylint: disable=missing-function-docstring
     async def cmd_invite(self, message: Message, **kwargs):
@@ -350,7 +319,7 @@ class NormalCommands(Commands):
             got_doc,
             "alias" in dir(cmd)
         ]):
-            alt_names = getattr(cmd, "alias")[:]
+            alt_names = cmd.alias[:]
             if cmd.__name__.replace("cmd_", "") not in alt_names:
                 alt_names.append(cmd.__name__.replace("cmd_", ""))
             alias_str = ', '.join(sorted(alt_names, key=len))

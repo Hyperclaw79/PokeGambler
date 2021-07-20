@@ -62,10 +62,10 @@ class CustomLogger:
         Wraps the text and prints it to Stdout.
         In case of an error (red), logs it to error.log
         '''
-        if kwargs and kwargs.get("color", None) == "red":
+        if kwargs and kwargs.get("color") == "red":
             # pylint: disable=protected-access
             func_name = sys._getframe(1).f_code.co_name
-            func_name = kwargs.get("wrapped_func", None)
+            func_name = kwargs.get("wrapped_func")
             # pylint: disable=invalid-name
             with open(self.error_log_path, 'a', encoding='utf-8') as f:
                 f.write(

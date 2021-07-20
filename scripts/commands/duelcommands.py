@@ -585,17 +585,27 @@ class DuelCommands(Commands):
         fresh_emb = discord.Embed(
             title="Match Starting..."
         )
-        start_fl = img2file(
-            next(gladhandler.get(glads))[0],
-            "start.jpg"
-        )
-        fresh_emb.set_image(
-            url="attachment://start.jpg"
-        )
-        base = await message.channel.send(
-            embed=fresh_emb, file=start_fl
-        )
-        return base
+        try:
+            start_fl = img2file(
+                next(gladhandler.get(glads))[0],
+                "start.jpg"
+            )
+            fresh_emb.set_image(
+                url="attachment://start.jpg"
+            )
+            base = await message.channel.send(
+                embed=fresh_emb, file=start_fl
+            )
+            return base
+        except StopIteration:
+            await message.channel.send(
+                embed=get_embed(
+                    "Something went wrong.",
+                    embed_type="error",
+                    title="Could Not Start Duel"
+                )
+            )
+            return None
 
     async def __duel_play(
         self, message: Message,
@@ -615,6 +625,8 @@ class DuelCommands(Commands):
             self.duelactions.refresh()
         gladhandler = GladitorMatchHandler(self.ctx.assets_path)
         base = await self.__duel_start(message, gladhandler, glads)
+        if base is None:
+            return
         emb = discord.Embed()
         adjust = 1
         for idx, (img, dmg1, dmg2) in enumerate(gladhandler.get(glads)):

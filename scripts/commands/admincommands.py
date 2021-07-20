@@ -288,7 +288,7 @@ class AdminCommands(Commands):
         await Blacklist(
             user,
             str(message.author.id),
-            reason=kwargs.get("reason", None)
+            reason=kwargs.get("reason")
         ).save()
         await message.add_reaction("👍")
 

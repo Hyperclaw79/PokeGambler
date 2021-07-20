@@ -142,9 +142,9 @@ def get_chan(func: Callable):
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        if kwargs.get("channel", None):
+        if kwargs.get("channel"):
             chan = kwargs["channel"]
-        elif kwargs.get("chan", None):
+        elif kwargs.get("chan"):
             chan = kwargs["chan"]
         elif self.ctx.active_channels:
             chan = self.ctx.active_channels[-1]
@@ -239,7 +239,7 @@ def ensure_user(func: Callable):
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        if not kwargs.get("args", None):
+        if not kwargs.get("args"):
             return message.channel.send(
                 embed=get_embed(
                     "You need to provide a user ID.",

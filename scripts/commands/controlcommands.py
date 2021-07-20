@@ -8,7 +8,6 @@ from __future__ import annotations
 from datetime import datetime
 from io import BytesIO
 import json
-import subprocess
 import time
 from typing import List, Optional, TYPE_CHECKING
 
@@ -22,8 +21,8 @@ from ..helpers.utils import (
     get_modules, wait_for
 )
 from .basecommand import (
-    maintenance, owner_only, no_log, alias,
-    Commands
+    owner_only, no_log,
+    alias, Commands
 )
 
 if TYPE_CHECKING:
@@ -35,26 +34,6 @@ class ControlCommands(Commands):
     Commands that control/interact with other commands.
     Examples: Togglers, Command Lister, Restart, Channel
     '''
-
-    @maintenance
-    @owner_only
-    @no_log
-    async def cmd_restart(self, message, **kwargs):
-        """Closes session and spawns a new process.
-        $```scss
-        {command_prefix}restart
-        ```$
-
-        @`👑 Owner Command`
-        Restarts the bot with local changes.@
-        """
-        await self.ctx.sess.close()
-        await self.ctx.close()
-        subprocess.run(
-            "systemctl --user restart pokegambler",
-            shell=True,
-            check=True
-        )
 
     @owner_only
     @no_log
@@ -511,91 +490,6 @@ class ControlCommands(Commands):
                 DB_CLIENT.drop_collection(collection)
         await message.add_reaction("👍")
 
-    @maintenance
-    @owner_only
-    @no_log
-    @alias('logs')
-    async def cmd_get_logs(self, message: Message, **kwargs):
-        # pylint: disable=anomalous-backslash-in-string
-        """Gets the remote logs.
-         $```scss
-        {command_prefix}get_logs [--since timeperiod] [--errors_only]
-        ```$
-
-        @`👑 Owner Command`
-        Get the logs since a specified time. Defaults to 10 hours ago.
-        If --errors_only is used, displays only the logs from error log file.@
-
-        ~To get the logs from 2 hours ago:
-            ```
-            {command_prefix}get_logs --since 2 hours ago
-            ```
-        To get the error logs:
-            ```
-            {command_prefix}get_logs --errors_only
-            ```~
-        """
-        if kwargs.get("errors_only", False):
-            with open(self.ctx.error_log_path) as error_log:
-                data = error_log.read()
-        else:
-            base_query = "journalctl --user-unit pokegambler"
-            since = kwargs.get("since", "10 hours ago")
-            options = f'-S "{since}" --no-pager -g "\[.+\]"'  # noqa
-            pipes = [
-                " ".join([base_query, options]),
-                'cut -d " " -f 6-',
-                'sed "1d"'
-            ]
-            output = subprocess.check_output(
-                " | ".join(pipes),
-                shell=True
-            )
-            data = output.decode()
-        embeds = []
-        datalines = data.splitlines()
-        while len(datalines) > 0:
-            msg = ""
-            while len(msg) < 500:
-                if len(datalines) == 0:
-                    break
-                msg += f"\n{datalines.pop()}"
-            embeds.append(
-                get_embed(
-                    content=f"```py\n{msg}\n```",
-                    title="Logs"
-                )
-            )
-        if not embeds:
-            await message.channel.send(
-                embed=get_embed(
-                    "No logs found."
-                )
-            )
-            return
-        await self.paginate(message, embeds)
-
-    @maintenance
-    @owner_only
-    @no_log
-    async def cmd_clean_logs(self, message: Message, **kwargs):
-        """Cleans the Error Logs.
-         $```scss
-        {command_prefix}clean_logs
-        ```$
-
-        @`👑 Owner Command`
-        Cleans the error log file.@
-
-        ~To clean the error logs:
-            ```
-            {command_prefix}clean_logs
-            ```~
-        """
-        with open(self.ctx.error_log_path, 'w') as error_log:
-            error_log.write('')
-        await message.add_reaction("👍")
-
     @owner_only
     @no_log
     async def cmd_export_items(self, message: Message, **kwargs):
@@ -626,7 +520,7 @@ class ControlCommands(Commands):
             item.pop("created_on", None)
         jsonified = json.dumps(
             items,
-            indent=kwargs.get("pretty", None),
+            indent=kwargs.get("pretty"),
             sort_keys=False
         )
         byio = BytesIO()
