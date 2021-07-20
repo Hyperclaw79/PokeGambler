@@ -81,19 +81,19 @@ class PokeGambler(discord.AutoShardedClient):
     def __bl_wl_check(self, message: Message):
         blacklist_checks = [
             self.channel_mode == "blacklist",
-            message.channel.id in getattr(self, "blacklist_channels")
+            message.channel.id in self.blacklist_channels
         ]
         whitelist_checks = [
             self.channel_mode == "whitelist",
-            message.channel.id not in getattr(self, "whitelist_channels")
+            message.channel.id not in self.whitelist_channels
         ]
         blackguild_checks = [
             self.guild_mode == "blacklist",
-            message.guild.id in getattr(self, "blacklist_guilds")
+            message.guild.id in self.blacklist_guilds
         ]
         whiteguild_checks = [
             self.guild_mode == "whitelist",
-            message.guild.id not in getattr(self, "whitelist_guilds")
+            message.guild.id not in self.whitelist_guilds
         ]
         return_checks = [
             all(blacklist_checks),
