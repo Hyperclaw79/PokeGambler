@@ -68,7 +68,7 @@ class Model(metaclass=NameSetter):
         """
         if not param:
             return dict(self)
-        return dict(self).get(param, None)
+        return dict(self).get(param)
 
     def save(self):
         """

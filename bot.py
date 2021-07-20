@@ -165,7 +165,7 @@ class PokeGambler(discord.AutoShardedClient):
     async def __handle_cd(self, message: Message):
         if is_owner(self, message.author):
             return False
-        on_cooldown = self.cooldown_users.get(message.author, None)
+        on_cooldown = self.cooldown_users.get(message.author)
         if on_cooldown and (
             datetime.now() - self.cooldown_users[message.author]
         ).total_seconds() < self.cooldown_time:
