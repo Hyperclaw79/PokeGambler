@@ -3,7 +3,11 @@
 
 name: Build
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches:
+      - main
+  release:
 
 jobs:
   Build_and_Push:
