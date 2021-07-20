@@ -3,7 +3,11 @@
 
 name: Build
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches:
+      - main
+  release:
 
 jobs:
   Build_and_Push:
@@ -21,6 +25,11 @@ jobs:
       run: |
        echo "TAG=beta" >> $GITHUB_ENV
        echo "SECRET_VERSION=1" >> $GITHUB_ENV
+
+    - name: Set TAG to Version
+      if: github.event_name == "release"
+      run: |
+        echo "TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
 
     - name: Checkout
       uses: actions/checkout@v2
