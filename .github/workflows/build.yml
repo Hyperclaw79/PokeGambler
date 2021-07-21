@@ -8,6 +8,8 @@ on:
     branches:
       - main
   release:
+    tags:
+      - v*.*.*
 
 jobs:
   Build_and_Push:
@@ -27,7 +29,7 @@ jobs:
        echo "SECRET_VERSION=1" >> $GITHUB_ENV
 
     - name: Set TAG to Version
-      if: github.event_name == "release"
+      if: github.event_name == 'release'
       run: |
         echo "TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
 
@@ -99,6 +101,11 @@ jobs:
        echo "TAG=beta" >> $GITHUB_ENV
        echo "SECRET_VERSION=1" >> $GITHUB_ENV
        echo "FOLDER=beta" >> $GITHUB_ENV
+
+    - name: Set TAG to Version
+      if: github.event_name == 'release'
+      run: |
+        echo "TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
 
     - name: Checkout
       uses: actions/checkout@v2
