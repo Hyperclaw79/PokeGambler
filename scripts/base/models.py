@@ -49,6 +49,9 @@ class Model(metaclass=NameSetter):
 
     def __iter__(self):
         for attr in dir(self):
+            # Patch for Full_Info being executed before Profile creation.
+            if attr in getattr(self, "excludes", []):
+                continue
             if all([
                 not attr.startswith("_"),
                 attr not in [
@@ -152,6 +155,7 @@ class Profiles(UnlockedModel):
     # pylint: disable=no-member, access-member-before-definition
 
     def __init__(self, user: discord.Member):
+        self.excludes = ['full_info']
         super().__init__(user)
         names = [self.user.name, self.name]
         if self.user.nick:
