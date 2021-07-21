@@ -55,7 +55,8 @@ class Model(metaclass=NameSetter):
             if all([
                 not attr.startswith("_"),
                 attr not in [
-                    "user", "model_name", "mongo"
+                    "user", "model_name",
+                    "mongo", "excludes"
                 ],
                 not ismethod(getattr(self, attr)),
                 not isinstance(
