@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: gcr.io/pokegambler/pokegambler:beta
+        image: gcr.io/PROJECT_ID/IMAGE:TAG
         imagePullPolicy: Always
         envFrom:
         - secretRef:
