@@ -3,7 +3,10 @@
 
 name: Lint & Style Check
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches:
+      - '!experimental'
 
 jobs:
   Lint_Styler:
