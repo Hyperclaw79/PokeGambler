@@ -393,6 +393,20 @@ class TradeCommands(Commands):
             )
             return
         status = shop.validate(message.author, item, quantity)
+        if all([
+            isinstance(item, Title),
+            message.guild.id != self.ctx.official_server
+        ]):
+            official_server = self.ctx.get_guild(self.ctx.official_server)
+            await message.channel.send(
+                embed=get_embed(
+                    f"You can buy titles only in [『{official_server}』]"
+                    "(https://discord.gg/g4TmVyfwj4).",
+                    embed_type="error",
+                    title="Cannot buy Titles here."
+                )
+            )
+            return
         if status != "proceed":
             await message.channel.send(
                 embed=get_embed(
