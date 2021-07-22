@@ -5,11 +5,13 @@ Normal Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
+from datetime import datetime, timedelta
 import re
 from typing import Callable, List, Optional, TYPE_CHECKING
 
 import discord
 
+from ..base.items import DB_CLIENT
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
     get_commands, get_embed, get_modules,
@@ -18,7 +20,7 @@ from ..helpers.utils import (
 from .basecommand import alias, Commands
 
 if TYPE_CHECKING:
-    from discord import Message, Member
+    from discord import Message
 
 
 class NormalCommands(Commands):
@@ -181,7 +183,6 @@ class NormalCommands(Commands):
         )
 
     async def cmd_info(self, message: Message, **kwargs):
-        # BETA: Modify info before release.
         """Gives info about PokeGambler
         $```scss
         {command_prefix}info
@@ -189,61 +190,10 @@ class NormalCommands(Commands):
 
         @Gives new players information about PokeGambler.@
         """
-        emb = get_embed(
-            dedent(
-                """
-                > Welcome to the first `BETA` test of PokeGambler.
-                **PokeGambler** uses pokemon themed playing cards
-                for entertaining gambling matches.
-                It has a dedicated currency and profile system.
-                Earned Pokechips may be cashed out for Poketwo credits.
-                """
-            ),
-            title="**Welcome to PokeGambler**"
-        )
-        emb.add_field(
-            name="**Getting Started**",
-            value=dedent(
-                f"""
-                ```diff
-                You can create a new profile using:
-                    {self.ctx.prefix}profile
-                Every players gets free 100 Pokechips
-
-                For a list of commands you can access:
-                    {self.ctx.prefix}commands
-
-                For usage guide of these commands:
-                    {self.ctx.prefix}help
-
-                Also keep an eye out for sudden gambling matches.
-                ```
-                """
-            ),
-            inline=False
-        )
-        emb.add_field(
-            name="**Owners**",
-            value=dedent(
-                """
-                ```py
-                Bot Owner: 'Hyperclaw79#3476'
-                Server Owner: 'justrilrx#9692'
-                ```
-                """
-            ),
-            inline=True
-        )
-        emb.add_field(
-            name="**Stats**",
-            value="`Disabled during BETA`",
-            inline=True
-        )
-        emb.set_image(
-            url="https://cdn.discordapp.com/attachments/"
-            "840469669332516904/843077048435736586/banner.jpg"
-        )
-        await message.channel.send(embed=emb)
+        emb1 = self.__info_embed_one()
+        emb2 = self.__info_embed_two()
+        embeds = [emb1, emb2]
+        await self.paginate(message, embeds)
 
     @alias('latency')
     async def cmd_ping(self, message: Message, **kwargs):
@@ -335,3 +285,200 @@ class NormalCommands(Commands):
                 "amazonaws.com/thumbs/160/facebook/105/money-bag_1f4b0.png"
             )
         return emb
+
+    def __info_embed_one(self):
+        emb = get_embed(
+            dedent(
+                """
+                ```
+                𝙋𝙤𝙠𝙚𝙂𝙖𝙢𝙗𝙡𝙚𝙧 uses pokemon themed playing cards
+                for entertaining gambling matches.
+                It has a dedicated currency and profile system.
+                Earned Pokechips may be cross-traded.
+                ```
+                """
+            ),
+            title="**Welcome to PokeGambler**",
+            image="https://cdn.discordapp.com/attachments/"
+            "840469669332516904/861292639857147914/pg_banner.png"
+        )
+        emb.add_field(
+            name="**Getting Started**",
+            value=dedent(
+                f"""
+                ```diff
+                You can create a new profile using:
+                    {self.ctx.prefix}profile
+                Every players gets free 100 Pokechips
+                For a list of commands you can access:
+                    {self.ctx.prefix}commands
+                For usage guide of these commands:
+                    {self.ctx.prefix}help
+                🛈 Also keep an eye out for sudden gambling matches.
+                ```
+                """
+            ),
+            inline=False
+        )
+        emb.add_field(
+            name="**Owners**",
+            value=dedent(
+                """
+                ```yaml
+                Bot Owner: Hyperclaw79#3476
+                Official Server Owner: justrilrx#9692
+                ```
+                """
+            ),
+            inline=False
+        )
+        return emb
+
+    def __info_embed_two(self):
+        emb = get_embed(
+            title="**Welcome to PokeGambler**",
+            content="\u200B",
+            image="https://cdn.discordapp.com/attachments/"
+            "840469669332516904/861292639857147914/pg_banner.png"
+        )
+        official_server = self.ctx.get_guild(self.ctx.official_server)
+        emb.add_field(
+            name="**Official Server**",
+            value="Come hang out with us in "
+            f"[『{official_server}』](https://discord.gg/g4TmVyfwj4).",
+            inline=False
+        )
+        emb.add_field(
+            name="**Stats**",
+            value=f"```yaml\n{self.__get_stats()}\n```",
+            inline=False
+        )
+        return emb
+
+    def __get_stats(self):
+        """Get the stats of the bot."""
+        handlers = {
+            "Latency": lambda: f"{round(self.ctx.latency * 1000, 2)} ms",
+            "Total Users": DB_CLIENT.profiles.count,
+            "Total Servers": lambda: len(self.ctx.guilds),
+            "Most Active User": self.__most_active_user,
+            "Most Active Channel": self.__most_active_channel,
+            "Most Used Command": self.__most_used_command
+        }
+        stats = {}
+        for key, func in handlers.items():
+            res = func()
+            if res is not None:
+                stats[key] = res
+        stats = "\n".join(
+            f"{key}: {val}"
+            for key, val in stats.items()
+        )
+        return stats.encode('utf-8').decode('utf-8')
+
+    def __most_active_user(self):
+        top_user = next(
+            DB_CLIENT.commanddata.aggregate([
+                {
+                    '$match': {
+                        'used_at': {
+                            '$gte': datetime.today() - timedelta(
+                                weeks=1
+                            )
+                        },
+                        'user_is_admin': False
+                    }
+                }, {
+                    '$group': {
+                        '_id': '$user_id',
+                        'num_cmds': {'$sum': 1}
+                    }
+                }, {
+                    '$sort': {'num_cmds': -1}
+                }, {
+                    '$limit': 1
+                }, {
+                    '$match': {'num_cmds': {'$gt': 1}}
+                }
+            ]),
+            None
+        )
+        if top_user is None:
+            return None
+        user = self.ctx.get_user(int(top_user['_id']))
+        return f"{user} ({top_user['num_cmds']})"
+
+    def __most_active_channel(self):
+        top_channel = next(
+            DB_CLIENT.commanddata.aggregate([
+                {
+                    '$match': {
+                        'used_at': {
+                            '$gte': datetime.today() - timedelta(
+                                weeks=1
+                            )
+                        },
+                        'user_is_admin': False
+                    }
+                }, {
+                    '$group': {
+                        '_id': '$channel',
+                        'num_cmds': {'$sum': 1},
+                        'guild': {'$first': '$guild'}
+                    }
+                }, {
+                    '$sort': {'num_cmds': -1}
+                }, {
+                    '$limit': 1
+                }, {
+                    '$match': {'num_cmds': {'$gt': 1}}
+                }
+            ]),
+            None
+        )
+        if top_channel is None:
+            return None
+        channel = self.ctx.get_channel(int(top_channel['_id']))
+        guild = self.ctx.get_guild(int(top_channel['guild']))
+        return f"{channel} ({guild})"
+
+    def __most_used_command(self):
+        top_command = next(
+            DB_CLIENT.commanddata.aggregate([
+                {
+                    '$match': {
+                        'used_at': {
+                            '$gte': datetime.today() - timedelta(
+                                weeks=1
+                            )
+                        },
+                        'user_is_admin': False
+                    }
+                }, {
+                    '$group': {
+                        '_id': '$command',
+                        'num_cmds': {'$sum': 1}
+                    }
+                }, {
+                    '$sort': {'num_cmds': -1}
+                }, {
+                    '$limit': 1
+                }, {
+                    '$match': {'num_cmds': {'$gt': 1}}
+                }
+            ]),
+            None
+        )
+        if top_command is None:
+            return None
+        command = top_command['_id']
+        modules = [
+            module
+            for module in get_modules(self.ctx)
+            if f"cmd_{command}" in module.alias
+        ]
+        if modules:
+            command = getattr(
+                modules[0], f"cmd_{command}"
+            ).__name__.replace("cmd_", "")
+        return f"{command} ({top_command['num_cmds']})"
