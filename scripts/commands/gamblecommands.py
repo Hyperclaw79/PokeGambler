@@ -18,6 +18,7 @@ from ..base.models import (
     Boosts, Flips, Loots, Matches,
     Moles, Profiles
 )
+from ..base.shop import BoostItem
 from ..helpers.checks import user_check, user_rctn
 from ..helpers.imageclasses import BoardGenerator
 from ..helpers.utils import (
@@ -236,9 +237,8 @@ class GambleCommands(Commands):
                     message.author
                 ).get()["flipster"]
             )
-            boosts = self.ctx.boost_dict.get(message.author.id, None)
-            if boosts:
-                amt_mult += boosts['boost_flip']['stack'] * 0.1
+            boosts = BoostItem.get_boosts(str(message.author.id))
+            amt_mult += boosts['boost_flip']['stack'] * 0.1
             tot_amt = amount + int(amount * amt_mult)
             msg += f"You have won {tot_amt} {self.chip_emoji}"
             title = "Congratulations!"

@@ -8,7 +8,6 @@ This module is a compilation of all shop related classed.
 
 from __future__ import annotations
 from abc import abstractmethod
-import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from queue import Queue
@@ -20,7 +19,7 @@ import discord
 
 from discord.errors import Forbidden, HTTPException
 
-from ..base.items import Item
+from ..base.items import Item, DB_CLIENT
 from ..base.models import (
     Boosts, Inventory,
     Loots, Profiles
@@ -252,23 +251,100 @@ class BoostItem(ShopItem):
     """
     This class represents a purchasable temporary boost.
     """
-    async def __boost_handler(
-        self, ctx: PokeGambler,
+    def __boost_handler(
+        self, boost_dict: Dict,
         user: Member, quantity: int
     ):
-        if user.id not in ctx.boost_dict:
-            ctx.boost_dict[user.id] = self.create_boost_dict()
-        ctx.boost_dict[user.id][self.itemid]["stack"] += quantity
-        ctx.boost_dict[user.id][self.itemid].update({
-            "added_on": datetime.now()
+        boost_dict["stack"] += quantity
+        DB_CLIENT["tempboosts"].create_index(
+            "added_on",
+            expireAfterSeconds=30 * 60
+        )
+        DB_CLIENT["tempboosts"].update_one(
+            {"user_id": str(user.id), "boost_id": self.itemid},
+            {"$set": boost_dict},
+            upsert=True
+        )
+
+    async def buy(
+        self,  message: Message,
+        quantity: int = 1, **kwargs
+    ):
+        """
+        Applies the relevant temporary boost to the user.
+        """
+        user = message.author
+        tier = Loots(user).tier
+        boost_dict = self._get_tempboosts(user)
+        if any([
+            boost_dict["stack"] == 5,
+            self._check_lootlust(boost_dict, user, quantity)
+        ]):
+            return (
+                "You've maxed out to 5 stacks for this boost."
+                if quantity == 1
+                else "You can't puchase that many "
+                "as it exceeds max stack of 5."
+            )
+        self.__boost_handler(boost_dict, user, quantity)
+        Profiles(user).debit(
+            amount=((self.price * (10 ** (tier - 1))) * quantity)
+        )
+        return "success"
+
+    def _get_tempboosts(self, user):
+        boost_dict = DB_CLIENT["tempboosts"].find_one({
+            "user_id": str(user.id),
+            "boost_id": self.itemid
         })
-        await asyncio.sleep(30 * 60)
-        ctx.boost_dict[user.id][self.itemid]["stack"] = 0
+        if not boost_dict:
+            boost_dict = {
+                "user_id": str(user.id),
+                "boost_id": self.itemid,
+                "added_on": datetime.utcnow(),
+                "name": self.name,
+                "description": self.description,
+                "stack": 0,
+            }
+        return boost_dict
 
     @staticmethod
-    def create_boost_dict():
+    def _check_lootlust(
+        boost_dict: Dict,
+        user: Member, quantity: int
+    ):
+        if boost_dict["boost_id"] not in (
+            "boost_lt_cd", "boost_pr_lt_cd"
+        ):
+            return False
+        return sum([
+            Boosts(user).get()["loot_lust"],
+            quantity,
+            boost_dict["stack"]
+        ]) > 5
+
+    @classmethod
+    def get_boosts(cls, user_id: str):
         """
-        Returns a new boosts dictionary.
+        Returns a list of all the temporary boosts for the user.
+        """
+        return {
+            boost.itemid: DB_CLIENT["tempboosts"].find_one({
+                "user_id": user_id,
+                "boost_id": boost.itemid
+            }) or {
+                "stack": 0,
+                "name": boost.name,
+                "description": boost.description,
+                "added_on": datetime.now()
+            }
+            for boost in Shop.categories["Boosts"].items
+        }
+
+    @classmethod
+    def default_boosts(cls):
+        """
+        Returns temporary boosts dictionary.
         """
         return {
             item.itemid: {
@@ -280,68 +356,21 @@ class BoostItem(ShopItem):
             for item in Shop.categories["Boosts"].items
         }
 
-    async def buy(
-        self, ctx: PokeGambler,
-        message: Message, quantity: int = 1,
-        **kwargs
-    ):
-        """
-        Applies the relevant temporary boost to the user.
-        """
-        user = message.author
-        tier = Loots(user).tier
-        if (
-            user.id not in ctx.boost_dict
-            or ctx.boost_dict[user.id][self.itemid]["stack"] == 0
-        ):
-            ctx.loop.create_task(
-                self.__boost_handler(ctx, user, quantity)
-            )
-        elif any([
-            ctx.boost_dict[user.id][self.itemid]["stack"] == 5,
-            self._check_lootlust(ctx, user, quantity)
-        ]):
-            return (
-                "You've maxed out to 5 stacks for this boost."
-                if quantity == 1
-                else "You can't puchase that many "
-                "as it exceeds max stack of 5."
-            )
-        else:
-            ctx.boost_dict[user.id][self.itemid]["stack"] += quantity
-        Profiles(user).debit(
-            amount=((self.price * (10 ** (tier - 1))) * quantity)
-        )
-        return "success"
-
-    def _check_lootlust(
-        self, ctx: PokeGambler,
-        user: Member, quantity: int
-    ):
-        if self.itemid not in ["boost_lt_cd", "boost_pr_lt_cd"]:
-            return False
-        units = [
-            Boosts(user).get()["loot_lust"],
-            quantity,
-            ctx.boost_dict.get(
-                user.id,
-                {"boost_lt_cd": {"stack": 0}}
-            )["boost_lt_cd"]["stack"]
-        ]
-        return sum(units) > 5
-
 
 class PremiumBoostItem(BoostItem):
     """
     Permanent Boosts purchasable from Premium Shop
     """
     def buy(
-        self, ctx: PokeGambler,
-        message: Message, quantity: int = 1,
+        self, message: Message,
+        quantity: int = 1,
         **kwargs
     ):
         user = message.author
-        if self._check_lootlust(ctx, user, quantity):
+        if self._check_lootlust(
+            self._get_tempboosts(user),
+            user, quantity
+        ):
             return (
                 "You've maxed out to 5 stacks for this boost."
                 if quantity == 1

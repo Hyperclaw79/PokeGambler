@@ -373,11 +373,10 @@ class ProfileCommands(Commands):
         loot_mult = 1 + (perm_boosts["lucky_looter"] * 0.05)
         cd_reducer = perm_boosts["loot_lust"]
         tr_mult = 0.1 * (perm_boosts["fortune_burst"] + 1)
-        boosts = self.ctx.boost_dict.get(message.author.id, None)
-        if boosts:
-            cd_reducer += boosts['boost_lt_cd']['stack']
-            loot_mult += 0.05 * boosts['boost_lt']['stack']
-            tr_mult += 0.1 * boosts['boost_tr']['stack']
+        boosts = BoostItem.get_boosts(str(message.author.id))
+        cd_reducer += boosts['boost_lt_cd']['stack']
+        loot_mult += 0.05 * boosts['boost_lt']['stack']
+        tr_mult += 0.1 * boosts['boost_tr']['stack']
         cd_time = 60 * (10 - cd_reducer)
         loot_cd = self.ctx.loot_cd.get(
             message.author,
@@ -535,7 +534,7 @@ class ProfileCommands(Commands):
             if prm_bst > 0:
                 desc_str += f" ({prm_bst} Permanent)"
             expires_in = (30 * 60) - (
-                datetime.now() - boost["added_on"]
+                datetime.utcnow() - boost["added_on"]
             ).total_seconds()
             if expires_in > 0 and boost['stack'] > 0:
                 expires_in = get_formatted_time(
@@ -545,7 +544,7 @@ class ProfileCommands(Commands):
                 expires_in = "Expired / Not Purchased Yet"
             desc_str += f"\nExpires in: {expires_in}"
             return f"```css\n{desc_str}\n```"
-        boosts = self.ctx.boost_dict.get(message.author.id, None)
+        boosts = BoostItem.get_boosts(str(message.author.id))
         perm_boosts = Boosts(message.author).get()
         perm_boosts.pop('user_id')
         if not (
@@ -566,7 +565,7 @@ class ProfileCommands(Commands):
             title="Active Boosts"
         )
         if not boosts:
-            boosts = BoostItem.create_boost_dict()
+            boosts = BoostItem.default_boosts()
         for val in boosts.values():
             emb.add_field(
                 name=val["name"],

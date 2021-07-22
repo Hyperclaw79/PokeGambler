@@ -64,7 +64,6 @@ class PokeGambler(discord.AutoShardedClient):
         self.cooldown_users = {}
         self.cooldown_cmds = {}
         self.loot_cd = {}
-        self.boost_dict = {}
         self.pending_cmds = {}
         self.nitro_rewarded = False
         # Classes
