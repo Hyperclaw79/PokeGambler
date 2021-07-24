@@ -171,15 +171,34 @@ class NormalCommands(Commands):
             pager = Paginator(self.ctx, message, base, embeds)
             await pager.run(content='**PokeGambler Commands List:**\n')
 
-    # pylint: disable=missing-function-docstring
     async def cmd_invite(self, message: Message, **kwargs):
+        """Invite PokeGambler to other servers
+        $```scss
+        {command_prefix}invite
+        ```$
+
+        @Get the Invite link for PokeGambler.@
+        """
+        pg_den = self.ctx.get_guild(self.ctx.official_server)
+        inv_emb = get_embed(
+            dedent(
+                f"""```md
+                # Want to add me to your own server?
+                [Invite me](By clicking the title of this embed).
+                * Following features are only allowed in {pg_den}:
+                    - Gamble Matches
+                    - Buying Titles
+                    - Cross Trades
+                ```"""
+            ),
+            title="Invite Link",
+            image="https://cdn.discordapp.com/attachments/"
+            "840469669332516904/861292639857147914/pg_banner.png"
+        )
+        inv_emb.url = "https://discordapp.com/oauth2/authorize?client_id=" + \
+            f"{self.ctx.user.id}&scope=bot&permissions=511040"
         await message.channel.send(
-            embed=get_embed(
-                "I am a private bot and cannot be invited to other servers.\n"
-                "Why not just get your friends to this server instead? :wink:",
-                embed_type="warning",
-                title="Cannot Join Other Servers"
-            )
+            embed=inv_emb
         )
 
     async def cmd_info(self, message: Message, **kwargs):
