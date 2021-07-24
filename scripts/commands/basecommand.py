@@ -119,10 +119,7 @@ def dealer_only(func: Callable):
 
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        if all([
-            is_dealer(message.author),
-            message.guild.id == self.ctx.official_server
-        ]):
+        if is_dealer(message.author):
             return func(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", self.ctx.prefix)
         return message.channel.send(
@@ -370,6 +367,24 @@ def needs_ticket(name: str):
             return func(self, *args, message=message, **kwargs)
         return wrapped
     return decorator
+
+
+def os_only(func: Callable):
+    '''
+    These commands can only run in the official server.
+    '''
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        if message.guild.id != self.ctx.official_server:
+            return message.channel.send(
+                embed=get_embed(
+                    "This command can only be used in the official server.",
+                    embed_type="error",
+                    title="Invalid Server"
+                )
+            )
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
 
 
 class Commands(ABC):

@@ -393,8 +393,8 @@ async def online_now(ctx: PokeGambler):
     """
     Notifies on Discord, that PokeGambler is ready.
     """
-    secret = ctx.DISCORD_WEBHOOK_TOKEN
-    channel = ctx.DISCORD_WEBHOOK_CHANNEL
+    secret = ctx.discord_webhook_token
+    channel = ctx.discord_webhook_channel
     url = f"https://discord.com/api/webhooks/{channel}/{secret}"
     body = {
         "username": "PokeGambler Status Monitor",

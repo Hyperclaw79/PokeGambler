@@ -51,8 +51,6 @@ class PokeGambler(discord.AutoShardedClient):
         self.version = "v0.9.0"
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
-        for var in ["DISCORD_WEBHOOK_TOKEN", "DISCORD_WEBHOOK_CHANNEL"]:
-            setattr(self, var, os.getenv(var))
         self.__update_configs()
         # Defaults
         self.active_channels = []
@@ -300,6 +298,11 @@ class PokeGambler(discord.AutoShardedClient):
         )
         self.prefix = os.getenv('COMMAND_PREFIX', '->')
         self.cooldown_time = int(os.getenv('COOLDOWN_TIME', "5"))
+        for cfg_id in (
+            "discord_webhook_token",
+            "discord_webhook_channel"
+        ):
+            setattr(self, cfg_id, os.getenv(cfg_id.upper()))
         for cfg_id in (
             "owner_id", "official_server",
             "admin_cmd_log_channel",

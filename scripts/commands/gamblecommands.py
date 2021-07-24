@@ -27,7 +27,8 @@ from ..helpers.utils import (
 )
 from .basecommand import (
     Commands, alias, check_completion,
-    dealer_only, model, no_thumb
+    dealer_only, model, no_thumb,
+    os_only
 )
 
 if TYPE_CHECKING:
@@ -65,6 +66,7 @@ class GambleCommands(Commands):
         self.boardgen = BoardGenerator(self.ctx.assets_path)
 
     @dealer_only
+    @os_only
     @model([Profiles, Matches, Loots])
     @alias(["deal", "roll"])
     async def cmd_gamble(
