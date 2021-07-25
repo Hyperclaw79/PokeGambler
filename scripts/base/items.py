@@ -103,7 +103,7 @@ class Item(ABC):
         attrs["created_on"] = datetime.now()
         self.mongo.insert_one(attrs)
 
-    def update(self, **kwargs):
+    def update(self, modify_all: bool = False, **kwargs):
         """
         Updates an existing item.
         """
@@ -111,8 +111,11 @@ class Item(ABC):
             return
         for key, val in kwargs.items():
             setattr(self, key, val)
+        filter_ = {'_id': self.itemid}
+        if modify_all:
+            filter_ = {'name': self.name}
         self.mongo.update_many(
-            {'name': self.name},
+            filter_,
             {'$set': kwargs}
         )
 
