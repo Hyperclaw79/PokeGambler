@@ -88,10 +88,10 @@ class Item(ABC):
         return f"{self.__class__.__name__}(\n    {attr_str}\n)"
 
     def __hash__(self) -> int:
-        return int(self.itemid, 16)
+        return hash(self.name)
 
     def __eq__(self, other: Item) -> bool:
-        return self.itemid == other.itemid
+        return self.name == other.name
 
     def save(self):
         """
@@ -686,7 +686,7 @@ class Rewardbox(Treasure):
         Gets the Items stored in a Reward Box.
         """
         return [
-            Item.from_id(item)
+            Item.from_id(item, force_new=True)
             for item in Item.from_id(boxid).items
         ]
 
