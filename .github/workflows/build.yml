@@ -132,17 +132,18 @@ jobs:
       id: secrets
       with:
         secrets: |-
-          ADMIN_CMD_LOG_CHANNEL:pokegambler/ADMIN_CMD_LOG_CHANNEL/${{ env.SECRET_VERSION }}
-          ALLOWED_USERS:pokegambler/ALLOWED_USERS/${{ env.SECRET_VERSION }}
-          ANNOUNCEMENT_CHANNEL:pokegambler/ANNOUNCEMENT_CHANNEL/${{ env.SECRET_VERSION }}
-          DEFAULT_GUILDMODE:pokegambler/DEFAULT_GUILDMODE/${{ env.SECRET_VERSION }}
+          TOKEN:pokegambler/TOKEN/${{ env.SECRET_VERSION }}
+          MONGO_CLUSTER_STRING:pokegambler/MONGO_CLUSTER_STRING/${{ env.SECRET_VERSION }}
           DISCORD_WEBHOOK_CHANNEL:pokegambler/DISCORD_WEBHOOK_CHANNEL/${{ env.SECRET_VERSION }}
           DISCORD_WEBHOOK_TOKEN:pokegambler/DISCORD_WEBHOOK_TOKEN/${{ env.SECRET_VERSION }}
-          IMG_UPLOAD_CHANNEL:pokegambler/IMG_UPLOAD_CHANNEL/${{ env.SECRET_VERSION }}
-          MONGO_CLUSTER_STRING:pokegambler/MONGO_CLUSTER_STRING/${{ env.SECRET_VERSION }}
           OFFICIAL_SERVER:pokegambler/OFFICIAL_SERVER/${{ env.SECRET_VERSION }}
+          ADMIN_CMD_LOG_CHANNEL:pokegambler/ADMIN_CMD_LOG_CHANNEL/${{ env.SECRET_VERSION }}
+          ANNOUNCEMENT_CHANNEL:pokegambler/ANNOUNCEMENT_CHANNEL/${{ env.SECRET_VERSION }}
+          IMG_UPLOAD_CHANNEL:pokegambler/IMG_UPLOAD_CHANNEL/${{ env.SECRET_VERSION }}
           OWNER_ID:pokegambler/OWNER_ID/${{ env.SECRET_VERSION }}
-          TOKEN:pokegambler/TOKEN/${{ env.SECRET_VERSION }}
+          ALLOWED_USERS:pokegambler/ALLOWED_USERS/${{ env.SECRET_VERSION }}
+          DEFAULT_GUILDMODE:pokegambler/DEFAULT_GUILDMODE/${{ env.SECRET_VERSION }}
+          BLACKLIST_GUILDS:pokegambler/BLACKLIST_GUILDS/${{ env.SECRET_VERSION }}
           WHITELIST_GUILDS:pokegambler/WHITELIST_GUILDS/${{ env.SECRET_VERSION }}
 
     - name: Set up Kustomize
@@ -158,14 +159,16 @@ jobs:
           --from-literal=TOKEN=${{ steps.secrets.outputs.TOKEN }} \
           --from-literal=DISCORD_WEBHOOK_CHANNEL=${{ steps.secrets.outputs.DISCORD_WEBHOOK_CHANNEL }} \
           --from-literal=DISCORD_WEBHOOK_TOKEN=${{ steps.secrets.outputs.DISCORD_WEBHOOK_TOKEN }} \
-          --from-literal=ANNOUNCEMENT_CHANNEL=${{ steps.secrets.outputs.ANNOUNCEMENT_CHANNEL }} \
-          --from-literal=OWNER_ID=${{ steps.secrets.outputs.OWNER_ID }} \
-          --from-literal=WHITELIST_GUILDS=${{ steps.secrets.outputs.WHITELIST_GUILDS }} \
-          --from-literal=DEFAULT_GUILDMODE=${{ steps.secrets.outputs.DEFAULT_GUILDMODE }} \
-          --from-literal=IMG_UPLOAD_CHANNEL=${{ steps.secrets.outputs.IMG_UPLOAD_CHANNEL }} \
-          --from-literal=ADMIN_CMD_LOG_CHANNEL=${{ steps.secrets.outputs.ADMIN_CMD_LOG_CHANNEL }} \
           --from-literal=OFFICIAL_SERVER=${{ steps.secrets.outputs.OFFICIAL_SERVER }} \
-          --from-literal=MONGO_CLUSTER_STRING=${{ steps.secrets.outputs.MONGO_CLUSTER_STRING }}
+          --from-literal=ADMIN_CMD_LOG_CHANNEL=${{ steps.secrets.outputs.ADMIN_CMD_LOG_CHANNEL }} \
+          --from-literal=ANNOUNCEMENT_CHANNEL=${{ steps.secrets.outputs.ANNOUNCEMENT_CHANNEL }} \
+          --from-literal=IMG_UPLOAD_CHANNEL=${{ steps.secrets.outputs.IMG_UPLOAD_CHANNEL }} \
+          --from-literal=OWNER_ID=${{ steps.secrets.outputs.OWNER_ID }} \
+          --from-literal=ALLOWED_USERS='${{ steps.secrets.outputs.ALLOWED_USERS }}' \
+          --from-literal=DEFAULT_GUILDMODE=${{ steps.secrets.outputs.DEFAULT_GUILDMODE }} \
+          --from-literal=BLACKLIST_GUILDS='${{ steps.secrets.outputs.BLACKLIST_GUILDS }}' \
+          --from-literal=WHITELIST_GUILDS='${{ steps.secrets.outputs.WHITELIST_GUILDS }}' \
+          --from-literal=MONGO_CLUSTER_STRING='${{ steps.secrets.outputs.MONGO_CLUSTER_STRING }}'
 
     - name: Send Restart Webhook to Discord
       run: |-
