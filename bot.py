@@ -5,6 +5,7 @@ The Main Module which serves as the brain of the code.
 from collections import namedtuple
 import difflib
 import importlib
+from io import BytesIO
 import os
 import sys
 import traceback
@@ -74,6 +75,181 @@ class PokeGambler(discord.AutoShardedClient):
             if module.endswith("commands.py"):
                 module_type = module.split("commands.py")[0]
                 self.load_commands(module_type)
+
+# Bot Base
+
+    # pylint: disable=too-many-locals
+    async def on_message(self, message: Message):
+        """
+        On_message event from Discord API.
+        """
+        # Guild and Channel Checks
+        if message.guild is None:
+            await self.__no_dm_cmds(message)
+            return
+        if self.__bl_wl_check(message):
+            return
+    # Controller
+        if message.content.lower().startswith(
+            self.prefix.lower()
+        ):
+            proceed = await self.__pre_command_checks(message)
+            if not proceed:
+                return
+            res = self.__get_method(message)
+            method, cmd, args, option_dict, closest = res
+            if not method:
+                cmd_name = cmd.replace('cmd_', self.prefix)
+                cmd_err_msg = f"Command `{cmd_name}` does not exist!"
+                if closest:
+                    cmd_err_msg += f"\nDid you mean `{closest}`?"
+                await message.channel.send(
+                    embed=get_embed(
+                        cmd_err_msg,
+                        embed_type="error",
+                        title="Invalid Command"
+                    )
+                )
+                return
+            cmd_cd = getattr(method, "cooldown", None)
+            if cmd_cd:
+                on_cmd_cd = await self.__handle_cmd_cd(message, method, cmd_cd)
+                if on_cmd_cd:
+                    return
+            kwargs = {
+                "message": message,
+                "args": args,
+                "mentions": [],
+                **option_dict
+            }
+            if message.mentions:
+                kwargs["mentions"] = message.mentions
+            try:
+                if "no_log" not in dir(method):
+                    cmd_data = CommandData(
+                        message.author, message,
+                        cmd.replace("cmd_", ""), args, option_dict
+                    )
+                    cmd_data.save()
+                task = method(**kwargs)
+                # Decorators can return None
+                if task:
+                    cmd_name = method.__name__.replace("cmd_", "")
+                    await task
+            except Exception:  # pylint: disable=broad-except
+                await self.__handle_error()
+
+# Connectors
+
+    def run(self, *args, **kwargs):
+        super().run(os.getenv('TOKEN'), *args, **kwargs)
+
+    async def on_ready(self):
+        """
+        On_ready event from Discord API.
+        """
+        if not getattr(self, "owner", False):
+            # pylint: disable=no-member
+            self.owner = self.get_user(self.owner_id)
+        headers = get_rand_headers()
+        self.sess = aiohttp.ClientSession(loop=self.loop, headers=headers)
+        pretty = {
+            itbl: prettify_discord(
+                self,
+                **{
+                    "iterable": getattr(self, itbl),
+                    "mode": itbl.split("_")[1].rstrip("s")
+                }
+            )
+            for itbl in [
+                "blacklist_channels", "whitelist_channels",
+                "blacklist_guilds", "whitelist_guilds"
+            ]
+        }
+        self.ready = True
+        ver_ascii = get_ascii(self.version)
+        self.logger.pprint(
+            """
+                \t██████╗  █████╗ ██╗  ██╗███████╗
+                \t██╔══██╗██╔══██╗██║ ██╔╝██╔════╝
+                \t██████╔╝██║  ██║█████═╝ █████╗
+                \t██╔═══╝ ██║  ██║██╔═██╗ ██╔══╝
+                \t██║     ╚█████╔╝██║ ╚██╗███████╗
+                \t╚═╝      ╚════╝ ╚═╝  ╚═╝╚══════╝
+            """,
+            color=["yellow", "bold"],
+            timestamp=False
+        )
+        self.logger.pprint(
+            """
+                ██████╗  █████╗  ███╗   ███╗██████╗ ██╗     ███████╗██████╗
+                ██╔════╝ ██╔══██╗████╗ ████║██╔══██╗██║     ██╔════╝██╔══██╗
+                ██║  ██╗ ███████║██╔████╔██║██████╦╝██║     █████╗  ██████╔╝
+                ██║  ╚██╗██╔══██║██║╚██╔╝██║██╔══██╗██║     ██╔══╝  ██╔══██╗
+                ╚██████╔╝██║  ██║██║ ╚═╝ ██║██████╦╝███████╗███████╗██║  ██║
+                 ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝
+            """,
+            color=["red"],
+            timestamp=False
+        )
+        self.logger.pprint(
+            f"\n{ver_ascii}\n",
+            color=["green", "bold"],
+            timestamp=False
+        )
+        # pylint: disable=no-member
+        print(
+            f"\t{self.logger.wrap('Owner:', color='blue')} "
+            f"{self.owner} ({self.owner_id})\n\n"
+            f"\t{self.logger.wrap('Bot Name:', color='blue')} {self.user}\n\n"
+            f"\t{self.logger.wrap('Command Prefix:', color='blue')} "
+            f"{self.prefix}\n\n"
+            f"\t{self.logger.wrap('Blacklisted Channels', color='blue')}\n"
+            "\t~~~~~~~~~~~~~~~~~~~~\n"
+            f"\t{pretty['blacklist_channels']}\n\n"
+            f"\t{self.logger.wrap('Whitelisted Channels', color='blue')}\n"
+            "\t~~~~~~~~~~~~~~~~~~~~\n"
+            f"\t{pretty['whitelist_channels']}\n\n"
+            f"\t{self.logger.wrap('Blacklisted Servers', color='blue')}\n"
+            "\t~~~~~~~~~~~~~~~~~~~\n"
+            f"\t{pretty['blacklist_guilds']}\n\n"
+            f"\t{self.logger.wrap('Whitelisted Servers', color='blue')}\n"
+            "\t~~~~~~~~~~~~~~~~~~~\n"
+            f"\t{pretty['whitelist_guilds']}\n\n"
+            f"\t{self.logger.wrap('Default Channel Mode:', color='blue')} "
+            f"{self.channel_mode}\n\n"
+            f"\t{self.logger.wrap('Default Guild Mode:', color='blue')} "
+            f"{self.guild_mode}\n\n"
+        )
+        game = discord.Game(
+            f"with the strings of fate. | Check: {self.prefix}info"
+        )
+        await self.change_presence(activity=game)
+        await online_now(self)
+        # pylint: disable=no-member
+        self.__reward_nitro_boosters.start()
+
+    def load_commands(
+        self, module_type: str,
+        reload_module: bool = False
+    ):
+        """
+        Hot Module Import for Commands.
+        """
+        if reload_module:
+            module = importlib.reload(
+                sys.modules.get(f"scripts.commands.{module_type}commands")
+            )
+        else:
+            module = importlib.import_module(
+                f"scripts.commands.{module_type}commands"
+            )
+        cmd_class = getattr(module, f"{module_type.title()}Commands")
+        cmd_obj = cmd_class(ctx=self)
+        setattr(self, f"{module_type}commands", cmd_obj)
+        return cmd_obj
+
+# Private Methods
 
     def __bl_wl_check(self, message: Message):
         blacklist_checks = [
@@ -264,26 +440,6 @@ class PokeGambler(discord.AutoShardedClient):
             return False
         return True
 
-    def load_commands(
-        self, module_type: str,
-        reload_module: bool = False
-    ):
-        """
-        Hot Module Import for Commands.
-        """
-        if reload_module:
-            module = importlib.reload(
-                sys.modules.get(f"scripts.commands.{module_type}commands")
-            )
-        else:
-            module = importlib.import_module(
-                f"scripts.commands.{module_type}commands"
-            )
-        cmd_class = getattr(module, f"{module_type.title()}Commands")
-        cmd_obj = cmd_class(ctx=self)
-        setattr(self, f"{module_type}commands", cmd_obj)
-        return cmd_obj
-
     def __update_configs(self):
         """
         For dynamic config updates.
@@ -306,7 +462,8 @@ class PokeGambler(discord.AutoShardedClient):
         for cfg_id in (
             "owner_id", "official_server",
             "admin_cmd_log_channel",
-            "img_upload_channel"
+            "img_upload_channel",
+            "error_log_channel"
         ):
             setattr(self, cfg_id, int(os.getenv(cfg_id.upper())))
         for itbl in (
@@ -322,161 +479,25 @@ class PokeGambler(discord.AutoShardedClient):
                 ]
             setattr(self, itbl, val)
 
-# Bot Base
-
-    # pylint: disable=too-many-locals
-    async def on_message(self, message: Message):
-        """
-        On_message event from Discord API.
-        """
-        # Guild and Channel Checks
-        if message.guild is None:
-            await self.__no_dm_cmds(message)
-            return
-        if self.__bl_wl_check(message):
-            return
-    # Controller
-        if message.content.lower().startswith(
-            self.prefix.lower()
-        ):
-            proceed = await self.__pre_command_checks(message)
-            if not proceed:
-                return
-            res = self.__get_method(message)
-            method, cmd, args, option_dict, closest = res
-            if not method:
-                cmd_name = cmd.replace('cmd_', self.prefix)
-                cmd_err_msg = f"Command `{cmd_name}` does not exist!"
-                if closest:
-                    cmd_err_msg += f"\nDid you mean `{closest}`?"
-                await message.channel.send(
-                    embed=get_embed(
-                        cmd_err_msg,
-                        embed_type="error",
-                        title="Invalid Command"
-                    )
-                )
-                return
-            cmd_cd = getattr(method, "cooldown", None)
-            if cmd_cd:
-                on_cmd_cd = await self.__handle_cmd_cd(message, method, cmd_cd)
-                if on_cmd_cd:
-                    return
-            kwargs = {
-                "message": message,
-                "args": args,
-                "mentions": [],
-                **option_dict
-            }
-            if message.mentions:
-                kwargs["mentions"] = message.mentions
-            try:
-                if "no_log" not in dir(method):
-                    cmd_data = CommandData(
-                        message.author, message,
-                        cmd.replace("cmd_", ""), args, option_dict
-                    )
-                    cmd_data.save()
-                task = method(**kwargs)
-                # Decorators can return None
-                if task:
-                    cmd_name = method.__name__.replace("cmd_", "")
-                    await task
-            except Exception:  # pylint: disable=broad-except
-                tb_obj = sys.exc_info()[2]
-                tb_obj = traceback.format_exc()
-                self.logger.pprint(
-                    tb_obj,
-                    timestamp=True,
-                    color="red"
-                )
-
-# Connectors
-
-    def run(self, *args, **kwargs):
-        super().run(os.getenv('TOKEN'), *args, **kwargs)
-
-    async def on_ready(self):
-        """
-        On_ready event from Discord API.
-        """
-        if not getattr(self, "owner", False):
-            # pylint: disable=no-member
-            self.owner = self.get_user(self.owner_id)
-        headers = get_rand_headers()
-        self.sess = aiohttp.ClientSession(loop=self.loop, headers=headers)
-        pretty = {
-            itbl: prettify_discord(
-                self,
-                **{
-                    "iterable": getattr(self, itbl),
-                    "mode": itbl.split("_")[1].rstrip("s")
-                }
+    async def __handle_error(self):
+        tb_obj = sys.exc_info()[2]
+        tb_obj = traceback.format_exc()
+        self.logger.pprint(
+            tb_obj,
+            timestamp=True,
+            color="red"
+        )
+        # pylint: disable=no-member
+        err_msg = f"```py\n{tb_obj}\n```"
+        if len(err_msg) > 2000:
+            err_fl = discord.File(
+                BytesIO(str(tb_obj).encode()),
+                filename="error.py"
             )
-            for itbl in [
-                "blacklist_channels", "whitelist_channels",
-                "blacklist_guilds", "whitelist_guilds"
-            ]
-        }
-        self.ready = True
-        ver_ascii = get_ascii(self.version)
-        self.logger.pprint(
-            """
-                \t██████╗  █████╗ ██╗  ██╗███████╗
-                \t██╔══██╗██╔══██╗██║ ██╔╝██╔════╝
-                \t██████╔╝██║  ██║█████═╝ █████╗
-                \t██╔═══╝ ██║  ██║██╔═██╗ ██╔══╝
-                \t██║     ╚█████╔╝██║ ╚██╗███████╗
-                \t╚═╝      ╚════╝ ╚═╝  ╚═╝╚══════╝
-            """,
-            color=["yellow", "bold"],
-            timestamp=False
-        )
-        self.logger.pprint(
-            """
-                ██████╗  █████╗  ███╗   ███╗██████╗ ██╗     ███████╗██████╗
-                ██╔════╝ ██╔══██╗████╗ ████║██╔══██╗██║     ██╔════╝██╔══██╗
-                ██║  ██╗ ███████║██╔████╔██║██████╦╝██║     █████╗  ██████╔╝
-                ██║  ╚██╗██╔══██║██║╚██╔╝██║██╔══██╗██║     ██╔══╝  ██╔══██╗
-                ╚██████╔╝██║  ██║██║ ╚═╝ ██║██████╦╝███████╗███████╗██║  ██║
-                 ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝
-            """,
-            color=["red"],
-            timestamp=False
-        )
-        self.logger.pprint(
-            f"\n{ver_ascii}\n",
-            color=["green", "bold"],
-            timestamp=False
-        )
-        # pylint: disable=no-member
-        print(
-            f"\t{self.logger.wrap('Owner:', color='blue')} "
-            f"{self.owner} ({self.owner_id})\n\n"
-            f"\t{self.logger.wrap('Bot Name:', color='blue')} {self.user}\n\n"
-            f"\t{self.logger.wrap('Command Prefix:', color='blue')} "
-            f"{self.prefix}\n\n"
-            f"\t{self.logger.wrap('Blacklisted Channels', color='blue')}\n"
-            "\t~~~~~~~~~~~~~~~~~~~~\n"
-            f"\t{pretty['blacklist_channels']}\n\n"
-            f"\t{self.logger.wrap('Whitelisted Channels', color='blue')}\n"
-            "\t~~~~~~~~~~~~~~~~~~~~\n"
-            f"\t{pretty['whitelist_channels']}\n\n"
-            f"\t{self.logger.wrap('Blacklisted Servers', color='blue')}\n"
-            "\t~~~~~~~~~~~~~~~~~~~\n"
-            f"\t{pretty['blacklist_guilds']}\n\n"
-            f"\t{self.logger.wrap('Whitelisted Servers', color='blue')}\n"
-            "\t~~~~~~~~~~~~~~~~~~~\n"
-            f"\t{pretty['whitelist_guilds']}\n\n"
-            f"\t{self.logger.wrap('Default Channel Mode:', color='blue')} "
-            f"{self.channel_mode}\n\n"
-            f"\t{self.logger.wrap('Default Guild Mode:', color='blue')} "
-            f"{self.guild_mode}\n\n"
-        )
-        game = discord.Game(
-            f"with the strings of fate. | Check: {self.prefix}info"
-        )
-        await self.change_presence(activity=game)
-        await online_now(self)
-        # pylint: disable=no-member
-        self.__reward_nitro_boosters.start()
+            await self.get_channel(
+                self.error_log_channel
+            ).send(file=err_fl)
+        else:
+            await self.get_channel(
+                self.error_log_channel
+            ).send(err_msg)

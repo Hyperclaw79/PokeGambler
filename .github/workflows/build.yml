@@ -139,6 +139,7 @@ jobs:
           OFFICIAL_SERVER:pokegambler/OFFICIAL_SERVER/${{ env.SECRET_VERSION }}
           ADMIN_CMD_LOG_CHANNEL:pokegambler/ADMIN_CMD_LOG_CHANNEL/${{ env.SECRET_VERSION }}
           ANNOUNCEMENT_CHANNEL:pokegambler/ANNOUNCEMENT_CHANNEL/${{ env.SECRET_VERSION }}
+          ERROR_LOG_CHANNEL:pokegambler/ERROR_LOG_CHANNEL/${{ env.SECRET_VERSION }}
           IMG_UPLOAD_CHANNEL:pokegambler/IMG_UPLOAD_CHANNEL/${{ env.SECRET_VERSION }}
           OWNER_ID:pokegambler/OWNER_ID/${{ env.SECRET_VERSION }}
           ALLOWED_USERS:pokegambler/ALLOWED_USERS/${{ env.SECRET_VERSION }}
@@ -162,6 +163,7 @@ jobs:
           --from-literal=OFFICIAL_SERVER=${{ steps.secrets.outputs.OFFICIAL_SERVER }} \
           --from-literal=ADMIN_CMD_LOG_CHANNEL=${{ steps.secrets.outputs.ADMIN_CMD_LOG_CHANNEL }} \
           --from-literal=ANNOUNCEMENT_CHANNEL=${{ steps.secrets.outputs.ANNOUNCEMENT_CHANNEL }} \
+          --from-literal=ERROR_LOG_CHANNEL=${{ steps.secrets.outputs.ERROR_LOG_CHANNEL }} \
           --from-literal=IMG_UPLOAD_CHANNEL=${{ steps.secrets.outputs.IMG_UPLOAD_CHANNEL }} \
           --from-literal=OWNER_ID=${{ steps.secrets.outputs.OWNER_ID }} \
           --from-literal=ALLOWED_USERS='${{ steps.secrets.outputs.ALLOWED_USERS }}' \
