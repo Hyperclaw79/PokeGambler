@@ -391,8 +391,7 @@ class PokeGambler(discord.AutoShardedClient):
                 )
             )
             for booster in boosters:
-                # Ensure booster has a Profiles.
-                _ = Profiles(booster)
+                profile = Profiles(booster)
                 nitro_box = Item.from_name(
                     "Nitro Booster Reward Box",
                     force_new=True
@@ -413,7 +412,8 @@ class PokeGambler(discord.AutoShardedClient):
                         f"!\nA『**{nitro_box}**』is added to your inventory.",
                         title="Monthly Server Booster Reward",
                         footer=f"ItemID: {nitro_box.itemid}",
-                        image=nitro_box.asset_url
+                        image=nitro_box.asset_url,
+                        color=profile.get('embed_color')
                     )
                 )
             self.nitro_rewarded = True

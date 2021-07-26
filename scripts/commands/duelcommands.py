@@ -152,7 +152,9 @@ class DuelCommands(Commands):
         amount = await self.__duel_get_cost(message, user_profile, args)
         if not amount:
             return
-        gladiator1 = await self.__duel_get_gladiator(message, message.author)
+        gladiator1 = await self.__duel_get_gladiator(
+            message, message.author, user_profile
+        )
         if not gladiator1:
             return
         user2 = mentions[0]
@@ -176,12 +178,16 @@ class DuelCommands(Commands):
                 )
             )
             return
-        confirmed = await self.__duel_confirmation(message, user2, amount)
+        other_profile = Profiles(user2)
+        confirmed = await self.__duel_confirmation(
+            message, user2,
+            amount, other_profile
+        )
         if not confirmed:
             return
-        other_profile = Profiles(user2)
         gladiator2 = await self.__duel_get_gladiator(
-            message, user2, notify=False
+            message, user2, other_profile,
+            notify=False
         )
         if not gladiator2:
             await message.channel.send(
@@ -228,6 +234,7 @@ class DuelCommands(Commands):
             "(200 Pokebonds)"
         ]
         charges = ["won_chips", "pokebonds"]
+        profile = Profiles(message.author)
         lvl_msg = await message.channel.send(
             embed=get_enum_embed(
                 [
@@ -236,7 +243,8 @@ class DuelCommands(Commands):
                         levels, dmg_info, cost_info
                     )
                 ],
-                title="Choose the action level"
+                title="Choose the action level",
+                color=profile.get("embed_color")
             )
         )
         reply = await wait_for(
@@ -260,7 +268,6 @@ class DuelCommands(Commands):
                 )
             )
             return
-        profile = Profiles(message.author)
         if profile.get(
             charges[levels.index(choice)]
         ) < 200:
@@ -288,7 +295,8 @@ class DuelCommands(Commands):
                         ```
                     """
                 ),
-                title="Enter the action message"
+                title="Enter the action message",
+                color=profile.get("embed_color")
             )
         )
         reply = await wait_for(
@@ -325,7 +333,8 @@ class DuelCommands(Commands):
             embed=get_embed(
                 "Successfully saved your duel action.\n"
                 "Let's hope it shows up soon.",
-                title="Duel Action saved"
+                title="Duel Action saved",
+                color=profile.get("embed_color")
             )
         )
         profile.debit(200, bonds=levels.index(choice))
@@ -343,7 +352,11 @@ class DuelCommands(Commands):
         @You can rename your gladiator using a Gladiator Name Change ticket.
         The ticket can be purchased from the Consumables Shop.@
         """
-        glad = await self.__duel_get_gladiator(message, message.author)
+        profile = Profiles(message.author)
+        glad = await self.__duel_get_gladiator(
+            message, message.author,
+            profile
+        )
         if not glad:
             return
         inp_msg = await dm_send(
@@ -351,7 +364,8 @@ class DuelCommands(Commands):
             message.author,
             embed=get_embed(
                 "Use a sensible name (Max 10 chars) for your gladiator.",
-                title="Enter New Nickname"
+                title="Enter New Nickname",
+                color=profile.get("embed_color")
             )
         )
         reply = await wait_for(
@@ -388,7 +402,8 @@ class DuelCommands(Commands):
             message.author,
             embed=get_embed(
                 f"Successfully renamed your Gladiator to {new_name}.",
-                title="Rename Complete"
+                title="Rename Complete",
+                color=profile.get("embed_color")
             )
         )
 
@@ -438,7 +453,7 @@ class DuelCommands(Commands):
 
     async def __duel_get_gladiator(
         self, message: Message, user: Member,
-        notify: bool = True
+        profile: Profiles, notify: bool = True
     ) -> Gladiator:
         inv = Inventory(user)
         glads, _ = inv.get(category='Gladiator')
@@ -462,7 +477,8 @@ class DuelCommands(Commands):
         if len(available) > 1:
             emb = get_enum_embed(
                 map(str, available),
-                title="Choose which gladiator you want to use:"
+                title="Choose which gladiator you want to use:",
+                color=profile.get("embed_color")
             )
             choice_msg = await dm_send(
                 message, user,
@@ -505,7 +521,8 @@ class DuelCommands(Commands):
             embed=get_embed(
                 f"Successfully chosen 『**{gladiator}**』"
                 "for this command/match.",
-                title="Gladiator Confirmed"
+                title="Gladiator Confirmed",
+                color=profile.get("embed_color")
             )
         )
         gladiator.image = await gladiator.get_image(self.ctx.sess)
@@ -514,7 +531,8 @@ class DuelCommands(Commands):
 
     async def __duel_confirmation(
         self, message: Message,
-        user: Member, amount: int
+        user: Member, amount: int,
+        user_profile: Profiles
     ) -> bool:
         inv_msg = await message.channel.send(
             content=f"Hey {user.mention}, you have been invited "
@@ -522,7 +540,8 @@ class DuelCommands(Commands):
             embed=get_embed(
                 "React to this message with ☑️ to accept the duel.\n"
                 f"Bet Amount: **{amount}** {self.chip_emoji}",
-                title="Do you accept?"
+                title="Do you accept?",
+                color=user_profile.get("embed_color")
             )
         )
         await inv_msg.add_reaction("☑️")
@@ -664,7 +683,8 @@ class DuelCommands(Commands):
                 f"**{winner.name}**'s『{winner_glad}』"
                 f"destroyed **{other.name}**'s『{other_glad}』",
                 title=f"💀 Match won by **{winner.name}**!",
-                no_icon=True
+                no_icon=True,
+                color=winner.get("embed_color")
             )
         )
         winner.credit(amount)

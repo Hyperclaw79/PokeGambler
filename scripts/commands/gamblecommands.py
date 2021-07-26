@@ -197,7 +197,8 @@ class GambleCommands(Commands):
                 footer=f"⚠️ You'll either get {amount * 2} or "
                 f"lose {amount} pokechips",
                 image="https://cdn.discordapp.com/attachments/"
-                "840469669332516904/843077878816178186/blinker.gif"
+                "840469669332516904/843077878816178186/blinker.gif",
+                color=profile.get("embed_color")
             )
         )
         idx = random.randint(0, 1)

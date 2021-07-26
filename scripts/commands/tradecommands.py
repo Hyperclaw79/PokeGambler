@@ -148,7 +148,8 @@ class TradeCommands(Commands):
             f"`{self.ctx.prefix}ids item_name`.\n"
             "\n> Your inventory's net worth, excluding Chests, is "
             f"**{net_worth}** {self.chip_emoji}.",
-            title=f"{message.author.name}'s Inventory"
+            title=f"{message.author.name}'s Inventory",
+            color=Profiles(message.author).get('embed_color')
         )
         for idx, (catog, items) in enumerate(catog_dict.items()):
             catog_name = self.verbose_names.get(catog, catog)
@@ -208,6 +209,7 @@ class TradeCommands(Commands):
                 embed=get_embed(
                     f'**{item_name}**\nYou have **0** of those.',
                     title=f"{message.author.name}'s Item IDs",
+                    color=Profiles(message.author).get('embed_color')
                 )
             )
             return
@@ -218,7 +220,8 @@ class TradeCommands(Commands):
                 f'**{item_name}**『{cnt_str}』',
                 title=f"{message.author.name}'s Item IDs",
                 footer=f"Use 『{self.ctx.prefix}details itemid』"
-                "for detailed view."
+                "for detailed view.",
+                color=Profiles(message.author).get('embed_color')
             )
             for id_ in ids[i:i+10]:
                 emb.add_field(
@@ -267,9 +270,10 @@ class TradeCommands(Commands):
             ```~
         """
         shop = Shop
+        profile = Profiles(message.author)
         if kwargs.get('premium'):
             shop = PremiumShop
-            if Profiles(message.author).get("pokebonds") == 0:
+            if profile.get("pokebonds") == 0:
                 await message.channel.send(
                     embed=get_embed(
                         "This option is available only to users"
@@ -310,7 +314,9 @@ class TradeCommands(Commands):
                     "**To view the items in a specific category:**\n"
                     f"**`{self.ctx.prefix}shop category`**",
                     title="PokeGambler Shop",
-                    footer="All purchases except Tradables are non-refundable."
+                    footer="All purchases except Tradables "
+                    "are non-refundable.",
+                    color=profile.get('embed_color')
                 )
                 for catog in catogs[i:i+3]:
                     emb.add_field(
@@ -453,7 +459,8 @@ class TradeCommands(Commands):
                     "But the role has been assigned succesfully."
                     if isinstance(item, Title)
                     else None
-                )
+                ),
+                color=Profiles(message.author).get('embed_color')
             )
         )
 
@@ -529,7 +536,8 @@ class TradeCommands(Commands):
             gained //= 10
             curr = self.bond_emoji
             bonds = True
-        Profiles(message.author).credit(
+        profile = Profiles(message.author)
+        profile.credit(
             gained, bonds=bonds
         )
         Shop.refresh_tradables()
@@ -538,7 +546,8 @@ class TradeCommands(Commands):
                 f"Succesfully sold `{deleted}` of your listed item(s).\n"
                 "Your account has been credited: "
                 f"**{gained}** {curr}",
-                title="Item(s) Sold"
+                title="Item(s) Sold",
+                color=profile.get('embed_color')
             )
         )
 
@@ -638,7 +647,8 @@ class TradeCommands(Commands):
             embed=get_embed(
                 f"Amount transferred: **{amount}** {self.chip_emoji}"
                 f"\nRecipient: **{mentions[0]}**",
-                title="Transaction Successful"
+                title="Transaction Successful",
+                color=author_prof.get('embed_color')
             )
         )
 
@@ -692,7 +702,8 @@ class TradeCommands(Commands):
             embed=get_embed(
                 f"Succesfully converted **{chips // 10}** {self.bond_emoji}"
                 f" into **{chips}** {self.chip_emoji}",
-                title="Redeem Succesfull"
+                title="Redeem Succesfull",
+                color=profile.get('embed_color')
             )
         )
 
@@ -728,7 +739,8 @@ class TradeCommands(Commands):
                     f"**To buy any item, use `{self.ctx.prefix}buy itemid`**"
                     f"\n**You currently have: {balance}**",
                     title=f"{catog} {shopname}",
-                    no_icon=True
+                    no_icon=True,
+                    color=profile.get('embed_color')
                 )
             for item in catog.items:
                 itemid = f"{item.itemid:0>8X}" if isinstance(
@@ -808,7 +820,8 @@ class TradeCommands(Commands):
             openable.chips
             for openable in openables
         )
-        Profiles(message.author).credit(chips)
+        profile = Profiles(message.author)
+        profile.credit(chips)
         loot_model = Loots(message.author)
         earned = loot_model.get("earned")
         loot_model.update(
@@ -848,6 +861,7 @@ class TradeCommands(Commands):
         await message.channel.send(
             embed=get_embed(
                 content,
-                title=f"Opened {quant_str}{openables[0].name}"
+                title=f"Opened {quant_str}{openables[0].name}",
+                color=profile.get('embed_color')
             )
         )

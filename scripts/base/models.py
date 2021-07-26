@@ -72,7 +72,7 @@ class Model(metaclass=NameSetter):
         """
         if not param:
             return dict(self)
-        return dict(self).get(param, None)
+        return dict(self).get(param)
 
     def save(self):
         """
@@ -201,7 +201,8 @@ class Profiles(UnlockedModel):
                 role.name.lower()
                 for role in self.user.roles
             ],
-            "background": None
+            "background": None,
+            "embed_color": None
         }
         for key, val in init_dict.items():
             setattr(self, key, val)

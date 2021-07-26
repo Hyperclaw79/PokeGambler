@@ -341,7 +341,8 @@ class ProfileCommands(Commands):
                 f"Won: {minigame.num_wins}"
         emb = get_embed(
             "Here's how you've performed till now.",
-            title=f"Statistics for **{message.author.name}**"
+            title=f"Statistics for **{message.author.name}**",
+            color=Profiles(message.author).get('embed_color')
         )
         for key, val in stat_dict.items():
             emb.add_field(
@@ -424,7 +425,8 @@ class ProfileCommands(Commands):
                 "It's been added to your inventory.",
                 title="**FOUND A TREASURE CHEST**",
                 thumbnail=chest.asset_url,
-                footer=f"Chest ID: {chest.itemid}"
+                footer=f"Chest ID: {chest.itemid}",
+                color=profile.get('embed_color')
             )
         profile.credit(loot)
         loot_model.update(earned=earned + loot)
@@ -504,7 +506,8 @@ class ProfileCommands(Commands):
             f"Claim the chest with `{self.ctx.prefix}open {chest.itemid}`.",
             title="**Daily Chest**",
             thumbnail=chest.asset_url,
-            footer=f"Current Streak: {daily_streak}"
+            footer=f"Current Streak: {daily_streak}",
+            color=profile.get('embed_color')
         )
         profile.credit(int(loot))
         loot_model.update(
@@ -545,6 +548,7 @@ class ProfileCommands(Commands):
             desc_str += f"\nExpires in: {expires_in}"
             return f"```css\n{desc_str}\n```"
         boosts = BoostItem.get_boosts(str(message.author.id))
+        profile = Profiles(message.author)
         perm_boosts = Boosts(message.author).get()
         perm_boosts.pop('user_id')
         if not (
@@ -556,13 +560,15 @@ class ProfileCommands(Commands):
             await message.channel.send(
                 embed=get_embed(
                     "You don't have any active boosts.",
-                    title="No Boosts"
+                    title="No Boosts",
+                    color=profile.get('embed_color')
                 )
             )
             return
         emb = get_embed(
             "\u200B",
-            title="Active Boosts"
+            title="Active Boosts",
+            color=profile.get('embed_color')
         )
         if not boosts:
             boosts = BoostItem.default_boosts()
@@ -588,6 +594,7 @@ class ProfileCommands(Commands):
         The Background Change ticket can be purchased
         from the Consumables Shop.@
         """
+        profile = Profiles(message.author)
         inp_msg = await dm_send(
             message, message.author,
             embed=get_embed(
@@ -597,7 +604,8 @@ class ProfileCommands(Commands):
                 "> Will rollback to default background "
                 "if link is not accessible any time.\n"
                 "⚠️Using inappropriate images will get you blacklisted.",
-                title="Enter the image url or upload it."
+                title="Enter the image url or upload it.",
+                color=profile.get('embed_color')
             )
         )
         reply = await wait_for(
@@ -607,7 +615,7 @@ class ProfileCommands(Commands):
             timeout="inf"
         )
         url = await self.__background_get_url(message, reply)
-        Profiles(message.author).update(
+        profile.update(
             background=url
         )
         inv = Inventory(message.author)
@@ -617,7 +625,65 @@ class ProfileCommands(Commands):
             message, message.author,
             embed=get_embed(
                 "You can check your profile now.",
-                title="Succesfully updated Profile Background."
+                title="Succesfully updated Profile Background.",
+                color=profile.get('embed_color')
+            )
+        )
+
+    @needs_ticket("Embed Color Change")
+    @check_completion
+    @model([Profiles, Inventory])
+    @alias(['embed', 'ec', 'color'])
+    async def cmd_embed_color(self, message: Message, **kwargs):
+        """Change Embed Color.
+        $```scss
+        {command_prefix}embed_color
+        ```$
+
+        @Change the color of the embeds you get from PokeGambler.
+        The Embed Color Change ticket can be purchased
+        from the Consumables Shop.@
+        """
+        profile = Profiles(message.author)
+        inp_msg = await dm_send(
+            message, message.author,
+            embed=get_embed(
+                "Enter the hexadecimal code for the color you want.\n"
+                "Should follow the pattern: #abcdef\n"
+                "> Eg: #000FFF",
+                title="Enter the color code",
+                color=profile.get('embed_color')
+            )
+        )
+        reply = await wait_for(
+            inp_msg.channel, self.ctx,
+            init_msg=inp_msg,
+            check=lambda msg: user_check(msg, message, inp_msg.channel),
+            timeout="inf"
+        )
+        if not re.match(r'#?[0-9A-Fa-f]{6}', reply.content):
+            await dm_send(
+                message, message.author,
+                embed=get_embed(
+                    "You need to enter a valid hex code.\n"
+                    "Please retry the command.",
+                    title="Invalid hexadecimal code.",
+                    embed_type="error"
+                )
+            )
+            return
+        hexcode = reply.content.lstrip('#')
+        profile.update(
+            embed_color=int(hexcode, 16)
+        )
+        inv = Inventory(message.author)
+        tickets = kwargs["tickets"]
+        inv.delete(tickets[0], quantity=1)
+        await dm_send(
+            message, message.author,
+            embed=get_embed(
+                title="Succesfully updated your Embed Color.",
+                color=profile.get('embed_color')
             )
         )
 

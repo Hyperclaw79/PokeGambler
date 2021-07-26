@@ -132,7 +132,8 @@ def prettify_discord(
 
 # pylint: disable=too-many-arguments
 def get_embed(
-    content: str, embed_type: str = "info",
+    content: Optional[str] = "",
+    embed_type: Optional[str] = "info",
     title: Optional[str] = None,
     footer: Optional[str] = None,
     image: Optional[str] = None,
@@ -147,7 +148,10 @@ def get_embed(
         "info": {
             "name": "INFORMATION",
             "icon": ":information_source:",
-            "color": 11068923
+            "color": (
+                color if color is not None
+                else 11068923
+            )
         },
         "warning": {
             "name": "WARNING",
@@ -185,7 +189,8 @@ def get_enum_embed(
     iterable: Iterable,
     embed_type: str = "info",
     title: Optional[str] = None,
-    custom_ext: bool = False
+    custom_ext: bool = False,
+    color: Optional[int] = None
 ) -> Embed:
     """ Creates a Discord Embed with prettified iterable as description. """
     enum_str = '\n'.join(
@@ -197,7 +202,8 @@ def get_enum_embed(
     return get_embed(
         enum_str,
         embed_type=embed_type,
-        title=title
+        title=title,
+        color=color
     )
 
 
