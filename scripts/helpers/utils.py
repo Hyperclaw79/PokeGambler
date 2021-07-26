@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import cProfile
 from io import BytesIO
+import os
 import random
 import re
 import time
@@ -351,7 +352,10 @@ def is_admin(user: Member) -> bool:
         role.name.lower()
         for role in user.roles
     ]
-    return "admins" in roles
+    return all([
+        "admins" in roles,
+        user.guild.id == os.getenv('OFFICIAL_SERVER')
+    ])
 
 
 def is_dealer(user: Member) -> bool:
@@ -362,7 +366,10 @@ def is_dealer(user: Member) -> bool:
         role.name.lower()
         for role in user.roles
     ]
-    return "dealers" in roles
+    return all([
+        "dealer" in roles,
+        user.guild.id == os.getenv('OFFICIAL_SERVER')
+    ])
 
 
 def get_modules(ctx: PokeGambler) -> List[Commands]:

@@ -104,7 +104,9 @@ def admin_only(func: Callable):
         return message.channel.send(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by '
-                'Pokegambler Admins.',
+                'Pokegambler Admins.\n'
+                'And this command can only be used in '
+                'the official server.',
                 embed_type="error"
             )
         )
@@ -125,7 +127,9 @@ def dealer_only(func: Callable):
         return message.channel.send(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by '
-                'Pokegambler Dealers.',
+                'Pokegambler Dealers.\n'
+                'And this command can only be used in '
+                'the official server.',
                 embed_type="error"
             )
         )
@@ -367,24 +371,6 @@ def needs_ticket(name: str):
             return func(self, *args, message=message, **kwargs)
         return wrapped
     return decorator
-
-
-def os_only(func: Callable):
-    '''
-    These commands can only run in the official server.
-    '''
-    @wraps(func)
-    def wrapped(self, message, *args, **kwargs):
-        if message.guild.id != self.ctx.official_server:
-            return message.channel.send(
-                embed=get_embed(
-                    "This command can only be used in the official server.",
-                    embed_type="error",
-                    title="Invalid Server"
-                )
-            )
-        return func(self, *args, message=message, **kwargs)
-    return wrapped
 
 
 class Commands(ABC):
