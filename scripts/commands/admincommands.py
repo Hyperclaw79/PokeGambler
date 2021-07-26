@@ -520,7 +520,7 @@ class AdminCommands(Commands):
     ):
         """Updates an existing Item from the database.
         $```scss
-        {command_prefix}delete_item itemid
+        {command_prefix}update_item itemid
         ```$
 
         @`🛡️ Admin Command`
@@ -546,7 +546,7 @@ class AdminCommands(Commands):
                 )
             )
             return
-        item.update(**updatables)
+        item.update(**updatables, modify_all=True)
         if issubclass(item.__class__, Tradable):
             Shop.refresh_tradables()
             PremiumShop.refresh_tradables()
