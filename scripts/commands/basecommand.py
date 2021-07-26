@@ -121,7 +121,10 @@ def dealer_only(func: Callable):
 
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        if is_dealer(message.author):
+        if any([
+            is_dealer(message.author),
+            is_owner(self.ctx, message.author)
+        ]):
             return func(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", self.ctx.prefix)
         return message.channel.send(
