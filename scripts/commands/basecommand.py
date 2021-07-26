@@ -314,8 +314,6 @@ def cooldown(secs: int):
 
         @wraps(func)
         def wrapped(self, message, *args, **kwargs):
-            # if func not in self.ctx.cooldown_cmds:
-            #     self.ctx.cooldown_cmds[func] = {}
             return func(self, *args, message=message, **kwargs)
         return wrapped
     return decorator

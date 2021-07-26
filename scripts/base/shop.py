@@ -318,7 +318,7 @@ class BoostItem(ShopItem):
         ):
             return False
         return sum([
-            Boosts(user).get()["loot_lust"],
+            Boosts(user).get("loot_lust"),
             quantity,
             boost_dict["stack"]
         ]) > 5
@@ -380,7 +380,7 @@ class PremiumBoostItem(BoostItem):
         tier = Loots(user).tier
         boost = Boosts(user)
         boost_name = self.name.lower().replace(' ', '_')
-        curr = boost.get()[boost_name]
+        curr = boost.get(boost_name)
         boost.update(**{boost_name: curr + quantity})
         Profiles(user).debit(
             amount=((self.price * (10 ** (tier - 2))) * quantity),

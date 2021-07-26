@@ -235,7 +235,7 @@ class GambleCommands(Commands):
             amt_mult = 1 + (
                 0.1 * Boosts(
                     message.author
-                ).get()["flipster"]
+                ).get("flipster")
             )
             boosts = BoostItem.get_boosts(str(message.author.id))
             amt_mult += boosts['boost_flip']['stack'] * 0.1

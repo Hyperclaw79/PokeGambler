@@ -269,7 +269,7 @@ class TradeCommands(Commands):
         shop = Shop
         if kwargs.get('premium'):
             shop = PremiumShop
-            if Profiles(message.author).get()["pokebonds"] == 0:
+            if Profiles(message.author).get("pokebonds") == 0:
                 await message.channel.send(
                     embed=get_embed(
                         "This option is available only to users"
@@ -676,7 +676,7 @@ class TradeCommands(Commands):
             return
         chips = int(args[0])
         profile = Profiles(message.author)
-        if profile.get()["pokebonds"] < chips // 10:
+        if profile.get("pokebonds") < chips // 10:
             await message.channel.send(
                 embed=get_embed(
                     f"You cannot afford that many chips.\n"
@@ -810,7 +810,7 @@ class TradeCommands(Commands):
         )
         Profiles(message.author).credit(chips)
         loot_model = Loots(message.author)
-        earned = loot_model.get()["earned"]
+        earned = loot_model.get("earned")
         loot_model.update(
             earned=(earned + chips)
         )

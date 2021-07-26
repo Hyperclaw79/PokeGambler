@@ -5,7 +5,6 @@ Custom Logger Module.
 # pylint: disable=unused-argument
 
 import re
-import sys
 from datetime import datetime
 from typing import Optional
 
@@ -64,7 +63,6 @@ class CustomLogger:
         '''
         if kwargs and kwargs.get("color") == "red":
             # pylint: disable=protected-access
-            func_name = sys._getframe(1).f_code.co_name
             func_name = kwargs.get("wrapped_func")
             # pylint: disable=invalid-name
             with open(self.error_log_path, 'a', encoding='utf-8') as f:
