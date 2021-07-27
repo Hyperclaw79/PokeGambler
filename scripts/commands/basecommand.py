@@ -355,6 +355,8 @@ def needs_ticket(name: str):
     Checks if user has the tickets in inventory.
     '''
     def decorator(func: Callable):
+        func.__dict__["ticket"] = name
+
         @wraps(func)
         def wrapped(self, message, *args, **kwargs):
             inv = Inventory(message.author)

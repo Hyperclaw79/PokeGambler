@@ -382,14 +382,14 @@ def get_modules(ctx: PokeGambler) -> List[Commands]:
     """
     Returns a list of all the commands.
     """
-    return [
+    yield from (
         getattr(ctx, comtype)
         for comtype in dir(ctx)
         if all([
             comtype.endswith('commands'),
             comtype != "load_commands"
         ])
-    ]
+    )
 
 
 def dedent(message: str) -> str:

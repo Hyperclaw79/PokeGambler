@@ -615,6 +615,8 @@ class ProfileCommands(Commands):
             timeout="inf"
         )
         url = await self.__background_get_url(message, reply)
+        if not url:
+            return
         profile.update(
             background=url
         )

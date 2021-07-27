@@ -756,13 +756,13 @@ class Inventory(Model):
         """
         Gets an item using ItemID if it exists in user's inventory.
         """
-        return next(
-            self.mongo.find({
-                "itemid": itemid,
-                "user_id": self.user_id
-            }),
-            None
-        )
+        item = self.mongo.find_one({
+            "user_id": self.user_id,
+            "itemid": itemid
+        })
+        if item:
+            return Item.from_id(itemid)
+        return None
 
     # pylint: disable=arguments-differ, no-member
     def save(self, itemid: str):

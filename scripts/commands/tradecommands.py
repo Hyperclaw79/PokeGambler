@@ -22,7 +22,7 @@ from ..base.shop import (
     PremiumShop, Shop, Title
 )
 
-from ..helpers.utils import dedent, get_embed
+from ..helpers.utils import dedent, get_embed, get_modules
 
 from .basecommand import (
     Commands, alias, dealer_only,
@@ -704,6 +704,68 @@ class TradeCommands(Commands):
                 f" into **{chips}** {self.chip_emoji}",
                 title="Redeem Succesfull",
                 color=profile.get('embed_color')
+            )
+        )
+
+    @model(Inventory)
+    async def cmd_use(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """Use a consumable ticket.
+        $```scss
+        {command_prefix}use ticket_name
+        ```$
+
+        @Use a consumable ticket and trigger it's related command.
+
+        ~To use the Background Change ticket with ID FFF000:
+            ```
+            {command_prefix}use FFF000
+            ```~
+        """
+        if not args or not re.match(r"[0-9a-fA-F]{6}", args[0]):
+            await message.channel.send(
+                embed=get_embed(
+                    "You need to enter a valid ticket ID.",
+                    embed_type="error",
+                    title="Invalid Ticket ID"
+                )
+            )
+            return
+        ticket = Inventory(message.author).from_id(args[0])
+        # pylint: disable=no-member
+        if (
+            not ticket
+            or "Change" not in ticket.name
+        ):
+            if ticket is None:
+                content = "You don't have that ticket."
+            else:
+                content = "That is not a valid ticket."
+            await message.channel.send(
+                embed=get_embed(
+                    content,
+                    embed_type="error",
+                    title="Invalid Ticket"
+                )
+            )
+            return
+        for module in get_modules(self.ctx):
+            for cmd in dir(module):
+                command = getattr(module, cmd)
+                if hasattr(command, "__dict__") and command.__dict__.get(
+                    "ticket"
+                ) == ticket.name:
+                    await command(message, args=args, **kwargs)
+                    return
+        await message.channel.send(
+            embed=get_embed(
+                "This ticket cannot be used yet.\n"
+                "Stay tuned for future updates.",
+                embed_type="warning",
+                title="Not Yet Usable"
             )
         )
 
