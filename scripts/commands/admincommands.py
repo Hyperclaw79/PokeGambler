@@ -43,54 +43,6 @@ class AdminCommands(Commands):
 
     @admin_only
     @ensure_user
-    @alias("upd_bal")
-    async def cmd_update_balance(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """Updates user's balance.
-        $```scss
-        {command_prefix}update_balance user_id balance
-        ```$
-
-        @`🛡️ Admin Command`
-        Overwrite a user's account balance.@
-
-        ~To overwrite balance of user with ID 12345:
-            ```
-            {command_prefix}update_balance 12345 100
-            ```~
-        """
-        if len(args) < 2:
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to provide a user ID and balance.",
-                    embed_type="error",
-                    title="Not enough args"
-                )
-            )
-            return
-        user_id = int(args[0])
-        try:
-            balance = int(args[1])
-        except ZeroDivisionError:
-            await message.channel.send(
-                embed=get_embed(
-                    "Good try but bad luck.",
-                    embed_type="error",
-                    title="Invalid input"
-                )
-            )
-            return
-        profile = await get_profile(message, user_id)
-        if not profile:
-            return
-        profile.update(balance=balance)
-        await message.add_reaction("👍")
-
-    @admin_only
-    @ensure_user
     @alias("chips+")
     async def cmd_add_chips(
         self, message: Message,
@@ -139,7 +91,9 @@ class AdminCommands(Commands):
         profile = await get_profile(message, user_id)
         if not profile:
             return
-        bonds = kwargs.get("purchased", False)
+        bonds = kwargs.get(
+            "purchased", False
+        ) and is_owner(self.ctx, message.author)
         profile.credit(increment, bonds=bonds)
         await message.add_reaction("👍")
 
@@ -507,6 +461,15 @@ class AdminCommands(Commands):
             ```~
         """
         item = kwargs.get("item")
+        if item.premium and not is_owner(self.ctx, message.author):
+            await message.channel.send(
+                embed=get_embed(
+                    "Only owners can delete a premium item.",
+                    embed_type="error",
+                    title="Forbidden"
+                )
+            )
+            return
         item.delete()
         await message.add_reaction("👍")
 
@@ -546,6 +509,10 @@ class AdminCommands(Commands):
                 )
             )
             return
+        if not is_owner(self.ctx, message.author):
+            updatables.pop("premium", None)
+        if not updatables:
+            return
         item.update(**updatables, modify_all=True)
         if issubclass(item.__class__, Tradable):
             Shop.refresh_tradables()
@@ -582,15 +549,27 @@ class AdminCommands(Commands):
                 )
             )
             return
+        # pylint: disable=no-member
         try:
-            user_id = int(args[0])
+            item = Item.get(args[1])
+            if not item:
+                raise ValueError
+            if (
+                item["premium"]
+                and not is_owner(self.ctx, message.author)
+            ):
+                await message.channel.send(
+                    embed=get_embed(
+                        "Only the owners can give Premium Items.",
+                        embed_type="error",
+                        title="Forbidden"
+                    )
+                )
+                return
             new_item = Item.from_id(
                 args[1],
                 force_new=True
             )
-            if not new_item:
-                raise ValueError
-            # pylint: disable=no-member
             itemid = new_item.itemid
         except (ValueError, ZeroDivisionError):
             await message.channel.send(
@@ -601,6 +580,7 @@ class AdminCommands(Commands):
                 )
             )
             return
+        user_id = int(args[0])
         user = message.guild.get_member(user_id)
         inv = Inventory(user)
         inv.save(itemid)
@@ -627,6 +607,16 @@ class AdminCommands(Commands):
             {command_prefix}item_all 0000FFFF
             ```~
         """
+        item = kwargs["item"]
+        if item.premium and not is_owner(self.ctx, message.author):
+            await message.channel.send(
+                embed=get_embed(
+                    "Only the owners can give Premium Items.",
+                    embed_type="error",
+                    title="Forbidden"
+                )
+            )
+            return
         ids = Profiles.get_all(ids_only=True)
         for uid in ids:
             if not uid:
