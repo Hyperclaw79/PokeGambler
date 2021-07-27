@@ -68,10 +68,7 @@ def admin_only(func: Callable):
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
         if any([
-            all([
-                is_admin(message.author),
-                message.guild.id == self.ctx.official_server
-            ]),
+            is_admin(message.author),
             is_owner(self.ctx, message.author)
         ]):
             async def func_with_callback(

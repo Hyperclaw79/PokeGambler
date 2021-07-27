@@ -360,7 +360,7 @@ def is_admin(user: Member) -> bool:
     ]
     return all([
         "admins" in roles,
-        user.guild.id == os.getenv('OFFICIAL_SERVER')
+        user.guild.id == int(os.getenv('OFFICIAL_SERVER'))
     ])
 
 
@@ -374,7 +374,7 @@ def is_dealer(user: Member) -> bool:
     ]
     return all([
         "dealer" in roles,
-        user.guild.id == os.getenv('OFFICIAL_SERVER')
+        user.guild.id == int(os.getenv('OFFICIAL_SERVER'))
     ])
 
 
