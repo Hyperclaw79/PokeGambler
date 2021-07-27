@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from inspect import ismethod
+import os
 from typing import (
     Any, Dict, List,
     Optional, Tuple, Type
@@ -168,22 +169,23 @@ class Profiles(UnlockedModel):
                 len(x)
             )
         )
-        if all([
-            "dealers" in [
-                role.name.lower()
-                for role in user.roles
-            ],
-            not self.is_dealer
-        ]):
-            self.update(is_dealer=True)
-        elif all([
-            "dealers" not in [
-                role.name.lower()
-                for role in user.roles
-            ],
-            self.is_dealer
-        ]):
-            self.update(is_dealer=False)
+        if self.user.guild.id == int(os.getenv('OFFICIAL_SERVER')):
+            if all([
+                "dealers" in [
+                    role.name.lower()
+                    for role in user.roles
+                ],
+                not self.is_dealer
+            ]):
+                self.update(is_dealer=True)
+            elif all([
+                "dealers" not in [
+                    role.name.lower()
+                    for role in user.roles
+                ],
+                self.is_dealer
+            ]):
+                self.update(is_dealer=False)
 
     def __eq__(self, other: Profiles) -> bool:
         return self.user.id == other.user.id
