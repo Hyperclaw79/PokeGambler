@@ -279,10 +279,22 @@ class Item(ABC):
         Unified Wrapper for the SQL endpoints,
         which fetches items of specified category.
         """
-        filter_ = {'category': category.title()}
+        filter_ = {
+            'category': category.title(),
+            'inventory': {'$eq': []}
+        }
         if premium is not None:
             filter_['premium'] = premium
         pipeline = [
+            {
+                "$lookup":
+                    {
+                        "from": "inventory",
+                        "localField": "_id",
+                        "foreignField": "itemid",
+                        "as": "inventory"
+                    }
+            },
             {"$match": filter_},
             {
                 "$group": {
