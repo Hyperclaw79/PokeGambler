@@ -866,10 +866,9 @@ class TradeCommands(Commands):
                     message.author
                 ).from_id(args[0])
                 if openable:
-                    openable = Item.from_id(openable["itemid"])
+                    openables = [openable]
                 else:
                     raise ValueError("Item not found in inventory.")
-                openables = [openable]
         except (ValueError, ZeroDivisionError):
             openables = []
         return openables
