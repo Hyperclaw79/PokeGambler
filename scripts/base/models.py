@@ -442,6 +442,15 @@ class CommandData(Model):
         """
         return list(cls.mongo.find().limit(limit))
 
+    @classmethod
+    def num_user_cmds(cls, user_id: str) -> int:
+        """
+        Returns the number of commands used by a user.
+        """
+        return cls.mongo.find({
+            "user_id": user_id
+        }).count()
+
 
 class Loots(UnlockedModel):
     """
@@ -840,7 +849,7 @@ class Minigame(Model):
         """
         return list(self.mongo.aggregate([
             {
-                "$group": self.__get_lb_group()
+                "$group": self._get_lb_group()
             },
             {
                 "$match": {
@@ -874,9 +883,9 @@ class Minigame(Model):
             "earned": -1
         }
 
-    def __get_lb_group(self):
+    def _get_lb_group(self):
         return {
-            "_id": str(self.user.id),
+            "_id": "$played_by",
             "num_wins": {
                 "$sum": {
                     "$toInt": "$won"
@@ -940,7 +949,7 @@ class Moles(Minigame):
 
     def _get_lb_group(self) -> Dict[str, Any]:
         return {
-            **super().__get_lb_group(),
+            **super()._get_lb_group(),
             "avg_lvl": {"$avg": "level"}
         }
 
@@ -974,6 +983,33 @@ class Duels(Minigame):
         self.opponent_gladiator = opponent_gladiator
         self.cost = cost
         self.won = won
+
+    def get_plays(self, wins: bool = False):
+        """
+        Returns list of minigames (of specified type) played.
+        """
+        filter_ = {
+            "played_by": str(self.user.id)
+        }
+        if wins:
+            filter_.update({"won": str(self.user.id)})
+        return list(self.mongo.aggregate([
+            {
+                "$match": filter_
+            }
+        ]))
+
+    def _get_lb_group(self):
+        return {
+            "_id": "$played_by",
+            "num_wins": {
+                "$sum": {
+                    "$toInt": {"$eq": ["$won", "$played_by"]}
+                }
+            },
+            "num_matches": {"$sum": 1},
+            "cumm_cost": {"$sum": "$cost"}
+        }
 
 
 class DuelActionsModel(Model):

@@ -16,7 +16,7 @@ import discord
 
 from ..base.items import Chest
 from ..base.models import (
-    Blacklist, Boosts, Inventory, Loots,
+    Blacklist, Boosts, CommandData, Inventory, Loots,
     Matches, Minigame, Profiles
 )
 from ..base.shop import BoostItem
@@ -197,12 +197,22 @@ class ProfileCommands(Commands):
                 leaderboard = []
                 lbrd = [
                     {
-                        "member": message.guild.get_member(int(res["_id"])),
+                        "member": (
+                            message.guild.get_member(int(res["_id"]))
+                            or self.ctx.get_guild(
+                                self.ctx.official_server
+                            ).get_member(int(res["_id"]))
+                        ),
                         **res,
                         "rank": idx + 1
                     }
                     for idx, res in enumerate(lbrd)
-                    if message.guild.get_member(int(res["_id"]))
+                    if (
+                        message.guild.get_member(int(res["_id"]))
+                        or self.ctx.get_guild(
+                            self.ctx.official_server
+                        ).get_member(int(res["_id"]))
+                    )
                 ]
                 for res in lbrd:
                     profile = Profiles(res["member"]).get()
@@ -223,13 +233,6 @@ class ProfileCommands(Commands):
                 leaderboard = Profiles.get_leaderboard(
                     sort_by=sort_by
                 )
-            leaderboard = [
-                usr
-                for usr in leaderboard
-                if message.guild.get_member(
-                    int(usr['user_id'])
-                )
-            ]
             if not leaderboard:
                 await message.channel.send(
                     embed=get_embed(
@@ -313,6 +316,7 @@ class ProfileCommands(Commands):
         discord_file = img2file(badgestrip, "badges.png", ext="PNG")
         await message.channel.send(file=discord_file)
 
+    @model([Minigame, Loots, CommandData])
     async def cmd_stats(self, message: Message, **kwargs):
         """Check match and minigame stats.
         $```scss
@@ -330,7 +334,7 @@ class ProfileCommands(Commands):
             message.author
         ).get_stats()
         stat_dict = {
-            "Gamble Matches": f"Played: {match_stats[0]}\n"
+            "Gambles": f"Played: {match_stats[0]}\n"
             f"Won: {match_stats[1]}"
         }
         for minigame_cls in Minigame.__subclasses__():
@@ -339,16 +343,21 @@ class ProfileCommands(Commands):
                 minigame_cls.__name__
             ] = f"Played: {minigame.num_plays}\n" + \
                 f"Won: {minigame.num_wins}"
+        loots_earned = Loots(message.author).earned
+        num_cmds = CommandData.num_user_cmds(str(message.author.id))
+        stat_dict["Misc."] = f"Looted: {loots_earned}\n" + \
+            f"Commands: {num_cmds}"
         emb = get_embed(
             "Here's how you've performed till now.",
             title=f"Statistics for **{message.author.name}**",
             color=Profiles(message.author).get('embed_color')
         )
-        for key, val in stat_dict.items():
+        for idx, (key, val) in enumerate(stat_dict.items()):
+            if idx and (idx % 2 == 0):
+                emb.add_field(name="\u200B", value="\u200B")
             emb.add_field(
                 name=f"**{key}**",
-                value=f"```rb\n{val}\n```",
-                inline=False
+                value=f"```rb\n{val}\n```"
             )
         await message.channel.send(embed=emb)
 
@@ -749,7 +758,8 @@ class ProfileCommands(Commands):
                             leaderboard = model_(
                                 user
                             ).get_lb()
-                            return leaderboard
+                            if leaderboard:
+                                return leaderboard
             return leaderboard
         modules = get_modules(self.ctx)
         return _get_lb(modules, mg_name, user)
