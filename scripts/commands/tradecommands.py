@@ -718,7 +718,7 @@ class TradeCommands(Commands):
         {command_prefix}use ticket_name
         ```$
 
-        @Use a consumable ticket and trigger it's related command.
+        @Use a consumable ticket and trigger it's related command.@
 
         ~To use the Background Change ticket with ID FFF000:
             ```

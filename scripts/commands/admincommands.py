@@ -343,7 +343,7 @@ class AdminCommands(Commands):
         :information_source: Chests cannot be created using this.
         **Owner(s) can create Premium items using the --premium kwarg.**
         *In case of Reward Boxes, the items should be a comma-separated*
-        *list of IDs.*
+        *list of IDs.*@
         """
 
         # pylint: disable=no-member
