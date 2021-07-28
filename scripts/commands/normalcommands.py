@@ -195,8 +195,7 @@ class NormalCommands(Commands):
             image="https://cdn.discordapp.com/attachments/"
             "840469669332516904/861292639857147914/pg_banner.png"
         )
-        inv_emb.url = "https://discordapp.com/oauth2/authorize?client_id=" + \
-            f"{self.ctx.user.id}&scope=bot&permissions=511040"
+        inv_emb.url = "https://top.gg/bot/831575371601412136/invite/"
         await message.channel.send(
             embed=inv_emb
         )
