@@ -78,6 +78,16 @@ class DuelActions:
                         action, key
                     ).save()
 
+    def get(self, damage: int) -> str:
+        """
+        Returns a random attack based on damage.
+        """
+        if damage >= 300:
+            return "<g1> uses 🅳🅸🆅🅸🅽🅴 🆆🆁🅰🆃🅷 and finishes off <g2>."
+        if damage > 150:
+            return random.choice(self.crit)
+        return random.choice(self.normal)
+
     def refresh(self):
         """
         Populates DuelActions class with all actions in DB.
@@ -90,16 +100,6 @@ class DuelActions:
             else:
                 self.crit.append(action["action"])
 
-    def get(self, damage: int) -> str:
-        """
-        Returns a random attack based on damage.
-        """
-        if damage >= 300:
-            return "<g1> uses 🅳🅸🆅🅸🅽🅴 🆆🆁🅰🆃🅷 and finishes off <g2>."
-        if damage > 150:
-            return random.choice(self.crit)
-        return random.choice(self.normal)
-
 
 class DuelCommands(Commands):
     """
@@ -109,107 +109,6 @@ class DuelCommands(Commands):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.duelactions = DuelActions(self.ctx)
-
-    @cooldown(300)
-    @model([Duels, Profiles, Inventory, Item])
-    @alias(["fight", "gladiator", "battle"])
-    async def cmd_duel(
-        self, message: Message,
-        args: Optional[List] = None,
-        mentions: List[Member] = None,
-        **kwargs
-    ):
-        """Gladiator Battler 1v1.
-        $```scss
-        {command_prefix}duel [chips] @player
-        ```$
-
-        @Have a 1v1 Gladiator match against any valid player.
-        Cost defaults to 50 {pokechip_emoji} (minimum) if not provided.
-        Both the players must own at least 1 Gladiator & have enough balance.
-        You can purchase Gladiators from the shop.@
-
-        ~To battle user ABCD#1234 for 50 chips:
-            ```
-            {command_prefix}duel @ABCD#1234
-            ```
-        To battle user EFGH#5678 for 50,000 chips:
-            ```
-            {command_prefix}duel @EFGH#5678 50000
-            ```~
-        """
-        if not mentions or mentions[0].id == message.author.id:
-            await dm_send(
-                message, message.author,
-                embed=get_embed(
-                    "You need to mention whom you want to duel.",
-                    embed_type="error",
-                    title="No Player 2"
-                )
-            )
-            return
-        user_profile = Profiles(message.author)
-        amount = await self.__duel_get_cost(message, user_profile, args)
-        if not amount:
-            return
-        gladiator1 = await self.__duel_get_gladiator(
-            message, message.author, user_profile
-        )
-        if not gladiator1:
-            return
-        user2 = mentions[0]
-        na_checks = [
-            user2.bot,
-            Blacklist.is_blacklisted(user2.id)
-        ]
-        if any(na_checks):
-            reasons = [
-                "Bot account",
-                "Blacklisted User"
-            ]
-            reason = reasons[
-                na_checks.index(True)
-            ]
-            await message.channel.send(
-                embed=get_embed(
-                    f"You cannot challenge a **{reason}.**",
-                    embed_type="error",
-                    title="Invalid Opponent"
-                )
-            )
-            return
-        other_profile = Profiles(user2)
-        confirmed = await self.__duel_confirmation(
-            message, user2,
-            amount, other_profile
-        )
-        if not confirmed:
-            return
-        gladiator2 = await self.__duel_get_gladiator(
-            message, user2, other_profile,
-            notify=False
-        )
-        if not gladiator2:
-            await message.channel.send(
-                embed=get_embed(
-                    f"Gladiator Match cancelled cause **{user2.name}**"
-                    " has no gladiator.",
-                    embed_type="warning",
-                    title="Duel cancelled."
-                )
-            )
-            return
-        proceed = await self.__duel_proceed(
-            message, user2, other_profile,
-            gladiator2, amount
-        )
-        if proceed:
-            glads = [gladiator1, gladiator2]
-            profiles = [user_profile, other_profile]
-            await self.__duel_play(
-                message, glads,
-                profiles, amount
-            )
 
     @alias("action+")
     @model([DuelActionsModel, Profiles])
@@ -340,6 +239,107 @@ class DuelCommands(Commands):
         profile.debit(200, bonds=levels.index(choice))
         self.duelactions.refresh()
 
+    @cooldown(300)
+    @model([Blacklist, Duels, Inventory, Item, Profiles])
+    @alias(["fight", "gladiator", "battle"])
+    async def cmd_duel(
+        self, message: Message,
+        args: Optional[List] = None,
+        mentions: List[Member] = None,
+        **kwargs
+    ):
+        """Gladiator Battler 1v1.
+        $```scss
+        {command_prefix}duel [chips] @player
+        ```$
+
+        @Have a 1v1 Gladiator match against any valid player.
+        Cost defaults to 50 {pokechip_emoji} (minimum) if not provided.
+        Both the players must own at least 1 Gladiator & have enough balance.
+        You can purchase Gladiators from the shop.@
+
+        ~To battle user ABCD#1234 for 50 chips:
+            ```
+            {command_prefix}duel @ABCD#1234
+            ```
+        To battle user EFGH#5678 for 50,000 chips:
+            ```
+            {command_prefix}duel @EFGH#5678 50000
+            ```~
+        """
+        if not mentions or mentions[0].id == message.author.id:
+            await dm_send(
+                message, message.author,
+                embed=get_embed(
+                    "You need to mention whom you want to duel.",
+                    embed_type="error",
+                    title="No Player 2"
+                )
+            )
+            return
+        user_profile = Profiles(message.author)
+        amount = await self.__duel_get_cost(message, user_profile, args)
+        if not amount:
+            return
+        gladiator1 = await self.__duel_get_gladiator(
+            message, message.author, user_profile
+        )
+        if not gladiator1:
+            return
+        user2 = mentions[0]
+        na_checks = [
+            user2.bot,
+            Blacklist.is_blacklisted(user2.id)
+        ]
+        if any(na_checks):
+            reasons = [
+                "Bot account",
+                "Blacklisted User"
+            ]
+            reason = reasons[
+                na_checks.index(True)
+            ]
+            await message.channel.send(
+                embed=get_embed(
+                    f"You cannot challenge a **{reason}.**",
+                    embed_type="error",
+                    title="Invalid Opponent"
+                )
+            )
+            return
+        other_profile = Profiles(user2)
+        confirmed = await self.__duel_confirmation(
+            message, user2,
+            amount, other_profile
+        )
+        if not confirmed:
+            return
+        gladiator2 = await self.__duel_get_gladiator(
+            message, user2, other_profile,
+            notify=False
+        )
+        if not gladiator2:
+            await message.channel.send(
+                embed=get_embed(
+                    f"Gladiator Match cancelled cause **{user2.name}**"
+                    " has no gladiator.",
+                    embed_type="warning",
+                    title="Duel cancelled."
+                )
+            )
+            return
+        proceed = await self.__duel_proceed(
+            message, user2, other_profile,
+            gladiator2, amount
+        )
+        if proceed:
+            glads = [gladiator1, gladiator2]
+            profiles = [user_profile, other_profile]
+            await self.__duel_play(
+                message, glads,
+                profiles, amount
+            )
+
     @needs_ticket("Gladiator Nickname Change")
     @check_completion
     @model(Inventory)
@@ -406,6 +406,47 @@ class DuelCommands(Commands):
                 color=profile.get("embed_color")
             )
         )
+
+    async def __duel_confirmation(
+        self, message: Message,
+        user: Member, amount: int,
+        user_profile: Profiles
+    ) -> bool:
+        inv_msg = await message.channel.send(
+            content=f"Hey {user.mention}, you have been invited "
+            f"to a Gladiator match by **{message.author.name}**",
+            embed=get_embed(
+                "React to this message with ☑️ to accept the duel.\n"
+                f"Bet Amount: **{amount}** {self.chip_emoji}",
+                title="Do you accept?",
+                color=user_profile.get("embed_color")
+            )
+        )
+        await inv_msg.add_reaction("☑️")
+        await inv_msg.add_reaction("❌")
+        reply = await wait_for(
+            message.channel, self.ctx,
+            "reaction_add", init_msg=inv_msg,
+            check=lambda rctn, usr: all([
+                rctn.emoji in ["☑️", "❌"],
+                rctn.message.id == inv_msg.id,
+                usr.id == user.id
+            ]),
+            timeout=60.0
+        )
+        if reply:
+            rctn, _ = reply
+        await inv_msg.delete()
+        if not reply or rctn.emoji == "❌":
+            await message.channel.send(
+                embed=get_embed(
+                    f"Gladiator Match has been declined by **{user.name}**.",
+                    embed_type="warning",
+                    title="Duel cancelled."
+                )
+            )
+            return False
+        return True
 
     def __duel_get_action(
         self, glads: List[Gladiator],
@@ -529,103 +570,6 @@ class DuelCommands(Commands):
         gladiator.owner = user
         return gladiator
 
-    async def __duel_confirmation(
-        self, message: Message,
-        user: Member, amount: int,
-        user_profile: Profiles
-    ) -> bool:
-        inv_msg = await message.channel.send(
-            content=f"Hey {user.mention}, you have been invited "
-            f"to a Gladiator match by **{message.author.name}**",
-            embed=get_embed(
-                "React to this message with ☑️ to accept the duel.\n"
-                f"Bet Amount: **{amount}** {self.chip_emoji}",
-                title="Do you accept?",
-                color=user_profile.get("embed_color")
-            )
-        )
-        await inv_msg.add_reaction("☑️")
-        await inv_msg.add_reaction("❌")
-        reply = await wait_for(
-            message.channel, self.ctx,
-            "reaction_add", init_msg=inv_msg,
-            check=lambda rctn, usr: all([
-                rctn.emoji in ["☑️", "❌"],
-                rctn.message.id == inv_msg.id,
-                usr.id == user.id
-            ]),
-            timeout=60.0
-        )
-        if reply:
-            rctn, _ = reply
-        await inv_msg.delete()
-        if not reply or rctn.emoji == "❌":
-            await message.channel.send(
-                embed=get_embed(
-                    f"Gladiator Match has been declined by **{user.name}**.",
-                    embed_type="warning",
-                    title="Duel cancelled."
-                )
-            )
-            return False
-        return True
-
-    @staticmethod
-    async def __duel_proceed(
-        message: Message, user: Member,
-        profile: Profiles, gladiator: Gladiator,
-        cost: int
-    ) -> bool:
-        if profile.get("balance") < cost:
-            await message.channel.send(
-                embed=get_embed(
-                    f"Match cancelled cause **{user.name}** can't afford it.",
-                    embed_type="error",
-                    title="Insufficient Balance"
-                )
-            )
-            return False
-        if not gladiator:
-            await message.channel.send(
-                embed=get_embed(
-                    f"Match cancelled cause **{user.name}** has no gladiator.",
-                    embed_type="error",
-                    title="No Gladiator"
-                )
-            )
-            return False
-        return True
-
-    async def __duel_start(
-        self, message: Message,
-        gladhandler: GladitorMatchHandler,
-        glads: List[Gladiator]
-    ) -> Message:
-        fresh_emb = discord.Embed(
-            title="Match Starting..."
-        )
-        try:
-            start_fl = img2file(
-                next(gladhandler.get(glads))[0],
-                "start.jpg"
-            )
-            fresh_emb.set_image(
-                url="attachment://start.jpg"
-            )
-            base = await message.channel.send(
-                embed=fresh_emb, file=start_fl
-            )
-            return base
-        except StopIteration:
-            await message.channel.send(
-                embed=get_embed(
-                    "Something went wrong.",
-                    embed_type="error",
-                    title="Could Not Start Duel"
-                )
-            )
-            return None
-
     async def __duel_play(
         self, message: Message,
         glads: List[Gladiator],
@@ -694,3 +638,59 @@ class DuelCommands(Commands):
             str(players[1].id), glads[1].name, str(winner.user.id),
             amount
         ).save()
+
+    @staticmethod
+    async def __duel_proceed(
+        message: Message, user: Member,
+        profile: Profiles, gladiator: Gladiator,
+        cost: int
+    ) -> bool:
+        if profile.get("balance") < cost:
+            await message.channel.send(
+                embed=get_embed(
+                    f"Match cancelled cause **{user.name}** can't afford it.",
+                    embed_type="error",
+                    title="Insufficient Balance"
+                )
+            )
+            return False
+        if not gladiator:
+            await message.channel.send(
+                embed=get_embed(
+                    f"Match cancelled cause **{user.name}** has no gladiator.",
+                    embed_type="error",
+                    title="No Gladiator"
+                )
+            )
+            return False
+        return True
+
+    async def __duel_start(
+        self, message: Message,
+        gladhandler: GladitorMatchHandler,
+        glads: List[Gladiator]
+    ) -> Message:
+        fresh_emb = discord.Embed(
+            title="Match Starting..."
+        )
+        try:
+            start_fl = img2file(
+                next(gladhandler.get(glads))[0],
+                "start.jpg"
+            )
+            fresh_emb.set_image(
+                url="attachment://start.jpg"
+            )
+            base = await message.channel.send(
+                embed=fresh_emb, file=start_fl
+            )
+            return base
+        except StopIteration:
+            await message.channel.send(
+                embed=get_embed(
+                    "Something went wrong.",
+                    embed_type="error",
+                    title="Could Not Start Duel"
+                )
+            )
+            return None

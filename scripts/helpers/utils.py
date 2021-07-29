@@ -17,7 +17,6 @@ from typing import (
 
 import discord
 
-
 if TYPE_CHECKING:
     from discord import (
         Embed, File, Message,
@@ -71,21 +70,33 @@ class LineTimer:
             )
 
 
-def get_formatted_time(
-    tot_secs: int,
-    show_hours: bool = True,
-    show_mins: bool = True
-) -> str:
-    """ Converts total seconds into a human readable format."""
-    hours = divmod(tot_secs, 3600)
-    minutes = divmod(hours[1], 60)
-    seconds = divmod(minutes[1], 1)
-    disp_tm = f"**{int(seconds[0]):02d} seconds**"
-    if show_mins:
-        disp_tm = f"**{int(minutes[0]):02d} minutes** and " + disp_tm
-    if show_hours:
-        disp_tm = f"**{int(hours[0]):02d} hours**, " + disp_tm
-    return disp_tm
+def dedent(message: str) -> str:
+    """
+    Strips whitespaces from the left of every line.
+    """
+    return '\n'.join(
+        line.lstrip()
+        for line in message.splitlines()
+    )
+
+
+async def dm_send(
+    message: Message, user: Member,
+    content: Optional[str] = None,
+    embed: Optional[Embed] = None
+) -> Message:
+    """
+    Attempts to send message to the User's DM.
+    In case of fallback, sends in the original channel.
+    """
+    try:
+        msg = await user.send(content=content, embed=embed)
+    except discord.Forbidden:
+        msg = await message.channel.send(
+            content=f"Hey {user.mention},\n{content if content else ''}",
+            embed=embed
+        )
+    return msg
 
 
 def get_ascii(msg: str) -> str:
@@ -112,22 +123,6 @@ def get_ascii(msg: str) -> str:
 
     art = '\t\t\t' + art.replace('\n', '\n\t\t\t')
     return art
-
-
-def prettify_discord(
-    ctx: PokeGambler,
-    iterable: List,
-    mode: str = "guild"
-) -> str:
-    """ Prettification for iterables like guilds and channels. """
-    func = getattr(ctx, f"get_{mode}")
-    return '\n\t'.join(
-        ', '.join(
-            f"{func(id=elem)} ({str(elem)})"
-            for elem in iterable[i: i + 2]
-        )
-        for i in range(0, len(iterable), 2)
-    )
 
 
 # pylint: disable=too-many-arguments
@@ -207,6 +202,133 @@ def get_enum_embed(
     )
 
 
+def get_formatted_time(
+    tot_secs: int,
+    show_hours: bool = True,
+    show_mins: bool = True
+) -> str:
+    """ Converts total seconds into a human readable format."""
+    hours = divmod(tot_secs, 3600)
+    minutes = divmod(hours[1], 60)
+    seconds = divmod(minutes[1], 1)
+    disp_tm = f"**{int(seconds[0]):02d} seconds**"
+    if show_mins:
+        disp_tm = f"**{int(minutes[0]):02d} minutes** and " + disp_tm
+    if show_hours:
+        disp_tm = f"**{int(hours[0]):02d} hours**, " + disp_tm
+    return disp_tm
+
+
+def get_modules(ctx: PokeGambler) -> List[Commands]:
+    """
+    Returns a list of all the commands.
+    """
+    yield from (
+        getattr(ctx, comtype)
+        for comtype in dir(ctx)
+        if all([
+            comtype.endswith('commands'),
+            comtype != "load_commands"
+        ])
+    )
+
+
+def get_rand_headers() -> Dict:
+    """
+    Generates a random header for the aiohttp session.
+    """
+    browsers = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "AppleWebKit/537.36 (KHTML, like Gecko)",
+        "discord/0.0.306",
+        "Chrome/80.0.3987.132",
+        "Discord/1.6.15",
+        "Safari/537.36",
+        "Electron/7.1.11"
+    ]
+    return {
+        "User-Agent": ' '.join(
+            set(
+                random.choices(
+                    browsers,
+                    k=random.randint(1, len(browsers))
+                )
+            )
+        ),
+        "Referer": "https://discordapp.com",
+        "Origin": "https://discordapp.com"
+    }
+
+
+def is_admin(user: Member) -> bool:
+    """
+    Checks if user is a server admin.
+    """
+    roles = [
+        role.name.lower()
+        for role in user.roles
+    ]
+    return all([
+        "admins" in roles,
+        user.guild.id == int(os.getenv('OFFICIAL_SERVER'))
+    ])
+
+
+def is_dealer(user: Member) -> bool:
+    """
+    Checks if user is a PokeGambler Dealer.
+    """
+    roles = [
+        role.name.lower()
+        for role in user.roles
+    ]
+    return all([
+        "dealer" in roles,
+        user.guild.id == int(os.getenv('OFFICIAL_SERVER'))
+    ])
+
+
+def is_owner(ctx: PokeGambler, user: Member) -> bool:
+    """
+    Checks if user is bot owner.
+    """
+    return user.id in (
+        ctx.allowed_users,
+        ctx.owner_id
+    )
+
+
+def img2file(
+    img: Image, fname: str,
+    ext: str = "JPEG"
+) -> File:
+    """
+    Convert a PIL Image into a discord File.
+    """
+    byio = BytesIO()
+    img.save(byio, ext)
+    byio.seek(0)
+    return discord.File(byio, fname)
+
+
+async def online_now(ctx: PokeGambler):
+    """
+    Notifies on Discord, that PokeGambler is ready.
+    """
+    secret = ctx.discord_webhook_token
+    channel = ctx.discord_webhook_channel
+    url = f"https://discord.com/api/webhooks/{channel}/{secret}"
+    body = {
+        "username": "PokeGambler Status Monitor",
+        "content": "\n".join([
+            "<:online:841643544581111808>\t**Online**",
+            "PokeGambler is back online, you can use commands again.",
+            "\u200B\n\u200B\n"
+        ])
+    }
+    await ctx.sess.post(url=url, data=body)
+
+
 def parse_command(prefix: str, msg: str) -> dict:
     """ Parses a message to obtain the command, args and kwargs. """
     def is_digit(word, check_float=False):
@@ -271,174 +393,23 @@ def parse_command(prefix: str, msg: str) -> dict:
     return parsed
 
 
+def prettify_discord(
+    ctx: PokeGambler,
+    iterable: List,
+    mode: str = "guild"
+) -> str:
+    """ Prettification for iterables like guilds and channels. """
+    func = getattr(ctx, f"get_{mode}")
+    return '\n\t'.join(
+        ', '.join(
+            f"{func(id=elem)} ({str(elem)})"
+            for elem in iterable[i: i + 2]
+        )
+        for i in range(0, len(iterable), 2)
+    )
+
+
 # pylint: disable=too-many-arguments
-async def wait_for(
-    chan: TextChannel, ctx: PokeGambler,
-    event: str = "message",
-    init_msg: Optional[Message] = None,
-    check: Optional[Callable] = None,
-    timeout: Optional[Union[float, str]] = None
-) -> Message:
-    """
-    Modified version of discord.Client.wait_for.
-    Checks the history once upon timeout.
-    """
-    if not timeout:
-        timeout = 5.0
-    elif timeout == "inf":
-        timeout = None
-    try:
-        reply = await ctx.wait_for(
-            event,
-            check=check,
-            timeout=timeout
-        )
-        return reply
-    except asyncio.TimeoutError:
-        history = chan.history(limit=10, after=init_msg)
-        reply = await history.find(predicate=check)
-        return reply
-
-
-def get_rand_headers() -> Dict:
-    """
-    Generates a random header for the aiohttp session.
-    """
-    browsers = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "AppleWebKit/537.36 (KHTML, like Gecko)",
-        "discord/0.0.306",
-        "Chrome/80.0.3987.132",
-        "Discord/1.6.15",
-        "Safari/537.36",
-        "Electron/7.1.11"
-    ]
-    return {
-        "User-Agent": ' '.join(
-            set(
-                random.choices(
-                    browsers,
-                    k=random.randint(1, len(browsers))
-                )
-            )
-        ),
-        "Referer": "https://discordapp.com",
-        "Origin": "https://discordapp.com"
-    }
-
-
-def img2file(
-    img: Image, fname: str,
-    ext: str = "JPEG"
-) -> File:
-    """
-    Convert a PIL Image into a discord File.
-    """
-    byio = BytesIO()
-    img.save(byio, ext)
-    byio.seek(0)
-    return discord.File(byio, fname)
-
-
-def is_owner(ctx: PokeGambler, user: Member) -> bool:
-    """
-    Checks if user is bot owner.
-    """
-    return user.id in (
-        ctx.allowed_users,
-        ctx.owner_id
-    )
-
-
-def is_admin(user: Member) -> bool:
-    """
-    Checks if user is a server admin.
-    """
-    roles = [
-        role.name.lower()
-        for role in user.roles
-    ]
-    return all([
-        "admins" in roles,
-        user.guild.id == int(os.getenv('OFFICIAL_SERVER'))
-    ])
-
-
-def is_dealer(user: Member) -> bool:
-    """
-    Checks if user is a PokeGambler Dealer.
-    """
-    roles = [
-        role.name.lower()
-        for role in user.roles
-    ]
-    return all([
-        "dealer" in roles,
-        user.guild.id == int(os.getenv('OFFICIAL_SERVER'))
-    ])
-
-
-def get_modules(ctx: PokeGambler) -> List[Commands]:
-    """
-    Returns a list of all the commands.
-    """
-    yield from (
-        getattr(ctx, comtype)
-        for comtype in dir(ctx)
-        if all([
-            comtype.endswith('commands'),
-            comtype != "load_commands"
-        ])
-    )
-
-
-def dedent(message: str) -> str:
-    """
-    Strips whitespaces from the left of every line.
-    """
-    return '\n'.join(
-        line.lstrip()
-        for line in message.splitlines()
-    )
-
-
-async def online_now(ctx: PokeGambler):
-    """
-    Notifies on Discord, that PokeGambler is ready.
-    """
-    secret = ctx.discord_webhook_token
-    channel = ctx.discord_webhook_channel
-    url = f"https://discord.com/api/webhooks/{channel}/{secret}"
-    body = {
-        "username": "PokeGambler Status Monitor",
-        "content": "\n".join([
-            "<:online:841643544581111808>\t**Online**",
-            "PokeGambler is back online, you can use commands again.",
-            "\u200B\n\u200B\n"
-        ])
-    }
-    await ctx.sess.post(url=url, data=body)
-
-
-async def dm_send(
-    message: Message, user: Member,
-    content: Optional[str] = None,
-    embed: Optional[Embed] = None
-) -> Message:
-    """
-    Attempts to send message to the User's DM.
-    In case of fallback, sends in the original channel.
-    """
-    try:
-        msg = await user.send(content=content, embed=embed)
-    except discord.Forbidden:
-        msg = await message.channel.send(
-            content=f"Hey {user.mention},\n{content if content else ''}",
-            embed=embed
-        )
-    return msg
-
-
 def showable_command(
     ctx: PokeGambler,
     cmd: Callable, user: Member
@@ -504,3 +475,31 @@ def get_commands(
             key=len
         )
     )
+
+
+async def wait_for(
+    chan: TextChannel, ctx: PokeGambler,
+    event: str = "message",
+    init_msg: Optional[Message] = None,
+    check: Optional[Callable] = None,
+    timeout: Optional[Union[float, str]] = None
+) -> Message:
+    """
+    Modified version of discord.Client.wait_for.
+    Checks the history once upon timeout.
+    """
+    if not timeout:
+        timeout = 5.0
+    elif timeout == "inf":
+        timeout = None
+    try:
+        reply = await ctx.wait_for(
+            event,
+            check=check,
+            timeout=timeout
+        )
+        return reply
+    except asyncio.TimeoutError:
+        history = chan.history(limit=10, after=init_msg)
+        reply = await history.find(predicate=check)
+        return reply

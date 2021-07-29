@@ -68,171 +68,282 @@ class AssetGenerator(ABC):
         canvas.text(pos, txt, fill=(255, 255, 255), font=font)
 
 
-class ProfileCardGenerator(AssetGenerator):
+class BadgeGenerator(AssetGenerator):
     """
-    ProfileCard Image Generation Class
+    Badgestrip Image Generation Class
     """
     def __init__(self, asset_path: str = "assets"):
         super().__init__(asset_path)
-        self.font = ImageFont.truetype(
-            os.path.join(asset_path, "Exo-ExtraBold.ttf"),
-            36
-        )
-        self.profilecard = Image.open(
-            os.path.join(asset_path, "basecards", "profilecard.jpg")
-        )
-        self.profileframe = Image.open(
-            os.path.join(asset_path, "basecards", "profileframe.png")
-        )
         self.badges = {
             badge: Image.open(
                 os.path.join(
                     asset_path, "basecards",
-                    "badges", "100x100", f"{badge}.png"
+                    "badges", f"{badge}.png"
                 )
             )
             for badge in ["champion", "emperor", "funder", "dealer"]
         }
+        self.badgestrip = Image.open(
+            os.path.join(
+                asset_path, "basecards",
+                "badges", "badgestrip.png"
+            )
+        )
 
     def get(
-        self, name: str, avatar: Image.Image,
-        balance: str, num_played: str, num_won: str,
-        badges: Optional[List[Image.Image]] = None,
-        blacklisted: bool = False,
-        background: Image.Image = None
+        self, badges: Optional[List] = None
     ) -> Image.Image:
-
-        # pylint: disable=too-many-locals
-
-        if background:
-            profilecard = background.convert('RGBA')
-            profilecard.paste(
-                self.profileframe,
-                (0, 0),
-                self.profileframe
+        badgestrip = self.badgestrip.copy()
+        if not badges:
+            return badgestrip
+        badge_dict = {
+            "funder": (40, 200),
+            "champion": (370, 200),
+            "emperor": (687, 200),
+            "dealer": (1020, 200)
+        }
+        for badge in badges:
+            badgestrip.paste(
+                self.badges[badge],
+                badge_dict[badge],
+                self.badges[badge]
             )
-            profilecard.convert('RGB')
-        else:
-            profilecard = self.profilecard.copy()
-        profilecard.paste(
-            avatar.resize((280, 280)).convert('RGB'),
-            (603, 128)
-        )
-        canvas = ImageDraw.Draw(profilecard)
-        params = [
-            {
-                "txt": name,
-                "start_pos": (220, 112),
-                "bbox": (280, 56)
-            },
-            {
-                "txt": num_played,
-                "start_pos": (220, 292),
-                "bbox": (280, 56)
-            },
-            {
-                "txt": num_won,
-                "start_pos": (220, 340),
-                "bbox": (280, 56)
-            },
-            {
-                "txt": balance,
-                "start_pos": (220, 177),
-                "bbox": (210, 56)
-            }
-        ]
-        for param in params:
-            canvas.text(
-                param["start_pos"],
-                param["txt"],
-                fill=(0, 0, 0),
-                font=self.get_font(
-                    self.font, param["txt"], param["bbox"]
-                )
-            )
-        profilecard = profilecard.convert('RGBA')
-        if all([
-            badges, not blacklisted
-        ]):
-            for idx, badge in enumerate(badges):
-                profilecard.paste(
-                    self.badges[badge],
-                    (25 + (120 * idx), 400),
-                    self.badges[badge]
-                )
-        chip_pos = (220 + self.font.getsize(balance)[0] + 20, 159)
-        chip = self.pokechip.resize((80, 80), Image.ANTIALIAS)
-        profilecard.paste(chip, chip_pos, chip)
-        profilecard = profilecard.convert('RGB')
-        if blacklisted:
-            profilecard = self.add_bl_effect(profilecard)
-        return profilecard
-
-    def add_bl_effect(self, profilecard: Image.Image) -> Image.Image:
-        """
-        Adds a Blacklisted label on profilecard.
-        Also desaturates and darkens the image.
-        """
-        for task in ["Brightness", "Color"]:
-            enhancer = getattr(ImageEnhance, task)(profilecard)
-            profilecard = enhancer.enhance(0.25)
-        text_layer = Image.new('RGBA', profilecard.size, (0, 0, 0, 0))
-        canvas = ImageDraw.Draw(text_layer)
-        canvas.text(
-            (50, 205),
-            "BLACKLISTED",
-            fill=(255, 255, 255, 255),
-            font=ImageFont.truetype(self.font.path, 130)
-        )
-        profilecard.paste(
-            text_layer.rotate(-20),
-            (0, 0),
-            text_layer.rotate(-20)
-        )
-        return profilecard
+        return badgestrip
 
 
-class WalletGenerator(AssetGenerator):
+class BoardGenerator(AssetGenerator):
     """
-    BalanceCard Image Generation Class
+    The Board Generator for Wackamole minigame.
+    """
+    def __init__(self, asset_path: str):
+        super().__init__(asset_path=asset_path)
+        self.mole = Image.new('RGB', (250, 250), (0, 0, 0))
+        self.mole.paste(
+            self.pokechip.resize((250, 250)).convert('RGB')
+        )
+        self.boards = []
+        self.board_names = []
+        for board in sorted(os.listdir(
+            os.path.join(asset_path, "basecards", "boards")
+        )):
+            self.board_names.append(
+                board.split(".jpg")[0].title()
+            )
+            self.boards.append(
+                Image.open(
+                    os.path.join(
+                        asset_path, "basecards", "boards", board
+                    )
+                )
+            )
+
+    def get(
+        self, level: Optional[int] = 0
+    ) -> Tuple[str, Image.Image]:
+        """
+        Returns a Board image with a random time replaced with a pokechip.
+        """
+        pos = (
+            random.randint(0, level + 2),
+            random.randint(0, level + 2)
+        )
+        tile_w, tile_h = (250, 250)
+        board_img = self.boards[level].copy()
+        board_img.paste(
+            self.mole,
+            (pos[0] * tile_w, pos[1] * tile_h)
+        )
+        letter = ('A', 'B', 'C', 'D', 'E', 'F', 'G')[pos[0]]
+        num = pos[1] + 1
+        rolled = f"{letter}{num}"
+        return (rolled, board_img)
+
+    def get_board(
+        self, level: Optional[int] = 0
+    ) -> Tuple[str, Image.Image]:
+        """
+        Returns a Wackamole board (name, Image) of given difficulty level.
+        """
+        return (
+            self.board_names[level],
+            self.boards[level].copy()
+        )
+
+    @staticmethod
+    def get_valids(level: Optional[int] = 0) -> List:
+        """
+        Returns a list of possible tile names for given difficulty level.
+        """
+        return [
+            f"{chr(65+i)}{j}"
+            for i in range(level + 3)
+            for j in range(1, level + 4)
+        ]
+
+
+class GladitorMatchHandler(AssetGenerator):
+    """
+    Gladiator Match handler class
     """
     def __init__(self, asset_path: str = "assets"):
         super().__init__(asset_path)
-        self.asset_path = asset_path
         self.font = ImageFont.truetype(
             os.path.join(asset_path, "Exo-ExtraBold.ttf"),
-            32
+            140
         )
-        self.wallet = Image.open(
-            os.path.join(asset_path, "basecards", "wallet.png")
+        self.arena = Image.open(
+            os.path.join(asset_path, "duel", "arena.jpg")
+        )
+        self.bloods = [
+            Image.open(
+                os.path.join(asset_path, 'duel', 'bloods', fname)
+            ).convert('RGBA')
+            for fname in os.listdir(
+                os.path.join(asset_path, 'duel', 'bloods')
+            )
+        ]
+        self.glad_x_offset = 270
+        self.hp_bar = Image.open(
+            os.path.join(asset_path, "duel", "hp_bar.png")
+        )
+        self.color_bars = [
+            Image.new(
+                'RGBA',
+                (134, 728),
+                color=(254, 0, 0, 255)   # RED_BAR
+            ),
+            Image.new(
+                'RGBA',
+                (134, 728),
+                color=(254, 240, 0, 255)   # YELLOW_BAR
+            ),
+            Image.new(
+                'RGBA',
+                (134, 728),
+                color=(60, 254, 0, 255)   # GREEN_BAR
+            )
+        ]
+
+    def get(
+        self, gladiators: List[Gladiator]
+    ) -> Tuple[Image.Image, int, int]:
+        """
+        Handles a duel match between Gladiators.
+        Returns an image and damages dealt by each gladiator per round.
+        """
+        canvas = self.__prepare_arena([
+            glad.owner.name
+            for glad in gladiators
+        ])
+        old_hp1 = old_hp2 = 300
+        for (glad1, hp1), (glad2, hp2) in zip(
+            self.__fight(gladiators[0]), self.__fight(gladiators[1])
+        ):
+            canvas.paste(glad1, (500, 675), glad1)
+            canvas.paste(glad2, (2340, 675), glad2)
+            dmg1 = old_hp2 - hp2
+            dmg2 = old_hp1 - hp1
+            old_hp1 = hp1
+            old_hp2 = hp2
+            yield canvas.copy(), dmg1, dmg2
+            if max(0, hp1) * max(0, hp2) == 0:
+                break
+
+    def __add_blood(
+        self, gladiator_sprite: Image.Image,
+        damage: int
+    ):
+        """
+        Applies bleeding effect to Gladiator sprite.
+        """
+        blood = self.__get_blood(damage=damage)
+        bld_w, bld_h = blood.size
+        bbox = gladiator_sprite.getbbox()
+        glad_w = bbox[2] - bbox[0]
+        glad_h = bbox[3] - bbox[1]
+        pos = (
+                random.randint(self.glad_x_offset, glad_w - bld_w),
+                random.randint(0, glad_h - bld_h)
+            )
+        gladiator_sprite.paste(blood, pos, blood)
+
+    def __fight(self, gladiator: Gladiator) -> Tuple[Image.Image, int]:
+        """
+        Makes the provider gladiator take damage and returns
+        a tuple of damaged gladiator image and remaining hitpoint.
+        """
+        fresh = True
+        if fresh:
+            fresh = False
+            glad = gladiator.image
+            glad.paste(self.hp_bar, (0, 0), self.hp_bar)
+            hitpoints = 300
+            fresh_glad = glad.copy()
+            green_bar = self.color_bars[-1]
+            fresh_glad.paste(green_bar, (833, 187), green_bar)
+            yield fresh_glad, 300
+        while hitpoints >= 0:
+            dmg = self.__get_damage()
+            hitpoints -= dmg
+            self.__add_blood(glad, dmg)
+            final_glad = self.__update_hitpoints(glad, hitpoints)
+            yield final_glad, hitpoints
+
+    def __get_blood(self, damage: int) -> Image.Image:
+        """
+        Returns corresponding blood image for the damage done.
+        """
+        return self.bloods[int(damage / 50)]
+
+    @staticmethod
+    def __get_damage():
+        """
+        Returns a random amount of damage.
+        """
+        return int(
+            min(
+                max(random.gauss(50, 100), 25),
+                300
+            )
         )
 
-    def get(self, data: Dict) -> Image.Image:
-        wallet = self.wallet.copy()
-        canvas = ImageDraw.Draw(wallet)
-        params = [
-            {
-                "txt": data["won_chips"],
-                "start_pos": (620, 100),
-                "bbox": (255, 70),
-                "fontsize": 54
-            },
-            {
-                "txt": data["pokebonds"],
-                "start_pos": (620, 235),
-                "bbox": (255, 70),
-                "fontsize": 54
-            },
-            {
-                "txt": data["balance"],
-                "start_pos": (620, 390),
-                "bbox": (255, 70),
-                "fontsize": 54
-            }
+    def __prepare_arena(self, players: List[str]) -> Image.Image:
+        """
+        Sets up the initial arena.
+        """
+        canvas = self.arena.copy()
+        board = ImageDraw.Draw(canvas)
+        gn_pad1, gn_pad2 = [
+            int((1000 - self.font.getsize(plyr)[0]) / 2)
+            for plyr in players
         ]
-        for param in params:
-            self.imprint_text(canvas, **param)
-        return wallet
+        board.text(
+            (500 + gn_pad1, 463),
+            players[0],
+            font=self.font,
+            fill=(255, 255, 255)
+        )
+        board.text(
+            (2340 + gn_pad2, 463),
+            players[1],
+            font=self.font,
+            fill=(255, 255, 255)
+        )
+        return canvas
+
+    def __update_hitpoints(self, gladiator: Image.Image, hitpoints: int):
+        """
+        Update the HP Bar of the gladiator sprite.
+        """
+        bar_ht = int((728 / 300) * hitpoints)
+        final_glad = gladiator
+        if bar_ht > 0:
+            clrbar = self.color_bars[int((hitpoints / 300) * 3)].resize(
+                    (134, bar_ht)
+                )
+            final_glad = gladiator.copy()
+            final_glad.paste(clrbar, (833, 187 + (728 - bar_ht)), clrbar)
+        return final_glad
 
 
 class LeaderBoardGenerator(AssetGenerator):
@@ -349,273 +460,168 @@ class LeaderBoardGenerator(AssetGenerator):
         return rankcard
 
 
-class BadgeGenerator(AssetGenerator):
+class ProfileCardGenerator(AssetGenerator):
     """
-    Badgestrip Image Generation Class
-    """
-    def __init__(self, asset_path: str = "assets"):
-        super().__init__(asset_path)
-        self.badges = {
-            badge: Image.open(
-                os.path.join(
-                    asset_path, "basecards",
-                    "badges", f"{badge}.png"
-                )
-            )
-            for badge in ["champion", "emperor", "funder", "dealer"]
-        }
-        self.badgestrip = Image.open(
-            os.path.join(
-                asset_path, "basecards",
-                "badges", "badgestrip.png"
-            )
-        )
-
-    def get(self, badges: List = None) -> Image.Image:
-        badgestrip = self.badgestrip.copy()
-        if not badges:
-            return badgestrip
-        badge_dict = {
-            "funder": (40, 200),
-            "champion": (370, 200),
-            "emperor": (687, 200),
-            "dealer": (1020, 200)
-        }
-        for badge in badges:
-            badgestrip.paste(
-                self.badges[badge],
-                badge_dict[badge],
-                self.badges[badge]
-            )
-        return badgestrip
-
-
-class BoardGenerator(AssetGenerator):
-    """
-    The Board Generator for Wackamole minigame.
-    """
-    def __init__(self, asset_path: str):
-        super().__init__(asset_path=asset_path)
-        self.mole = Image.new('RGB', (250, 250), (0, 0, 0))
-        self.mole.paste(
-            self.pokechip.resize((250, 250)).convert('RGB')
-        )
-        self.boards = []
-        self.board_names = []
-        for board in sorted(os.listdir(
-            os.path.join(asset_path, "basecards", "boards")
-        )):
-            self.board_names.append(
-                board.split(".jpg")[0].title()
-            )
-            self.boards.append(
-                Image.open(
-                    os.path.join(
-                        asset_path, "basecards", "boards", board
-                    )
-                )
-            )
-
-    @staticmethod
-    def get_valids(level: int = 0) -> List:
-        """
-        Returns a list of possible tile names for given difficulty level.
-        """
-        return [
-            f"{chr(65+i)}{j}"
-            for i in range(level + 3)
-            for j in range(1, level + 4)
-        ]
-
-    def get_board(self, level: int = 0) -> Tuple[str, Image.Image]:
-        """
-        Returns a Wackamole board (name, Image) of given difficulty level.
-        """
-        return (
-            self.board_names[level],
-            self.boards[level].copy()
-        )
-
-    def get(self, level: int = 0) -> Tuple[str, Image.Image]:
-        """
-        Returns a Board image with a random time replaced with a pokechip.
-        """
-        pos = (
-            random.randint(0, level + 2),
-            random.randint(0, level + 2)
-        )
-        tile_w, tile_h = (250, 250)
-        board_img = self.boards[level].copy()
-        board_img.paste(
-            self.mole,
-            (pos[0] * tile_w, pos[1] * tile_h)
-        )
-        letter = ('A', 'B', 'C', 'D', 'E', 'F', 'G')[pos[0]]
-        num = pos[1] + 1
-        rolled = f"{letter}{num}"
-        return (rolled, board_img)
-
-
-class GladitorMatchHandler(AssetGenerator):
-    """
-    Gladiator Match handler class
+    ProfileCard Image Generation Class
     """
     def __init__(self, asset_path: str = "assets"):
         super().__init__(asset_path)
         self.font = ImageFont.truetype(
             os.path.join(asset_path, "Exo-ExtraBold.ttf"),
-            140
+            36
         )
-        self.arena = Image.open(
-            os.path.join(asset_path, "duel", "arena.jpg")
+        self.profilecard = Image.open(
+            os.path.join(asset_path, "basecards", "profilecard.jpg")
         )
-        self.bloods = [
-            Image.open(
-                os.path.join(asset_path, 'duel', 'bloods', fname)
-            ).convert('RGBA')
-            for fname in os.listdir(
-                os.path.join(asset_path, 'duel', 'bloods')
-            )
-        ]
-        self.glad_x_offset = 270
-        self.hp_bar = Image.open(
-            os.path.join(asset_path, "duel", "hp_bar.png")
+        self.profileframe = Image.open(
+            os.path.join(asset_path, "basecards", "profileframe.png")
         )
-        self.color_bars = [
-            Image.new(
-                'RGBA',
-                (134, 728),
-                color=(254, 0, 0, 255)   # RED_BAR
-            ),
-            Image.new(
-                'RGBA',
-                (134, 728),
-                color=(254, 240, 0, 255)   # YELLOW_BAR
-            ),
-            Image.new(
-                'RGBA',
-                (134, 728),
-                color=(60, 254, 0, 255)   # GREEN_BAR
-            )
-        ]
-
-    @staticmethod
-    def __get_damage():
-        """
-        Returns a random amount of damage.
-        """
-        return int(
-            min(
-                max(random.gauss(50, 100), 25),
-                300
-            )
-        )
-
-    def __get_blood(self, damage: int) -> Image.Image:
-        """
-        Returns corresponding blood image for the damage done.
-        """
-        return self.bloods[int(damage / 50)]
-
-    def __add_blood(
-        self, gladiator_sprite: Image.Image,
-        damage: int
-    ):
-        """
-        Applies bleeding effect to Gladiator sprite.
-        """
-        blood = self.__get_blood(damage=damage)
-        bld_w, bld_h = blood.size
-        bbox = gladiator_sprite.getbbox()
-        glad_w = bbox[2] - bbox[0]
-        glad_h = bbox[3] - bbox[1]
-        pos = (
-                random.randint(self.glad_x_offset, glad_w - bld_w),
-                random.randint(0, glad_h - bld_h)
-            )
-        gladiator_sprite.paste(blood, pos, blood)
-
-    def __update_hitpoints(self, gladiator: Image.Image, hitpoints: int):
-        """
-        Update the HP Bar of the gladiator sprite.
-        """
-        bar_ht = int((728 / 300) * hitpoints)
-        final_glad = gladiator
-        if bar_ht > 0:
-            clrbar = self.color_bars[int((hitpoints / 300) * 3)].resize(
-                    (134, bar_ht)
+        self.badges = {
+            badge: Image.open(
+                os.path.join(
+                    asset_path, "basecards",
+                    "badges", "100x100", f"{badge}.png"
                 )
-            final_glad = gladiator.copy()
-            final_glad.paste(clrbar, (833, 187 + (728 - bar_ht)), clrbar)
-        return final_glad
-
-    def __prepare_arena(self, players: List[str]) -> Image.Image:
-        """
-        Sets up the initial arena.
-        """
-        canvas = self.arena.copy()
-        board = ImageDraw.Draw(canvas)
-        gn_pad1, gn_pad2 = [
-            int((1000 - self.font.getsize(plyr)[0]) / 2)
-            for plyr in players
-        ]
-        board.text(
-            (500 + gn_pad1, 463),
-            players[0],
-            font=self.font,
-            fill=(255, 255, 255)
-        )
-        board.text(
-            (2340 + gn_pad2, 463),
-            players[1],
-            font=self.font,
-            fill=(255, 255, 255)
-        )
-        return canvas
-
-    def fight(self, gladiator: Gladiator) -> Tuple[Image.Image, int]:
-        """
-        Makes the provider gladiator take damage and returns
-        a tuple of damaged gladiator image and remaining hitpoint.
-        """
-        fresh = True
-        if fresh:
-            fresh = False
-            glad = gladiator.image
-            glad.paste(self.hp_bar, (0, 0), self.hp_bar)
-            hitpoints = 300
-            fresh_glad = glad.copy()
-            green_bar = self.color_bars[-1]
-            fresh_glad.paste(green_bar, (833, 187), green_bar)
-            yield fresh_glad, 300
-        while hitpoints >= 0:
-            dmg = self.__get_damage()
-            hitpoints -= dmg
-            self.__add_blood(glad, dmg)
-            final_glad = self.__update_hitpoints(glad, hitpoints)
-            yield final_glad, hitpoints
+            )
+            for badge in ["champion", "emperor", "funder", "dealer"]
+        }
 
     def get(
-        self, gladiators: List[Gladiator]
-    ) -> Tuple[Image.Image, int, int]:
+        self, name: str, avatar: Image.Image,
+        balance: str, num_played: str, num_won: str,
+        badges: Optional[List[Image.Image]] = None,
+        blacklisted: bool = False,
+        background: Image.Image = None
+    ) -> Image.Image:
+
+        # pylint: disable=too-many-locals
+
+        if background:
+            profilecard = background.convert('RGBA')
+            profilecard.paste(
+                self.profileframe,
+                (0, 0),
+                self.profileframe
+            )
+            profilecard.convert('RGB')
+        else:
+            profilecard = self.profilecard.copy()
+        profilecard.paste(
+            avatar.resize((280, 280)).convert('RGB'),
+            (603, 128)
+        )
+        canvas = ImageDraw.Draw(profilecard)
+        params = [
+            {
+                "txt": name,
+                "start_pos": (220, 112),
+                "bbox": (280, 56)
+            },
+            {
+                "txt": num_played,
+                "start_pos": (220, 292),
+                "bbox": (280, 56)
+            },
+            {
+                "txt": num_won,
+                "start_pos": (220, 340),
+                "bbox": (280, 56)
+            },
+            {
+                "txt": balance,
+                "start_pos": (220, 177),
+                "bbox": (210, 56)
+            }
+        ]
+        for param in params:
+            canvas.text(
+                param["start_pos"],
+                param["txt"],
+                fill=(0, 0, 0),
+                font=self.get_font(
+                    self.font, param["txt"], param["bbox"]
+                )
+            )
+        profilecard = profilecard.convert('RGBA')
+        if all([
+            badges, not blacklisted
+        ]):
+            for idx, badge in enumerate(badges):
+                profilecard.paste(
+                    self.badges[badge],
+                    (25 + (120 * idx), 400),
+                    self.badges[badge]
+                )
+        chip_pos = (220 + self.font.getsize(balance)[0] + 20, 159)
+        chip = self.pokechip.resize((80, 80), Image.ANTIALIAS)
+        profilecard.paste(chip, chip_pos, chip)
+        profilecard = profilecard.convert('RGB')
+        if blacklisted:
+            profilecard = self.__add_bl_effect(profilecard)
+        return profilecard
+
+    def __add_bl_effect(self, profilecard: Image.Image) -> Image.Image:
         """
-        Handles a duel match between Gladiators.
-        Returns an image and damages dealt by each gladiator per round.
+        Adds a Blacklisted label on profilecard.
+        Also desaturates and darkens the image.
         """
-        canvas = self.__prepare_arena([
-            glad.owner.name
-            for glad in gladiators
-        ])
-        old_hp1 = old_hp2 = 300
-        for (glad1, hp1), (glad2, hp2) in zip(
-            self.fight(gladiators[0]), self.fight(gladiators[1])
-        ):
-            canvas.paste(glad1, (500, 675), glad1)
-            canvas.paste(glad2, (2340, 675), glad2)
-            dmg1 = old_hp2 - hp2
-            dmg2 = old_hp1 - hp1
-            old_hp1 = hp1
-            old_hp2 = hp2
-            yield canvas.copy(), dmg1, dmg2
-            if max(0, hp1) * max(0, hp2) == 0:
-                break
+        for task in ["Brightness", "Color"]:
+            enhancer = getattr(ImageEnhance, task)(profilecard)
+            profilecard = enhancer.enhance(0.25)
+        text_layer = Image.new('RGBA', profilecard.size, (0, 0, 0, 0))
+        canvas = ImageDraw.Draw(text_layer)
+        canvas.text(
+            (50, 205),
+            "BLACKLISTED",
+            fill=(255, 255, 255, 255),
+            font=ImageFont.truetype(self.font.path, 130)
+        )
+        profilecard.paste(
+            text_layer.rotate(-20),
+            (0, 0),
+            text_layer.rotate(-20)
+        )
+        return profilecard
+
+
+class WalletGenerator(AssetGenerator):
+    """
+    BalanceCard Image Generation Class
+    """
+    def __init__(self, asset_path: str = "assets"):
+        super().__init__(asset_path)
+        self.asset_path = asset_path
+        self.font = ImageFont.truetype(
+            os.path.join(asset_path, "Exo-ExtraBold.ttf"),
+            32
+        )
+        self.wallet = Image.open(
+            os.path.join(asset_path, "basecards", "wallet.png")
+        )
+
+    def get(self, data: Dict) -> Image.Image:
+        wallet = self.wallet.copy()
+        canvas = ImageDraw.Draw(wallet)
+        params = [
+            {
+                "txt": data["won_chips"],
+                "start_pos": (620, 100),
+                "bbox": (255, 70),
+                "fontsize": 54
+            },
+            {
+                "txt": data["pokebonds"],
+                "start_pos": (620, 235),
+                "bbox": (255, 70),
+                "fontsize": 54
+            },
+            {
+                "txt": data["balance"],
+                "start_pos": (620, 390),
+                "bbox": (255, 70),
+                "fontsize": 54
+            }
+        ]
+        for param in params:
+            self.imprint_text(canvas, **param)
+        return wallet

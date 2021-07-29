@@ -114,7 +114,7 @@ class GambleCommands(Commands):
         except (ZeroDivisionError, ValueError):
             fee = 50
         kwargs["fee"] = fee
-        gamble_channel, hot_time = await self.__handle_registration(
+        gamble_channel, hot_time = await self.__gamble_register(
             message, **kwargs
         )
         if len(self.registered) <= 1:
@@ -125,24 +125,24 @@ class GambleCommands(Commands):
                     title="Not enough players!"
                 )
             )
-            await self.__cleanup(gamble_channel, delay=10.0)
+            await self.__gamble_cleanup(gamble_channel, delay=10.0)
             return
         self.match_status = 2
         lower_wins = kwargs.get("lower_wins", False)
-        joker_chance = 0.05
-        if hot_time:
-            joker_chance = 0.2
+        joker_chance = 0.2 if hot_time else 0.05
         num_cards = len(self.registered)
-        dealed_deck, closed_decks = self.__get_decks(num_cards, joker_chance)
-        profiles = self.__charge_player(dealed_deck, fee)
+        dealed_deck, closed_decks = self.__gamble_get_decks(
+            num_cards, joker_chance
+        )
+        profiles = self.__gamble_charge_player(dealed_deck, fee)
         for deck, (player, card) in zip(closed_decks, dealed_deck.items()):
-            joker_found = await self.__handle_roll(
+            joker_found = await self.__gamble_handle_roll(
                 message, deck, player, card,
                 gamble_channel, dealed_deck
             )
             if joker_found:
                 break
-        winner, is_joker = await self.__handle_winner(
+        winner, is_joker = await self.__gamble_handle_winner(
             dealed_deck, gamble_channel,
             profiles, lower_wins, fee
         )
@@ -155,7 +155,7 @@ class GambleCommands(Commands):
             deal_cost=fee,
             by_joker=is_joker
         ).save()
-        await self.__cleanup(gamble_channel, delay=30.0)
+        await self.__gamble_cleanup(gamble_channel, delay=30.0)
 
     @model([Flips, Profiles])
     @alias(["flip", "chipflip", "flips"])
@@ -184,7 +184,7 @@ class GambleCommands(Commands):
             ```~
         """
         profile = Profiles(message.author)
-        amount = await self.__input_handler(
+        amount = await self.__flip_input_handler(
             message, args, profile, default=50,
             min_chips=50, max_chips=9999
         )
@@ -258,6 +258,91 @@ class GambleCommands(Commands):
         ).save()
         emb = get_embed(msg, title=title, image=img, color=color)
         await opt_msg.edit(embed=emb)
+
+    @model(Matches)
+    async def cmd_matches(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """List latest gamble matches.
+        $```scss
+        {command_prefix}matches [quantity] [--verbose]
+        ```$
+
+        @Lists out the results of latest gamble matches.
+        If no quantity is given, defaults to 10.
+        If --verbose is used, lists the mode and if joker spawned.@
+
+        ~To list latest matches:
+            ```
+            {command_prefix}matches
+            ```
+        To latest 5 matches:
+            ```
+            {command_prefix}matches 5
+            ```
+        To see if Joker spawned in last 5 matches:
+            ```
+            {command_prefix}matches 5 --verbose
+            ```~
+        """
+        limit = int(args[0]) if args else 10
+        matches = Matches.get_matches(limit=limit)
+        embeds = []
+        for match in matches:
+            started_by = message.guild.get_member(
+                int(match["started_by"])
+            )
+            played_at = match["played_at"]
+            pot = match["deal_cost"] * len(match['participants'])
+            parts = "\n".join(
+                str(message.guild.get_member(int(plyr)))
+                for plyr in match["participants"]
+            )
+            parts = f"```py\n{parts}\n```"
+            winner = message.guild.get_member(int(match["winner"]))
+            emb = get_embed(
+                f"Match started by: **{started_by}**\n"
+                f"Played on: **{played_at}**\n"
+                f"Amount in pot: **{pot}** {self.chip_emoji}",
+                title="Recent Matches"
+            )
+            emb.add_field(
+                name="Participants",
+                value=parts,
+                inline=True
+            )
+            emb.add_field(
+                name="Winner",
+                value=f"**```{winner if winner else 'Not in Server'}```**",
+                inline=True
+            )
+            emb.add_field(
+                name="\u200B",
+                value="\u200B",
+                inline=True
+            )
+            if kwargs.get("verbose", False):
+                emb.add_field(
+                    name="Mode",
+                    value=f"```py\n{match['lower_wins']}\n```",
+                    inline=True
+                )
+                emb.add_field(
+                    name="Joker Spawned",
+                    value=f"```py\n{match['by_joker']}\n```",
+                    inline=True
+                )
+                emb.add_field(
+                    name="\u200B",
+                    value="\u200B",
+                    inline=True
+                )
+            if winner:
+                emb.set_image(url=winner.avatar_url_as(size=256))
+            embeds.append(emb)
+        await self.paginate(message, embeds)
 
     @model([Moles, Profiles])
     @alias(["mole", "whack", "moles"])
@@ -367,92 +452,58 @@ class GambleCommands(Commands):
             file=img2file(board_img, f"{rolled}.jpg")
         )
 
-    @model(Matches)
-    async def cmd_matches(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
+    async def __handle_low_bal(self, usr, gamble_channel):
+        low_bal_embed = get_embed(
+            "Every user gets 100 chips as a starting bonus.\n"
+            "You can buy more or exchange for other bot credits.",
+            embed_type="error",
+            title="Not enough Pokechips!",
+            footer="Contact an admin for details."
+        )
+        try:
+            await usr.send(embed=low_bal_embed)
+        except discord.Forbidden:
+            await gamble_channel.send(
+                content=usr.mention,
+                embed=low_bal_embed
+            )
+
+    async def __flip_input_handler(
+        self, message, args, profile,
+        default, min_chips, max_chips
     ):
-        """List latest gamble matches.
-        $```scss
-        {command_prefix}matches [quantity] [--verbose]
-        ```$
-
-        @Lists out the results of latest gamble matches.
-        If no quantity is given, defaults to 10.
-        If --verbose is used, lists the mode and if joker spawned.@
-
-        ~To list latest matches:
-            ```
-            {command_prefix}matches
-            ```
-        To latest 5 matches:
-            ```
-            {command_prefix}matches 5
-            ```
-        To see if Joker spawned in last 5 matches:
-            ```
-            {command_prefix}matches 5 --verbose
-            ```~
-        """
-        limit = int(args[0]) if args else 10
-        matches = Matches.get_matches(limit=limit)
-        embeds = []
-        for match in matches:
-            started_by = message.guild.get_member(
-                int(match["started_by"])
-            )
-            played_at = match["played_at"]
-            pot = match["deal_cost"] * len(match['participants'])
-            parts = "\n".join(
-                str(message.guild.get_member(int(plyr)))
-                for plyr in match["participants"]
-            )
-            parts = f"```py\n{parts}\n```"
-            winner = message.guild.get_member(int(match["winner"]))
-            emb = get_embed(
-                f"Match started by: **{started_by}**\n"
-                f"Played on: **{played_at}**\n"
-                f"Amount in pot: **{pot}** {self.chip_emoji}",
-                title="Recent Matches"
-            )
-            emb.add_field(
-                name="Participants",
-                value=parts,
-                inline=True
-            )
-            emb.add_field(
-                name="Winner",
-                value=f"**```{winner if winner else 'Not in Server'}```**",
-                inline=True
-            )
-            emb.add_field(
-                name="\u200B",
-                value="\u200B",
-                inline=True
-            )
-            if kwargs.get("verbose", False):
-                emb.add_field(
-                    name="Mode",
-                    value=f"```py\n{match['lower_wins']}\n```",
-                    inline=True
+        amount = default
+        if args:
+            try:
+                amount = int(args[0])
+            except (ZeroDivisionError, ValueError):
+                await message.channel.send(
+                    embed=get_embed(
+                        f"Amount will be defaulted to {default} chips.",
+                        embed_type="warning",
+                        title="Invalid Input"
+                    )
                 )
-                emb.add_field(
-                    name="Joker Spawned",
-                    value=f"```py\n{match['by_joker']}\n```",
-                    inline=True
+        if any([
+            amount < min_chips,
+            amount > max_chips
+        ]):
+            await message.channel.send(
+                embed=get_embed(
+                    f"Amount should be more than {min_chips} and "
+                    f"less than {max_chips} chips.",
+                    embed_type="error",
+                    title="Invalid Input"
                 )
-                emb.add_field(
-                    name="\u200B",
-                    value="\u200B",
-                    inline=True
-                )
-            if winner:
-                emb.set_image(url=winner.avatar_url_as(size=256))
-            embeds.append(emb)
-        await self.paginate(message, embeds)
+            )
+            return None
+        if profile.get("balance") < amount:
+            await self.__handle_low_bal(message.author, message.channel)
+            await message.add_reaction("❌")
+            return None
+        return amount
 
-    def __charge_player(self, dealed_deck, fee):
+    def __gamble_charge_player(self, dealed_deck, fee):
         profiles = {}
         for player, _ in dealed_deck.items():
             profiles[str(player.id)] = profile = Profiles(player)
@@ -471,7 +522,7 @@ class GambleCommands(Commands):
             self.registered.remove(player)
         return profiles
 
-    async def __create_gamble_channel(self, message):
+    async def __gamble_create_channel(self, message):
         if not self.catog_channel:
             self.catog_channel = [
                 chan
@@ -503,14 +554,14 @@ class GambleCommands(Commands):
         )
         return gamble_channel, gamblers
 
-    async def __cleanup(self, gamble_channel, delay=30.0):
+    async def __gamble_cleanup(self, gamble_channel, delay=30.0):
         await asyncio.sleep(delay)
         if gamble_channel:
             await gamble_channel.delete()
         self.registered = []
         self.match_status = 0
 
-    def __get_decks(self, num_cards, joker_chance):
+    def __gamble_get_decks(self, num_cards, joker_chance):
         dealed_deck = {
             self.registered[i]: card
             for i, card in enumerate(
@@ -526,26 +577,10 @@ class GambleCommands(Commands):
         ]
         return dealed_deck, closed_decks
 
-    async def __handle_low_bal(self, usr, gamble_channel):
-        low_bal_embed = get_embed(
-            "Every user gets 100 chips as a starting bonus.\n"
-            "You can buy more or exchange for Poketwo credits.",
-            embed_type="error",
-            title="Not enough Pokechips!",
-            footer="Contact an admin for details."
-        )
-        try:
-            await usr.send(embed=low_bal_embed)
-        except discord.Forbidden:
-            await gamble_channel.send(
-                content=usr.mention,
-                embed=low_bal_embed
-            )
-
-    async def __handle_registration(self, message, **kwargs):
+    async def __gamble_register(self, message, **kwargs):
         fee = kwargs["fee"]
         max_players = max(2, int(kwargs.pop("max_players", 12)))
-        gamble_channel, gamblers = await self.__create_gamble_channel(message)
+        gamble_channel, gamblers = await self.__gamble_create_channel(message)
         rules = ', '.join(
             self.rules[key]
             for key in kwargs
@@ -606,7 +641,7 @@ class GambleCommands(Commands):
                     continue
                 self.registered.append(usr)
                 players = ', '.join(player.name for player in self.registered)
-                embed = self.__prep_reg_embed(
+                embed = self.__gamble_prep_reg_embed(
                     register_embed, players,
                     fee, now, max_players
                 )
@@ -615,7 +650,7 @@ class GambleCommands(Commands):
                 continue
         return gamble_channel, hot_time
 
-    async def __handle_roll(
+    async def __gamble_handle_roll(
         self, message, deck, player,
         card, gamble_channel, dealed_deck
     ):
@@ -658,7 +693,7 @@ class GambleCommands(Commands):
         if card["card_num"] == "Joker":
             return "Joker"
 
-    async def __announce_winner(
+    async def __gamble_announce_winner(
         self, gamble_channel, dealed_deck,
         winner, fee, profiles
     ):
@@ -706,7 +741,7 @@ class GambleCommands(Commands):
         await gamble_channel.send(embed=winner_embed)
         return bool(is_joker)
 
-    async def __handle_winner(
+    async def __gamble_handle_winner(
         self, dealed_deck,
         gamble_channel, profiles,
         lower_wins, fee
@@ -749,13 +784,13 @@ class GambleCommands(Commands):
         # Return is_joker for saving into DB
         return (
             winner,
-            await self.__announce_winner(
+            await self.__gamble_announce_winner(
                 gamble_channel, dealed_deck,
                 winner, fee, profiles
             )
         )
 
-    def __prep_reg_embed(
+    def __gamble_prep_reg_embed(
         self, register_embed, players,
         fee, now, max_players
     ):
@@ -786,38 +821,3 @@ class GambleCommands(Commands):
             inline=False
         )
         return embed
-
-    async def __input_handler(
-        self, message, args, profile,
-        default, min_chips, max_chips
-    ):
-        amount = default
-        if args:
-            try:
-                amount = int(args[0])
-            except (ZeroDivisionError, ValueError):
-                await message.channel.send(
-                    embed=get_embed(
-                        f"Amount will be defaulted to {default} chips.",
-                        embed_type="warning",
-                        title="Invalid Input"
-                    )
-                )
-        if any([
-            amount < min_chips,
-            amount > max_chips
-        ]):
-            await message.channel.send(
-                embed=get_embed(
-                    f"Amount should be more than {min_chips} and "
-                    f"less than {max_chips} chips.",
-                    embed_type="error",
-                    title="Invalid Input"
-                )
-            )
-            return None
-        if profile.get("balance") < amount:
-            await self.__handle_low_bal(message.author, message.channel)
-            await message.add_reaction("❌")
-            return None
-        return amount

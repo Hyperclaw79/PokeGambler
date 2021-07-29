@@ -15,7 +15,6 @@ from typing import (
     Dict, List, Optional,
     TYPE_CHECKING, Type, Union
 )
-import discord
 
 from discord.errors import Forbidden, HTTPException
 
@@ -28,7 +27,6 @@ from ..helpers.utils import get_embed
 
 if TYPE_CHECKING:
     from discord import Member, Message
-    from bot import PokeGambler
 
 
 class Listing(Queue):
@@ -86,7 +84,9 @@ class Listing(Queue):
         """
         return super().get_nowait()
 
-    def register(self, items: Union[ShopItem, List[ShopItem]]):
+    def register(
+        self, items: Union[ShopItem, List[ShopItem]]
+    ):
         """
         Adds an item/list of items to the queue.
         """
@@ -107,6 +107,20 @@ class Listing(Queue):
                 return
             self.queue.remove(removable)
             super().put_nowait(item)
+
+
+@dataclass
+class ShopCategory:
+    """
+    This class holds categories of PokeGambler Shop.
+    """
+    name: str
+    description: str
+    emoji: str
+    items: Listing
+
+    def __str__(self) -> str:
+        return f"『{self.emoji}』 {self.name}"
 
 
 @dataclass
@@ -134,8 +148,15 @@ class ShopItem:
             return f"{self.name} "
         return f"{self.name} 『{self.emoji}』"
 
+    @abstractmethod
+    def buy(self, **kwargs) -> str:
+        """
+        Every ShopItem should have a buy action.
+        """
+
     def debit_player(
-        self, user: Member, quantity: int = 1,
+        self, user: Member,
+        quantity: Optional[int] = 1,
         premium: bool = False
     ):
         """
@@ -150,11 +171,149 @@ class ShopItem:
             amount=amount, bonds=bonds
         )
 
-    @abstractmethod
-    def buy(self, **kwargs):
+
+class BoostItem(ShopItem):
+    """
+    This class represents a purchasable temporary boost.
+    """
+    async def buy(
+        self,  message: Message,
+        quantity: int = 1, **kwargs
+    ) -> str:
         """
-        Every ShopItem should have a buy action.
+        Applies the relevant temporary boost to the user.
         """
+        user = message.author
+        tier = Loots(user).tier
+        boost_dict = self._get_tempboosts(user)
+        if any([
+            boost_dict["stack"] == 5,
+            self._check_lootlust(boost_dict, user, quantity)
+        ]):
+            return (
+                "You've maxed out to 5 stacks for this boost."
+                if quantity == 1
+                else "You can't puchase that many "
+                "as it exceeds max stack of 5."
+            )
+        self.__boost_handler(boost_dict, user, quantity)
+        Profiles(user).debit(
+            amount=((self.price * (10 ** (tier - 1))) * quantity)
+        )
+        return "success"
+
+    @classmethod
+    def get_boosts(
+        cls: Type[BoostItem], user_id: str
+    ) -> Dict:
+        """
+        Returns a list of all the temporary boosts for the user.
+        """
+        return {
+            boost.itemid: DB_CLIENT["tempboosts"].find_one({
+                "user_id": user_id,
+                "boost_id": boost.itemid
+            }) or {
+                "stack": 0,
+                "name": boost.name,
+                "description": boost.description,
+                "added_on": datetime.now()
+            }
+            for boost in Shop.categories["Boosts"].items
+        }
+
+    @classmethod
+    def default_boosts(cls: Type[BoostItem]) -> Dict:
+        """
+        Returns temporary boosts dictionary.
+        """
+        return {
+            item.itemid: {
+                "stack": 0,
+                "name": item.name,
+                "description": item.description,
+                "added_on": datetime.now()
+            }
+            for item in Shop.categories["Boosts"].items
+        }
+
+    def __boost_handler(
+        self, boost_dict: Dict,
+        user: Member, quantity: int
+    ):
+        boost_dict["stack"] += quantity
+        DB_CLIENT["tempboosts"].create_index(
+            "added_on",
+            expireAfterSeconds=30 * 60
+        )
+        DB_CLIENT["tempboosts"].update_one(
+            {"user_id": str(user.id), "boost_id": self.itemid},
+            {"$set": boost_dict},
+            upsert=True
+        )
+
+    @staticmethod
+    def _check_lootlust(
+        boost_dict: Dict,
+        user: Member, quantity: int
+    ) -> bool:
+        if boost_dict["boost_id"] not in (
+            "boost_lt_cd", "boost_pr_lt_cd"
+        ):
+            return False
+        return sum([
+            Boosts(user).get("loot_lust"),
+            quantity,
+            boost_dict["stack"]
+        ]) > 5
+
+    def _get_tempboosts(self, user: Member) -> Dict:
+        boost_dict = DB_CLIENT["tempboosts"].find_one({
+            "user_id": str(user.id),
+            "boost_id": self.itemid
+        })
+        if not boost_dict:
+            boost_dict = {
+                "user_id": str(user.id),
+                "boost_id": self.itemid,
+                "added_on": datetime.utcnow(),
+                "name": self.name,
+                "description": self.description,
+                "stack": 0,
+            }
+        return boost_dict
+
+
+class PremiumBoostItem(BoostItem):
+    """
+    Permanent Boosts purchasable from Premium Shop
+    """
+    def buy(
+        self, message: Message,
+        quantity: Optional[int] = 1,
+        **kwargs
+    ) -> str:
+        user = message.author
+        if self._check_lootlust(
+            self._get_tempboosts(user),
+            user, quantity
+        ):
+            return (
+                "You've maxed out to 5 stacks for this boost."
+                if quantity == 1
+                else "You can't puchase that many "
+                "as it exceeds max stack of 5."
+            )
+        tier = Loots(user).tier
+        boost = Boosts(user)
+        boost_name = self.name.lower().replace(' ', '_')
+        curr = boost.get(boost_name)
+        boost.update(**{boost_name: curr + quantity})
+        Profiles(user).debit(
+            amount=((self.price * (10 ** (tier - 2))) * quantity),
+            bonds=True
+        )
+        return "success"
 
 
 class TradebleItem(ShopItem):
@@ -164,7 +323,7 @@ class TradebleItem(ShopItem):
     def buy(
         self, message: Message,
         quantity: int, **kwargs
-    ):
+    ) -> str:
         """
         Buys the Item and places in user's inventory.
         """
@@ -183,7 +342,10 @@ class Title(ShopItem):
     """
     This class represents a purchasable Title.
     """
-    async def buy(self, message: Message, **kwargs):
+    async def buy(
+        self, message: Message,
+        **kwargs
+    ) -> str:
         """
         Automatically adds the titled role to the user.
         """
@@ -209,7 +371,7 @@ class Title(ShopItem):
                         hoist=True
                     )
                 ]
-            except discord.Forbidden:
+            except Forbidden:
                 return str(
                     "**Need [Manage Server] permission to "
                     "create title roles.**"
@@ -245,162 +407,6 @@ class Title(ShopItem):
                 "**You're too OP for me to give you a role.**\n"
                 "**Please ask an admin to give you the role.**\n"
             )
-
-
-class BoostItem(ShopItem):
-    """
-    This class represents a purchasable temporary boost.
-    """
-    def __boost_handler(
-        self, boost_dict: Dict,
-        user: Member, quantity: int
-    ):
-        boost_dict["stack"] += quantity
-        DB_CLIENT["tempboosts"].create_index(
-            "added_on",
-            expireAfterSeconds=30 * 60
-        )
-        DB_CLIENT["tempboosts"].update_one(
-            {"user_id": str(user.id), "boost_id": self.itemid},
-            {"$set": boost_dict},
-            upsert=True
-        )
-
-    async def buy(
-        self,  message: Message,
-        quantity: int = 1, **kwargs
-    ):
-        """
-        Applies the relevant temporary boost to the user.
-        """
-        user = message.author
-        tier = Loots(user).tier
-        boost_dict = self._get_tempboosts(user)
-        if any([
-            boost_dict["stack"] == 5,
-            self._check_lootlust(boost_dict, user, quantity)
-        ]):
-            return (
-                "You've maxed out to 5 stacks for this boost."
-                if quantity == 1
-                else "You can't puchase that many "
-                "as it exceeds max stack of 5."
-            )
-        self.__boost_handler(boost_dict, user, quantity)
-        Profiles(user).debit(
-            amount=((self.price * (10 ** (tier - 1))) * quantity)
-        )
-        return "success"
-
-    def _get_tempboosts(self, user):
-        boost_dict = DB_CLIENT["tempboosts"].find_one({
-            "user_id": str(user.id),
-            "boost_id": self.itemid
-        })
-        if not boost_dict:
-            boost_dict = {
-                "user_id": str(user.id),
-                "boost_id": self.itemid,
-                "added_on": datetime.utcnow(),
-                "name": self.name,
-                "description": self.description,
-                "stack": 0,
-            }
-        return boost_dict
-
-    @staticmethod
-    def _check_lootlust(
-        boost_dict: Dict,
-        user: Member, quantity: int
-    ):
-        if boost_dict["boost_id"] not in (
-            "boost_lt_cd", "boost_pr_lt_cd"
-        ):
-            return False
-        return sum([
-            Boosts(user).get("loot_lust"),
-            quantity,
-            boost_dict["stack"]
-        ]) > 5
-
-    @classmethod
-    def get_boosts(cls, user_id: str):
-        """
-        Returns a list of all the temporary boosts for the user.
-        """
-        return {
-            boost.itemid: DB_CLIENT["tempboosts"].find_one({
-                "user_id": user_id,
-                "boost_id": boost.itemid
-            }) or {
-                "stack": 0,
-                "name": boost.name,
-                "description": boost.description,
-                "added_on": datetime.now()
-            }
-            for boost in Shop.categories["Boosts"].items
-        }
-
-    @classmethod
-    def default_boosts(cls):
-        """
-        Returns temporary boosts dictionary.
-        """
-        return {
-            item.itemid: {
-                "stack": 0,
-                "name": item.name,
-                "description": item.description,
-                "added_on": datetime.now()
-            }
-            for item in Shop.categories["Boosts"].items
-        }
-
-
-class PremiumBoostItem(BoostItem):
-    """
-    Permanent Boosts purchasable from Premium Shop
-    """
-    def buy(
-        self, message: Message,
-        quantity: int = 1,
-        **kwargs
-    ):
-        user = message.author
-        if self._check_lootlust(
-            self._get_tempboosts(user),
-            user, quantity
-        ):
-            return (
-                "You've maxed out to 5 stacks for this boost."
-                if quantity == 1
-                else "You can't puchase that many "
-                "as it exceeds max stack of 5."
-            )
-        tier = Loots(user).tier
-        boost = Boosts(user)
-        boost_name = self.name.lower().replace(' ', '_')
-        curr = boost.get(boost_name)
-        boost.update(**{boost_name: curr + quantity})
-        Profiles(user).debit(
-            amount=((self.price * (10 ** (tier - 2))) * quantity),
-            bonds=True
-        )
-        return "success"
-
-
-@dataclass
-class ShopCategory:
-    """
-    This class holds categories of PokeGambler Shop.
-    """
-    name: str
-    description: str
-    emoji: str
-    items: Listing
-
-    def __str__(self) -> str:
-        return f"『{self.emoji}』 {self.name}"
 
 
 class Shop:
@@ -548,9 +554,12 @@ class Shop:
         for item in catog.items:
             ids_dict[item.itemid] = item
 
-    @staticmethod
-    def _premium_cond(premium: bool):
-        return premium
+    @classmethod
+    def add_category(cls: Type[Shop], category: ShopCategory):
+        """
+        Adds a new category to the Shop.
+        """
+        cls.categories[category.name] = category
 
     @classmethod
     def get_item(
@@ -572,31 +581,6 @@ class Shop:
         if cls._premium_cond(item.premium):
             return None
         return TradebleItem(**dict(item))
-
-    @classmethod
-    def add_category(cls: Type[Shop], category: ShopCategory):
-        """
-        Adds a new category to the Shop.
-        """
-        cls.categories[category.name] = category
-
-    @classmethod
-    def update_category(
-        cls: Type[Shop], category: str,
-        items: List[ShopItem]
-    ):
-        """
-        Updates an existing category in the Shop.
-        """
-        new_items = [
-            item
-            for item in items
-            if item.name not in (
-                itm.name
-                for itm in cls.categories[category].items
-            )
-        ]
-        cls.categories[category].items.register(new_items)
 
     @classmethod
     def refresh_tradables(cls: Type[Shop]):
@@ -631,6 +615,24 @@ class Shop:
             cls.update_category(item_type, items)
 
     @classmethod
+    def update_category(
+        cls: Type[Shop], category: str,
+        items: List[ShopItem]
+    ):
+        """
+        Updates an existing category in the Shop.
+        """
+        new_items = [
+            item
+            for item in items
+            if item.name not in (
+                itm.name
+                for itm in cls.categories[category].items
+            )
+        ]
+        cls.categories[category].items.register(new_items)
+
+    @classmethod
     def validate(
         cls: Type[Shop], user: Member,
         item: ShopItem, quantity: int = 1
@@ -656,6 +658,10 @@ class Shop:
          ) < price * quantity:
             return "You have Insufficient Balance."
         return "proceed"
+
+    @staticmethod
+    def _premium_cond(premium: bool):
+        return premium
 
 
 class PremiumShop(Shop):

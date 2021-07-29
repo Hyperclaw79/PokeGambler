@@ -25,8 +25,8 @@ from ..base.items import Item, Rewardbox, Tradable
 from ..base.shop import Shop, PremiumShop
 from .basecommand import (
     Commands, admin_only, alias,
-    ensure_user, get_profile, ensure_item,
-    no_thumb
+    ensure_user, get_profile,
+    ensure_item, model, no_thumb
 )
 
 if TYPE_CHECKING:
@@ -42,7 +42,41 @@ class AdminCommands(Commands):
     """
 
     @admin_only
+    async def cmd_announce(self, message: Message, **kwargs):
+        """Send an announcement.
+        $```scss
+        {command_prefix}announce
+        ```$
+
+        @`🛡️ Admin Command`
+        Make PokeGambler send an announcement in the announcement channel.@
+
+        ~To start an announcement:
+            ```
+            {command_prefix}announce
+            ```~
+        """
+        start_msg = await message.channel.send(
+            embed=get_embed(
+                'Enter your announcement message:\n>_'
+            )
+        )
+        reply = await wait_for(
+            message.channel, self.ctx, init_msg=start_msg,
+            check=lambda msg: user_check(msg, message),
+            timeout="inf"
+        )
+        content = reply.content
+        chan = message.guild.get_channel(
+            int(os.getenv("ANNOUNCEMENT_CHANNEL"))
+        )
+        msg = await chan.send(content=content)
+        await msg.publish()
+        await reply.add_reaction("👍")
+
+    @admin_only
     @ensure_user
+    @model(Profiles)
     @alias("chips+")
     async def cmd_add_chips(
         self, message: Message,
@@ -99,108 +133,7 @@ class AdminCommands(Commands):
 
     @admin_only
     @ensure_user
-    @alias("usr_pr")
-    async def cmd_get_user_profile(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """Get Complete User Profile.
-        $```scss
-        {command_prefix}get_user_profile user_id
-        ```$
-
-        @`🛡️ Admin Command`
-        Get the complete profile of a user, including their loot information.@
-
-        ~To get the profile of user with ID 12345:
-            ```
-            {command_prefix}usr_pr 12345
-            ```~
-        """
-        user_id = int(args[0])
-        profile = await get_profile(message, user_id)
-        if not profile:
-            return
-        data = profile.full_info
-        if not data:
-            return
-        content = f'```json\n{json.dumps(data, indent=3, default=str)}\n```'
-        await message.channel.send(content)
-
-    @admin_only
-    @ensure_user
-    @alias("rst_usr")
-    async def cmd_reset_user(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """Completely resets a user's profile.
-        $```scss
-        {command_prefix}reset_user user_id
-        ```$
-
-        @`🛡️ Admin Command`
-        Completely resets a user's profile to the starting stage.@
-
-        ~To reset user with ID 12345:
-            ```
-            {command_prefix}reset_user 12345
-            ```~
-        """
-        user_id = int(args[0])
-        profile = await get_profile(message, user_id)
-        profile.reset()
-        await message.add_reaction("👍")
-
-    @admin_only
-    @ensure_user
-    @alias("upd_usr")
-    async def cmd_update_user(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """Updates a user's profile.
-        $```scss
-        {command_prefix}update_user user_id --param value
-        ```$
-
-        @`🛡️ Admin Command`
-        Updates a user's profile based on the kwargs.@
-
-        ~To update num_wins of user with ID 12345:
-            ```
-            {command_prefix}update_user 12345 --num_wins 10
-            ```~
-        """
-        user_id = int(args[0])
-        kwargs.pop("mentions", [])
-        profile = await get_profile(message, user_id)
-        if not profile:
-            return
-        try:
-            profile.update(**kwargs)
-        except Exception as excp:  # pylint: disable=broad-except
-            await message.channel.send(
-                embed=get_embed(
-                    "Good try but bad luck.",
-                    embed_type="error",
-                    title="Invalid input"
-                )
-            )
-            self.logger.pprint(
-                f"{message.author} triggered cmd_update_user with {kwargs}.\n"
-                f"Error: {excp}",
-                color="red",
-                timestamp=True
-            )
-            return
-        await message.add_reaction("👍")
-
-    @admin_only
-    @ensure_user
+    @model([Blacklist, Profiles])
     @alias("bl")
     async def cmd_blacklist_user(
         self, message: Message,
@@ -248,6 +181,39 @@ class AdminCommands(Commands):
 
     @admin_only
     @ensure_user
+    @model(Profiles)
+    @alias("usr_pr")
+    async def cmd_get_user_profile(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """Get Complete User Profile.
+        $```scss
+        {command_prefix}get_user_profile user_id
+        ```$
+
+        @`🛡️ Admin Command`
+        Get the complete profile of a user, including their loot information.@
+
+        ~To get the profile of user with ID 12345:
+            ```
+            {command_prefix}usr_pr 12345
+            ```~
+        """
+        user_id = int(args[0])
+        profile = await get_profile(message, user_id)
+        if not profile:
+            return
+        data = profile.full_info
+        if not data:
+            return
+        content = f'```json\n{json.dumps(data, indent=3, default=str)}\n```'
+        await message.channel.send(content)
+
+    @admin_only
+    @ensure_user
+    @model([Blacklist, Profiles])
     @alias("pardon")
     async def cmd_pardon_user(
         self, message: Message,
@@ -297,40 +263,81 @@ class AdminCommands(Commands):
         await message.add_reaction("👍")
 
     @admin_only
-    async def cmd_announce(self, message: Message, **kwargs):
-        """Send an announcement.
+    @ensure_user
+    @model(Profiles)
+    @alias("rst_usr")
+    async def cmd_reset_user(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """Completely resets a user's profile.
         $```scss
-        {command_prefix}announce
+        {command_prefix}reset_user user_id
         ```$
 
         @`🛡️ Admin Command`
-        Make PokeGambler send an announcement in the announcement channel.@
+        Completely resets a user's profile to the starting stage.@
 
-        ~To start an announcement:
+        ~To reset user with ID 12345:
             ```
-            {command_prefix}announce
+            {command_prefix}reset_user 12345
             ```~
         """
-        start_msg = await message.channel.send(
-            embed=get_embed(
-                'Enter your announcement message:\n>_'
+        user_id = int(args[0])
+        profile = await get_profile(message, user_id)
+        profile.reset()
+        await message.add_reaction("👍")
+
+    @admin_only
+    @ensure_user
+    @model(Profiles)
+    @alias("upd_usr")
+    async def cmd_update_user(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """Updates a user's profile.
+        $```scss
+        {command_prefix}update_user user_id --param value
+        ```$
+
+        @`🛡️ Admin Command`
+        Updates a user's profile based on the kwargs.@
+
+        ~To update num_wins of user with ID 12345:
+            ```
+            {command_prefix}update_user 12345 --num_wins 10
+            ```~
+        """
+        user_id = int(args[0])
+        kwargs.pop("mentions", [])
+        profile = await get_profile(message, user_id)
+        if not profile:
+            return
+        try:
+            profile.update(**kwargs)
+        except Exception as excp:  # pylint: disable=broad-except
+            await message.channel.send(
+                embed=get_embed(
+                    "Good try but bad luck.",
+                    embed_type="error",
+                    title="Invalid input"
+                )
             )
-        )
-        reply = await wait_for(
-            message.channel, self.ctx, init_msg=start_msg,
-            check=lambda msg: user_check(msg, message),
-            timeout="inf"
-        )
-        content = reply.content
-        chan = message.guild.get_channel(
-            int(os.getenv("ANNOUNCEMENT_CHANNEL"))
-        )
-        msg = await chan.send(content=content)
-        await msg.publish()
-        await reply.add_reaction("👍")
+            self.logger.pprint(
+                f"{message.author} triggered cmd_update_user with {kwargs}.\n"
+                f"Error: {excp}",
+                color="red",
+                timestamp=True
+            )
+            return
+        await message.add_reaction("👍")
 
     @no_thumb
     @admin_only
+    @model(Item)
     @alias("item+")
     async def cmd_create_item(self, message: Message, **kwargs):
         """Self-assign Gambler Role.
@@ -349,7 +356,7 @@ class AdminCommands(Commands):
         # pylint: disable=no-member
 
         categories = {}
-        self.__populate_categories(Item, categories, curr_recc=0)
+        self.__create_item_populate_categories(Item, categories, curr_recc=0)
         inp_msg = await message.channel.send(
             embed=get_enum_embed(
                 categories,
@@ -425,7 +432,7 @@ class AdminCommands(Commands):
             await inp_msg.delete()
         if kwargs.get("premium", False) and is_owner(self.ctx, message.author):
             details["premium"] = True
-        item = self.__item_factory(
+        item = self.__create_item__item_factory(
             category=catogclass, **details
         )
         item.save()
@@ -440,6 +447,7 @@ class AdminCommands(Commands):
 
     @admin_only
     @ensure_item
+    @model(Item)
     @alias("item-")
     async def cmd_delete_item(
         self, message: Message,
@@ -475,52 +483,49 @@ class AdminCommands(Commands):
 
     @admin_only
     @ensure_item
-    @alias("upd_itm")
-    async def cmd_update_item(
+    @model([Inventory, Item, Profiles])
+    @alias("item_all")
+    async def cmd_distribute_item(
         self, message: Message,
-        args: List[str] = None,
+        args: Optional[List] = None,
         **kwargs
     ):
-        """Updates an existing Item from the database.
+        """Adds item to User's inventory.
         $```scss
-        {command_prefix}update_item itemid
+        {command_prefix}distribute_item itemid
         ```$
 
         @`🛡️ Admin Command`
-        Update any attribute of an existing item from the database.@
+        Distribute an item to everyone.@
 
-        ~To make a Golden Cigar with ID 0000FFFF premium:
+        ~To distribute a Golden Cigar with ID 0000FFFF:
             ```
-            {command_prefix}update_item 0000FFFF --premium True
+            {command_prefix}item_all 0000FFFF
             ```~
         """
-        item = kwargs.get("item")
-        updatables = {
-            key.lower(): val
-            for key, val in kwargs.items()
-            if key.lower() in dict(item)
-        }
-        if not updatables:
+        item = kwargs["item"]
+        if item.premium and not is_owner(self.ctx, message.author):
             await message.channel.send(
                 embed=get_embed(
-                    "That's not a valid attribute.",
-                    embed_type="warning",
-                    title="Unable to Update."
+                    "Only the owners can give Premium Items.",
+                    embed_type="error",
+                    title="Forbidden"
                 )
             )
             return
-        if not is_owner(self.ctx, message.author):
-            updatables.pop("premium", None)
-        if not updatables:
-            return
-        item.update(**updatables, modify_all=True)
-        if issubclass(item.__class__, Tradable):
-            Shop.refresh_tradables()
-            PremiumShop.refresh_tradables()
+        ids = Profiles.get_all(ids_only=True)
+        for uid in ids:
+            if not uid:
+                continue
+            user = message.guild.get_member(int(uid))
+            if not user:
+                continue
+            Inventory(user).save(args[0])
         await message.add_reaction("👍")
 
     @admin_only
     @ensure_user
+    @model([Inventory, Item])
     @alias("usr_itm")
     async def cmd_give_item(
         self, message: Message,
@@ -588,47 +593,56 @@ class AdminCommands(Commands):
 
     @admin_only
     @ensure_item
-    @alias("item_all")
-    async def cmd_distribute_item(
+    @model([Item, Tradable])
+    @alias("upd_itm")
+    async def cmd_update_item(
         self, message: Message,
-        args: Optional[List] = None,
+        args: List[str] = None,
         **kwargs
     ):
-        """Adds item to User's inventory.
+        """Updates an existing Item from the database.
         $```scss
-        {command_prefix}distribute_item itemid
+        {command_prefix}update_item itemid
         ```$
 
         @`🛡️ Admin Command`
-        Distribute an item to everyone.@
+        Update any attribute of an existing item from the database.@
 
-        ~To distribute a Golden Cigar with ID 0000FFFF:
+        ~To make a Golden Cigar with ID 0000FFFF premium:
             ```
-            {command_prefix}item_all 0000FFFF
+            {command_prefix}update_item 0000FFFF --premium True
             ```~
         """
-        item = kwargs["item"]
-        if item.premium and not is_owner(self.ctx, message.author):
+        item = kwargs.get("item")
+        updatables = {
+            key.lower(): val
+            for key, val in kwargs.items()
+            if key.lower() in dict(item)
+        }
+        if not updatables:
             await message.channel.send(
                 embed=get_embed(
-                    "Only the owners can give Premium Items.",
-                    embed_type="error",
-                    title="Forbidden"
+                    "That's not a valid attribute.",
+                    embed_type="warning",
+                    title="Unable to Update."
                 )
             )
             return
-        ids = Profiles.get_all(ids_only=True)
-        for uid in ids:
-            if not uid:
-                continue
-            user = message.guild.get_member(int(uid))
-            if not user:
-                continue
-            Inventory(user).save(args[0])
+        if not is_owner(self.ctx, message.author):
+            updatables.pop("premium", None)
+        if not updatables:
+            return
+        item.update(**updatables, modify_all=True)
+        if issubclass(item.__class__, Tradable):
+            Shop.refresh_tradables()
+            PremiumShop.refresh_tradables()
         await message.add_reaction("👍")
 
     @staticmethod
-    def __item_factory(category: Type[Item], name: str, **kwargs) -> Item:
+    def __create_item__item_factory(
+        category: Type[Item],
+        name: str, **kwargs
+    ) -> Item:
         cls_name = ''.join(
             word.title()
             for word in name.split(' ')
@@ -636,7 +650,7 @@ class AdminCommands(Commands):
         item_cls = type(cls_name, (category, ), kwargs)
         return item_cls(**kwargs)
 
-    def __populate_categories(
+    def __create_item_populate_categories(
         self, catog: Type[Item],
         categories: Dict, curr_recc: int
     ):
@@ -646,4 +660,6 @@ class AdminCommands(Commands):
             if subcatog.__name__ != 'Chest':
                 categories[subcatog.__name__] = subcatog
                 curr_recc += 1
-                self.__populate_categories(subcatog, categories, curr_recc)
+                self.__create_item_populate_categories(
+                    subcatog, categories, curr_recc
+                )

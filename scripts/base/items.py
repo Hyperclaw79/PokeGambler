@@ -17,7 +17,7 @@ from hashlib import md5
 from io import BytesIO
 from typing import (
     Dict, List, Optional,
-    Tuple, Type, TYPE_CHECKING, Union
+    Tuple, Type, TYPE_CHECKING
 )
 
 from dotenv import load_dotenv
@@ -58,6 +58,16 @@ class Item(ABC):
     # MongoDB Client
     mongo = DB_CLIENT.items
 
+    def __eq__(self, other: Item) -> bool:
+        return self.name == other.name
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+    def __iter__(self) -> Tuple:
+        for attr in self.attrs:
+            yield (attr, getattr(self, attr))
+
     def __post_init__(self):
         self.itemid = md5(
             str(datetime.utcnow()).encode()
@@ -68,9 +78,12 @@ class Item(ABC):
             "sellable", "price", "premium"
         )
 
-    def __iter__(self) -> Tuple:
-        for attr in self.attrs:
-            yield (attr, getattr(self, attr))
+    def __repr__(self) -> str:
+        attr_str = ',\n    '.join(
+            f"{attr}={getattr(self, attr)}"
+            for attr in self.attrs
+        )
+        return f"{self.__class__.__name__}(\n    {attr_str}\n)"
 
     def __str__(self) -> str:
         return ' '.join(
@@ -80,18 +93,22 @@ class Item(ABC):
             )
         )
 
-    def __repr__(self) -> str:
-        attr_str = ',\n    '.join(
-            f"{attr}={getattr(self, attr)}"
-            for attr in self.attrs
-        )
-        return f"{self.__class__.__name__}(\n    {attr_str}\n)"
+    async def get_image(self, sess: ClientSession) -> Image.Image:
+        """
+        Downloads and returns the image of the item.
+        """
+        byio = BytesIO()
+        async with sess.get(self.asset_url) as resp:
+            data = await resp.read()
+        byio.write(data)
+        byio.seek(0)
+        return Image.open(byio)
 
-    def __hash__(self) -> int:
-        return hash(self.name)
-
-    def __eq__(self, other: Item) -> bool:
-        return self.name == other.name
+    def delete(self):
+        """
+        Deletes the Item from the Collection.
+        """
+        self.mongo.delete_one({"_id": self.itemid})
 
     def save(self):
         """
@@ -103,7 +120,10 @@ class Item(ABC):
         attrs["created_on"] = datetime.now()
         self.mongo.insert_one(attrs)
 
-    def update(self, modify_all: bool = False, **kwargs):
+    def update(
+        self, modify_all: Optional[bool] = False,
+        **kwargs
+    ):
         """
         Updates an existing item.
         """
@@ -118,12 +138,6 @@ class Item(ABC):
             filter_,
             {'$set': kwargs}
         )
-
-    def delete(self):
-        """
-        Deletes the Item from the Collection.
-        """
-        self.mongo.delete_one({"_id": self.itemid})
 
     @property
     def name(self) -> str:
@@ -164,52 +178,6 @@ class Item(ABC):
             )
         return emb
 
-    async def get_image(self, sess: ClientSession) -> Image.Image:
-        """
-        Downloads and returns the image of the item.
-        """
-        byio = BytesIO()
-        async with sess.get(self.asset_url) as resp:
-            data = await resp.read()
-        byio.write(data)
-        byio.seek(0)
-        return Image.open(byio)
-
-    @classmethod
-    def get(cls: Type[Item], itemid: str) -> Union[Dict, None]:
-        """
-        Get an Item with an ID as a dictionary.
-        Returns None if item not in the DB.
-        """
-        return cls.mongo.find_one({"_id": itemid})
-
-    @classmethod
-    def _new_item(
-        cls: Type[Item], existing_item: Dict,
-        force_new: bool = False
-    ) -> Item:
-        old_item = {**existing_item}
-        category = cls.get_category(old_item)
-        old_item.pop('category', None)
-        itemid = old_item.pop('_id', None)
-        if not itemid:
-            itemid = old_item.pop('itemid', None)
-        new_item = type(
-            "".join(
-                word.title()
-                for word in old_item.pop("name").split(" ")
-            ),
-            (category, ),
-            old_item
-        )(**old_item)
-        if force_new:
-            new_item.save()
-        elif itemid:
-            new_item.itemid = itemid
-        else:
-            new_item.__post_init__()
-        return new_item
-
     @classmethod
     def from_id(
         cls: Type[Item], itemid: int,
@@ -235,6 +203,14 @@ class Item(ABC):
         if not item:
             return None
         return cls._new_item(item, force_new=force_new)
+
+    @classmethod
+    def get(cls: Type[Item], itemid: str) -> Dict:
+        """
+        Get an Item with an ID as a dictionary.
+        Returns None if item not in the DB.
+        """
+        return cls.mongo.find_one({"_id": itemid})
 
     @classmethod
     def get_category(cls: Type[Item], item: Dict) -> Type[Item]:
@@ -269,10 +245,30 @@ class Item(ABC):
         return category
 
     @classmethod
+    def get_unique_items(cls) -> List[Dict]:
+        """
+        Gets all items with a unique name.
+        """
+        return list(cls.mongo.aggregate([
+            {
+                "$match": {
+                    "category": {"$ne": "Chest"}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$name",
+                    "items": {"$first": "$$ROOT"}
+                }
+            },
+            {"$replaceRoot": {"newRoot": "$items"}}
+        ]))
+
+    @classmethod
     def list_items(
         cls: Type[Item],
         category: str = "Tradable",
-        limit: int = 5,
+        limit: Optional[int] = 5,
         premium: Optional[bool] = None
     ) -> List:
         """
@@ -315,24 +311,31 @@ class Item(ABC):
         return modded_items
 
     @classmethod
-    def get_unique_items(cls) -> List[Dict]:
-        """
-        Gets all items with a unique name.
-        """
-        return list(cls.mongo.aggregate([
-            {
-                "$match": {
-                    "category": {"$ne": "Chest"}
-                }
-            },
-            {
-                "$group": {
-                    "_id": "$name",
-                    "items": {"$first": "$$ROOT"}
-                }
-            },
-            {"$replaceRoot": {"newRoot": "$items"}}
-        ]))
+    def _new_item(
+        cls: Type[Item], existing_item: Dict,
+        force_new: bool = False
+    ) -> Item:
+        old_item = {**existing_item}
+        category = cls.get_category(old_item)
+        old_item.pop('category', None)
+        itemid = old_item.pop('_id', None)
+        if not itemid:
+            itemid = old_item.pop('itemid', None)
+        new_item = type(
+            "".join(
+                word.title()
+                for word in old_item.pop("name").split(" ")
+            ),
+            (category, ),
+            old_item
+        )(**old_item)
+        if force_new:
+            new_item.save()
+        elif itemid:
+            new_item.itemid = itemid
+        else:
+            new_item.__post_init__()
+        return new_item
 
 
 @dataclass(eq=False)
@@ -578,7 +581,9 @@ class Lootbag(Treasure):
     Lootbags contain other items inside them.
     Premium Lootbags can also contain Premium Items.
     """
-    def __init__(self, items: Optional[List[Item]] = None, **kwargs):
+    def __init__(
+        self, **kwargs
+    ):
         super().__init__(
             category=kwargs.pop(
                 "category",
@@ -586,6 +591,16 @@ class Lootbag(Treasure):
             ),
             **kwargs
         )
+
+    @property
+    def chips(self) -> int:
+        """
+        Return random amount of Pokechips in following ranges:
+            Normal => [100, 499]
+            Premium => [500, 1000]
+        """
+        limits = [500, 1000] if self.premium else [100, 499]
+        return random.randint(*limits)
 
     def get_random_items(
         self, categories: Optional[List[str]] = None,
@@ -660,18 +675,6 @@ class Lootbag(Treasure):
             Item.from_id(itm_dict["_id"])
             for itm_dict in rand_items
         ]
-
-    @property
-    def chips(self) -> int:
-        """
-        Return random amount of Pokechips in following ranges:
-            Normal => [100, 499]
-            Premium => [500, 1000]
-        """
-        limits = [100, 499]
-        if self.premium:
-            limits = [500, 1000]
-        return random.randint(*limits)
 
 
 @dataclass(eq=False)

@@ -5,19 +5,18 @@ Normal Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
-from datetime import datetime, timedelta
 import re
 from typing import Callable, List, Optional, TYPE_CHECKING
 
 import discord
 
-from ..base.items import DB_CLIENT
+from ..base.models import CommandData, Profiles
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
     get_commands, get_embed, get_modules,
     dedent, showable_command
 )
-from .basecommand import alias, Commands
+from .basecommand import alias, Commands, model
 
 if TYPE_CHECKING:
     from discord import Message
@@ -158,9 +157,9 @@ class NormalCommands(Commands):
         embeds = []
         for i, cmd in enumerate(commands):
             if len(args) > 0:
-                emb = self.__generate_help_embed(cmd, keep_footer=True)
+                emb = self.__help_generate_embed(cmd, keep_footer=True)
             else:
-                emb = self.__generate_help_embed(cmd)
+                emb = self.__help_generate_embed(cmd)
                 emb.set_footer(text=f"{i+1}/{len(commands)}")
             embeds.append(emb)
         base = await message.channel.send(
@@ -170,6 +169,20 @@ class NormalCommands(Commands):
         if len(embeds) > 1:
             pager = Paginator(self.ctx, message, base, embeds)
             await pager.run(content='**PokeGambler Commands List:**\n')
+
+    @model([Profiles, CommandData])
+    async def cmd_info(self, message: Message, **kwargs):
+        """Gives info about PokeGambler
+        $```scss
+        {command_prefix}info
+        ```$
+
+        @Gives new players information about PokeGambler.@
+        """
+        emb1 = self.__info_embed_one()
+        emb2 = self.__info_embed_two()
+        embeds = [emb1, emb2]
+        await self.paginate(message, embeds)
 
     async def cmd_invite(self, message: Message, **kwargs):
         """Invite PokeGambler to other servers
@@ -200,19 +213,6 @@ class NormalCommands(Commands):
             embed=inv_emb
         )
 
-    async def cmd_info(self, message: Message, **kwargs):
-        """Gives info about PokeGambler
-        $```scss
-        {command_prefix}info
-        ```$
-
-        @Gives new players information about PokeGambler.@
-        """
-        emb1 = self.__info_embed_one()
-        emb2 = self.__info_embed_two()
-        embeds = [emb1, emb2]
-        await self.paginate(message, embeds)
-
     @alias('latency')
     async def cmd_ping(self, message: Message, **kwargs):
         """PokeGambler Latency
@@ -230,7 +230,7 @@ class NormalCommands(Commands):
             )
         )
 
-    def __generate_help_embed(
+    def __help_generate_embed(
         self, cmd: Callable,
         keep_footer: bool = False
     ):
@@ -368,20 +368,21 @@ class NormalCommands(Commands):
         )
         emb.add_field(
             name="**Stats**",
-            value=f"```yaml\n{self.__get_stats()}\n```",
+            value=f"```yaml\n{self.__info_get_stats()}\n```",
             inline=False
         )
         return emb
 
-    def __get_stats(self):
+    def __info_get_stats(self):
         """Get the stats of the bot."""
         handlers = {
             "Latency": lambda: f"{round(self.ctx.latency * 1000, 2)} ms",
-            "Total Users": DB_CLIENT.profiles.count,
+            # pylint: disable=no-member
+            "Total Users": Profiles.mongo.count,
             "Total Servers": lambda: len(self.ctx.guilds),
-            "Most Active User": self.__most_active_user,
-            "Most Active Channel": self.__most_active_channel,
-            "Most Used Command": self.__most_used_command
+            "Most Active User": self.__info_most_active_user,
+            "Most Active Channel": self.__info_most_active_channel,
+            "Most Used Command": self.__info_most_used_command
         }
         stats = {}
         for key, func in handlers.items():
@@ -394,99 +395,23 @@ class NormalCommands(Commands):
         )
         return stats.encode('utf-8').decode('utf-8')
 
-    def __most_active_user(self):
-        top_user = next(
-            DB_CLIENT.commanddata.aggregate([
-                {
-                    '$match': {
-                        'used_at': {
-                            '$gte': datetime.today() - timedelta(
-                                weeks=1
-                            )
-                        },
-                        'user_is_admin': False
-                    }
-                }, {
-                    '$group': {
-                        '_id': '$user_id',
-                        'num_cmds': {'$sum': 1}
-                    }
-                }, {
-                    '$sort': {'num_cmds': -1}
-                }, {
-                    '$limit': 1
-                }, {
-                    '$match': {'num_cmds': {'$gt': 1}}
-                }
-            ]),
-            None
-        )
-        if top_user is None:
-            return None
-        user = self.ctx.get_user(int(top_user['_id']))
-        return f"{user} ({top_user['num_cmds']})"
-
-    def __most_active_channel(self):
-        top_channel = next(
-            DB_CLIENT.commanddata.aggregate([
-                {
-                    '$match': {
-                        'used_at': {
-                            '$gte': datetime.today() - timedelta(
-                                weeks=1
-                            )
-                        },
-                        'user_is_admin': False
-                    }
-                }, {
-                    '$group': {
-                        '_id': '$channel',
-                        'num_cmds': {'$sum': 1},
-                        'guild': {'$first': '$guild'}
-                    }
-                }, {
-                    '$sort': {'num_cmds': -1}
-                }, {
-                    '$limit': 1
-                }, {
-                    '$match': {'num_cmds': {'$gt': 1}}
-                }
-            ]),
-            None
-        )
+    def __info_most_active_channel(self):
+        top_channel = CommandData.most_active_channel()
         if top_channel is None:
             return None
         channel = self.ctx.get_channel(int(top_channel['_id']))
         guild = self.ctx.get_guild(int(top_channel['guild']))
         return f"{channel} ({guild})"
 
-    def __most_used_command(self):
-        top_command = next(
-            DB_CLIENT.commanddata.aggregate([
-                {
-                    '$match': {
-                        'used_at': {
-                            '$gte': datetime.today() - timedelta(
-                                weeks=1
-                            )
-                        },
-                        'user_is_admin': False
-                    }
-                }, {
-                    '$group': {
-                        '_id': '$command',
-                        'num_cmds': {'$sum': 1}
-                    }
-                }, {
-                    '$sort': {'num_cmds': -1}
-                }, {
-                    '$limit': 1
-                }, {
-                    '$match': {'num_cmds': {'$gt': 1}}
-                }
-            ]),
-            None
-        )
+    def __info_most_active_user(self):
+        top_user = CommandData.most_active_user()
+        if top_user is None:
+            return None
+        user = self.ctx.get_user(int(top_user['_id']))
+        return f"{user} ({top_user['num_cmds']})"
+
+    def __info_most_used_command(self):
+        top_command = CommandData.most_used_command()
         if top_command is None:
             return None
         command = top_command['_id']

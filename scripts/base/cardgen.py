@@ -3,7 +3,7 @@ The Base Card Generation Module
 """
 import os
 import random
-from typing import List
+from typing import List, Optional
 
 from PIL import Image
 
@@ -44,9 +44,53 @@ class CardGambler:
         ).convert('RGBA')
         return Image.alpha_composite(facecard, self.watermark).convert('RGB')
 
+    @staticmethod
+    def get_deck(
+        cards: List[Image.Image],
+        sep: Optional[str] = "auto",
+        reverse: Optional[bool] = False
+    ):
+        """
+        Gets a deck generated from list of cards.
+        """
+        width, height = cards[0].size
+        if sep == "auto":
+            sep = width // 2
+        deck_size = (width + sep * (len(cards) - 1), height)
+        deck = Image.new("RGB", deck_size, (0, 0, 0))
+        if reverse:
+            for i, card in enumerate(cards[::-1]):
+                deck.paste(
+                    card,
+                    (deck_size[0] - ((i * sep) + width), 0)
+                )
+        else:
+            for i, card in enumerate(cards):
+                deck.paste(
+                    card,
+                    ((i * sep), 0)
+                )
+        return deck
+
+    def get_closed_deck(
+        self, sep: Optional[int] = 5,
+        num_cards: Optional[int] = 12
+    ):
+        """
+        Gets a deck of closed cards.
+        """
+        cards = [self.closed_card for i in range(num_cards)]
+        return self.get_deck(cards, sep=sep, reverse=True)
+
+    def get_random_card(self):
+        """
+        Alias for get_random_cards(num_cards=1).
+        """
+        return self.get_random_cards(num_cards=1)[0]
+
     def get_random_cards(
-        self, num_cards: int = 4,
-        joker_chance: float = 0.05
+        self, num_cards: Optional[int] = 4,
+        joker_chance: Optional[float] = 0.05
     ):
         """
         Gets a list of random cards.
@@ -81,50 +125,15 @@ class CardGambler:
         random.shuffle(cards)
         return cards
 
-    def get_random_card(self):
-        """
-        Alias for get_random_cards(num_cards=1).
-        """
-        return self.get_random_cards(num_cards=1)[0]
-
-    @staticmethod
-    def get_deck(
-        cards: List,
-        sep: str = "auto",
-        reverse: bool = False
+    def get_random_deck(
+        self, num_cards: Optional[int] = 12,
+        **kwargs
     ):
-        """
-        Gets a deck generated from list of cards.
-        """
-        width, height = cards[0].size
-        if sep == "auto":
-            sep = width // 2
-        deck_size = (width + sep * (len(cards) - 1), height)
-        deck = Image.new("RGB", deck_size, (0, 0, 0))
-        if reverse:
-            for i, card in enumerate(cards[::-1]):
-                deck.paste(
-                    card,
-                    (deck_size[0] - ((i * sep) + width), 0)
-                )
-        else:
-            for i, card in enumerate(cards):
-                deck.paste(
-                    card,
-                    ((i * sep), 0)
-                )
-        return deck
-
-    def get_random_deck(self, sep: str = "auto", num_cards: int = 12):
         """
         Gets a deck generated from a list of random cards.
         """
-        cards = [self.get_random_card()[1] for i in range(num_cards)]
-        return self.get_deck(cards, sep=sep)
-
-    def get_closed_deck(self, sep: int = 5, num_cards: int = 12):
-        """
-        Gets a deck of closed cards.
-        """
-        cards = [self.closed_card for i in range(num_cards)]
-        return self.get_deck(cards, sep=sep, reverse=True)
+        cards = [
+            self.get_random_card()[1]
+            for _ in range(num_cards)
+        ]
+        return self.get_deck(cards, **kwargs)

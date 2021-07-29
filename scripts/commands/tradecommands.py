@@ -7,7 +7,7 @@ Trade Commands Module
 from __future__ import annotations
 import asyncio
 from typing import (
-    List, Optional, TYPE_CHECKING,
+    List, Optional, TYPE_CHECKING, Tuple,
     Type, Union, Dict
 )
 import re
@@ -43,6 +43,252 @@ class TradeCommands(Commands):
         'Rewardbox': 'Reward Boxe',
         'Giftbox': 'Gift Boxe'
     }
+
+    @model([Profiles, Loots, Inventory])
+    async def cmd_buy(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """Buy item from Shop.
+        $```scss
+        {command_prefix}buy itemid [--quantity]
+        ```$
+
+        @Buys an item from the PokeGambler Shop.
+        You can provide a quantity to buy multiple Tradables.
+        To see the list of purchasable items, check out:
+        ```diff
+        {command_prefix}shop
+        ```@
+
+        ~To buy a Loot boost with ID boost_lt:
+            ```
+            {command_prefix}buy boost_lt
+            ```
+        ~To buy 10 items with ID 0000FFFF:
+            ```
+            {command_prefix}buy 0000FFFF --quantity 10
+            ```~
+        """
+        if not args:
+            return
+        itemid = args[0].lower()
+        quantity = int(kwargs.get('quantity', 1))
+        shop, item = await self.__buy_get_item(message, itemid)
+        if item is None:
+            return
+        status = shop.validate(message.author, item, quantity)
+        if status != "proceed":
+            await message.channel.send(
+                embed=get_embed(
+                    status,
+                    embed_type="error",
+                    title="Unable to Purchase item."
+                )
+            )
+            return
+        success = await self.__buy_perform(message, quantity, item)
+        if not success:
+            return
+        spent = item.price * quantity
+        if item.__class__ in [BoostItem, PremiumBoostItem]:
+            tier = Loots(message.author).tier
+            spent *= (10 ** (tier - 1))
+        curr = self.chip_emoji
+        if item.premium:
+            spent //= 10
+            curr = self.bond_emoji
+        ftr_txt = None
+        if isinstance(item, Title):
+            ftr_txt = "Your nickname might've not changed " + \
+                "if it's too long.\nBut the role has been " + \
+                "assigned succesfully."
+        quant_str = f"x {quantity}" if quantity > 1 else ''
+        await message.channel.send(
+            embed=get_embed(
+                f"Successfully purchased **{item}**{quant_str}.\n"
+                "Your account has been debited: "
+                f"**{spent}** {curr}",
+                title="Success",
+                footer=ftr_txt,
+                color=Profiles(message.author).get('embed_color')
+            )
+        )
+
+    @model(Item)
+    @ensure_item
+    @alias(['item', 'detail'])
+    async def cmd_details(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """Check the details of a PokeGambler Item.
+        $```scss
+        {command_prefix}details chest_id
+        ```$
+
+        @Check the details, of a PokeGambler item, like:
+            Description, Price, Category
+        @
+
+        ~To check the details of an Item with ID 0000FFFF:
+            ```
+            {command_prefix}details 0000FFFF
+            ```~
+        """
+
+        item = kwargs["item"]
+        await message.channel.send(embed=item.details)
+
+    @dealer_only
+    @model([Profiles, Trades])
+    @alias(["transfer", "pay"])
+    async def cmd_give(
+        self, message: Message,
+        args: Optional[List] = None,
+        mentions: Optional[List[Member]] = None,
+        **kwargs
+    ):
+        """Transfer credits.
+        $```scss
+        {command_prefix}give quantity @mention
+        ```$
+
+        @`🎲 Dealer Command`
+        Transfer some of your own {pokechip_emoji} to another user.
+        If you're being generous, we respect you.
+        But if found abusing it, you will be blacklisted.@
+
+        ~To give user ABCD#1234 500 chips:
+            ```
+            {command_prefix}give @ABCD#1234 500
+            ```~
+        """
+        error_tuple = self.__give_santize(message, args, mentions)
+        if error_tuple:
+            await message.channel.send(
+                embed=get_embed(
+                    error_tuple[1],
+                    embed_type="error",
+                    title=error_tuple[0]
+                )
+            )
+            return
+        author_prof = Profiles(message.author)
+        mention_prof = Profiles(mentions[0])
+        amount = int(args[0])
+        if author_prof.get("balance") < amount:
+            await message.channel.send(
+                embed=get_embed(
+                    f"You don't have enough {self.chip_emoji}.",
+                    embed_type="error",
+                    title="Low Balance"
+                )
+            )
+            return
+        author_prof.debit(amount)
+        mention_prof.credit(amount)
+        Trades(
+            message.author,
+            str(mentions[0].id), amount
+        ).save()
+        await message.channel.send(
+            embed=get_embed(
+                f"Amount transferred: **{amount}** {self.chip_emoji}"
+                f"\nRecipient: **{mentions[0]}**",
+                title="Transaction Successful",
+                color=author_prof.get('embed_color')
+            )
+        )
+
+    @model(Inventory)
+    async def cmd_ids(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """Check IDs of possessed items.
+        $```scss
+        {command_prefix}ids item_name
+        ```$
+
+        @Get a list of IDs of an item you own using its name.@
+
+        ~To get the list of IDs for Common Chest:
+            ```
+            {command_prefix}ids Common Chest
+            ```~
+        """
+        if not args:
+            return
+        item_name = " ".join(arg.title() for arg in args)
+        ids = Inventory(
+            message.author
+        ).from_name(item_name)
+        if not ids:
+            await message.channel.send(
+                embed=get_embed(
+                    f'**{item_name}**\nYou have **0** of those.',
+                    title=f"{message.author.name}'s Item IDs",
+                    color=Profiles(message.author).get('embed_color')
+                )
+            )
+            return
+        embeds = self.__ids_get_embeds(message, item_name, ids)
+        await self.paginate(message, embeds)
+
+    @model(Inventory)
+    @alias('inv')
+    async def cmd_inventory(self, message: Message, **kwargs):
+        """Check personal inventory.
+        $```scss
+        {command_prefix}inventory
+        ```$
+
+        @Check your personal inventory for collected Chests, Treasures, etc.@
+        """
+        inv = Inventory(message.author)
+        catog_dict, net_worth = inv.get()
+        emb = get_embed(
+            "Your personal inventory categorized according to item type.\n"
+            "You can get the list of IDs for an item using "
+            f"`{self.ctx.prefix}ids item_name`.\n"
+            "\n> Your inventory's net worth, excluding Chests, is "
+            f"**{net_worth}** {self.chip_emoji}.",
+            title=f"{message.author.name}'s Inventory",
+            color=Profiles(message.author).get('embed_color')
+        )
+        for idx, (catog, items) in enumerate(catog_dict.items()):
+            catog_name = self.verbose_names.get(catog, catog)
+            unique_items = []
+            for item in items:
+                if item['name'] not in (
+                    itm['name']
+                    for itm in unique_items
+                ):
+                    item['count'] = [
+                        itm['name']
+                        for itm in items
+                    ].count(item['name'])
+                    unique_items.append(item)
+            unique_str = "\n".join(
+                f"『{item['emoji']}』 **{item['name']}** x{item['count']}"
+                for item in unique_items
+            )
+            emb.add_field(
+                name=f"**{catog_name}s** ({len(items)})",
+                value=unique_str,
+                inline=True
+            )
+            if idx % 2 == 0:
+                emb.add_field(
+                    name="\u200B",
+                    value="\u200B",
+                    inline=True
+                )
+        await message.channel.send(embed=emb)
 
     @model([Loots, Profiles, Chest, Inventory])
     @no_thumb
@@ -104,367 +350,62 @@ class TradeCommands(Commands):
             return
         await self.__open_handle_rewards(message, openables)
 
-    @model(Item)
-    @ensure_item
-    @alias(['item', 'detail'])
-    async def cmd_details(
+    @model(Profiles)
+    async def cmd_redeem_chips(
         self, message: Message,
         args: Optional[List] = None,
         **kwargs
     ):
-        """Check the details of a PokeGambler Item.
+        """Convert Bonds to Chips.
         $```scss
-        {command_prefix}details chest_id
+        {command_prefix}redeem_chips amount
         ```$
 
-        @Check the details, of a PokeGambler item, like:
-            Description, Price, Category
-        @
+        @Redeem your pokebonds as x10 pokechips.@
 
-        ~To check the details of an Item with ID 0000FFFF:
+        ~To redeem 500 chips:
             ```
-            {command_prefix}details 0000FFFF
+            {command_prefix}redeem_chips 500
             ```~
         """
-
-        item = kwargs["item"]
-        await message.channel.send(embed=item.details)
-
-    @model(Inventory)
-    @alias('inv')
-    async def cmd_inventory(self, message: Message, **kwargs):
-        """Check personal inventory.
-        $```scss
-        {command_prefix}inventory
-        ```$
-
-        @Check your personal inventory for collected Chests, Treasures, etc.@
-        """
-        inv = Inventory(message.author)
-        catog_dict, net_worth = inv.get()
-        emb = get_embed(
-            "Your personal inventory categorized according to item type.\n"
-            "You can get the list of IDs for an item using "
-            f"`{self.ctx.prefix}ids item_name`.\n"
-            "\n> Your inventory's net worth, excluding Chests, is "
-            f"**{net_worth}** {self.chip_emoji}.",
-            title=f"{message.author.name}'s Inventory",
-            color=Profiles(message.author).get('embed_color')
-        )
-        for idx, (catog, items) in enumerate(catog_dict.items()):
-            catog_name = self.verbose_names.get(catog, catog)
-            unique_items = []
-            for item in items:
-                if item['name'] not in (
-                    itm['name']
-                    for itm in unique_items
-                ):
-                    item['count'] = [
-                        itm['name']
-                        for itm in items
-                    ].count(item['name'])
-                    unique_items.append(item)
-            emb.add_field(
-                name=f"**{catog_name}s** ({len(items)})",
-                value="\n".join(
-                    f"『{item['emoji']}』 **{item['name']}** x{item['count']}"
-                    for item in unique_items
-                ),
-                inline=True
-            )
-            if idx % 2 == 0:
-                emb.add_field(
-                    name="\u200B",
-                    value="\u200B",
-                    inline=True
-                )
-        await message.channel.send(embed=emb)
-
-    @model(Inventory)
-    async def cmd_ids(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """Check IDs of possessed items.
-        $```scss
-        {command_prefix}ids item_name
-        ```$
-
-        @Get a list of IDs of an item you own using its name.@
-
-        ~To get the list of IDs for Common Chest:
-            ```
-            {command_prefix}ids Common Chest
-            ```~
-        """
-        if not args:
-            return
-        item_name = " ".join(arg.title() for arg in args)
-        ids = Inventory(
-            message.author
-        ).from_name(item_name)
-        if not ids:
+        if (
+            not args
+            or not args[0].isdigit()
+            or int(args[0]) < 10
+            or int(args[0]) % 10  # Must be a multiple of 10, 0 -> False
+        ):
             await message.channel.send(
                 embed=get_embed(
-                    f'**{item_name}**\nYou have **0** of those.',
-                    title=f"{message.author.name}'s Item IDs",
-                    color=Profiles(message.author).get('embed_color')
+                    "You need to enter the number of chips to redeem.",
+                    embed_type="error",
+                    title="Invalid Amount"
                 )
             )
             return
-        embeds = []
-        for i in range(0, len(ids), 10):
-            cnt_str = f'{i + 1} - {min(i + 11, len(ids))} / {len(ids)}'
-            emb = get_embed(
-                f'**{item_name}**『{cnt_str}』',
-                title=f"{message.author.name}'s Item IDs",
-                footer=f"Use 『{self.ctx.prefix}details itemid』"
-                "for detailed view.",
-                color=Profiles(message.author).get('embed_color')
-            )
-            for id_ in ids[i:i+10]:
-                emb.add_field(
-                    name="\u200B",
-                    value=f"**{id_}**",
-                    inline=False
-                )
-            embeds.append(emb)
-        await self.paginate(message, embeds)
-
-    @no_thumb
-    async def cmd_shop(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """Access PokeGambler Shop.
-        $```scss
-        {command_prefix}shop [category] [--premium]
-        ```$
-
-        @Used to access the **PokeGambler Shop.**
-        If no arguments are provided, a list of categories will be displayed.
-        If a category is provided, list of items will be shown.
-        To access the Premium shop, use the kwarg `--premium` at the end.
-        > You need to own PokeBonds to access this shop.
-
-        There are currently 3 shop categories:
-        ```md
-            1. Titles - Special Purchasable Roles
-            2. Boosts - Temporary Boosts to gain an edge
-            3. Tradables - Purchasable assets of trade
-        ```@
-
-        ~To view the shop categoies:
-            ```
-            {command_prefix}shop
-            ```
-        To view the shop for Titles:
-            ```
-            {command_prefix}shop titles
-            ```
-        To view the Premium shop for Gladiators:
-            ```
-            {command_prefix}shop gladiators --premium
-            ```~
-        """
-        shop = Shop
+        chips = int(args[0])
         profile = Profiles(message.author)
-        if kwargs.get('premium'):
-            shop = PremiumShop
-            if profile.get("pokebonds") == 0:
-                await message.channel.send(
-                    embed=get_embed(
-                        "This option is available only to users"
-                        " who purchased PokeBonds.",
-                        embed_type="error",
-                        title="Premium Only"
-                    )
-                )
-                return
-        categories = shop.categories
-        shop_alias = shop.alias_map
-        if args and args[0].title() not in shop_alias:
-            cat_str = "\n".join(categories)
+        if profile.get("pokebonds") < chips // 10:
             await message.channel.send(
                 embed=get_embed(
-                    "That category does not exist. "
-                    f"Try one of these:\n{cat_str}",
+                    f"You cannot afford that many chips.\n"
+                    f"You'll need {chips // 10} {self.bond_emoji} for that.",
                     embed_type="error",
-                    title="Invalid Category"
+                    title="Insufficient Balance"
                 )
             )
             return
-        embeds = []
-        if not args:
-            shop.refresh_tradables()
-            categories = {
-                key: catog
-                for key, catog in sorted(
-                    shop.categories.items(),
-                    key=lambda x: len(x[1].items),
-                    reverse=True
-                )
-                if catog.items
-            }
-            catogs = list(categories.values())
-            for i in range(0, len(catogs), 3):
-                emb = get_embed(
-                    "**To view the items in a specific category:**\n"
-                    f"**`{self.ctx.prefix}shop category`**",
-                    title="PokeGambler Shop",
-                    footer="All purchases except Tradables "
-                    "are non-refundable.",
-                    color=profile.get('embed_color')
-                )
-                for catog in catogs[i:i+3]:
-                    emb.add_field(
-                        name=str(catog),
-                        value=f"```diff\n{dedent(catog.description)}\n"
-                        "To view the items:\n"
-                        f"{self.ctx.prefix}shop {catog.name}\n```",
-                        inline=False
-                    )
-                embeds.append(emb)
-        else:
-            emb = self.__get_shop_page(
-                shop,
-                args[0].title(),
-                message.author
-            )
-            embeds.append(emb)
-        if kwargs.get("premium"):
-            for emb in embeds:
-                emb.set_image(
-                    url="https://cdn.discordapp.com/attachments/"
-                    "840469669332516904/853990953953525870/pokebond.png"
-                )
-        await self.paginate(message, embeds)
-
-    async def cmd_buy(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """Buy item from Shop.
-        $```scss
-        {command_prefix}buy itemid [--quantity]
-        ```$
-
-        @Buys an item from the PokeGambler Shop.
-        You can provide a quantity to buy multiple Tradables.
-        To see the list of purchasable items, check out:
-        ```diff
-        {command_prefix}shop
-        ```@
-
-        ~To buy a Loot boost with ID boost_lt:
-            ```
-            {command_prefix}buy boost_lt
-            ```
-        ~To buy 10 items with ID 0000FFFF:
-            ```
-            {command_prefix}buy 0000FFFF --quantity 10
-            ```~
-        """
-        if not args:
-            return
-        itemid = args[0].lower()
-        quantity = int(kwargs.get('quantity', 1))
-        shop = Shop
-        shop.refresh_tradables()
-        try:
-            item = shop.get_item(itemid, force_new=True)
-            if not item:
-                shop = PremiumShop
-                item = shop.get_item(itemid, force_new=True)
-        except (ValueError, ZeroDivisionError):
-            await message.channel.send(
-                embed=get_embed(
-                    "The provided ID seems to be of wrong format.\n",
-                    embed_type="error",
-                    title="Invalid Item ID"
-                )
-            )
-            return
-        if not item:
-            await message.channel.send(
-                embed=get_embed(
-                    "This item was not found in the Shop.\n"
-                    "Since the Shop is dynamic, maybe it's too late.",
-                    embed_type="error",
-                    title="Item not in Shop"
-                )
-            )
-            return
-        status = shop.validate(message.author, item, quantity)
-        if all([
-            isinstance(item, Title),
-            message.guild.id != self.ctx.official_server
-        ]):
-            official_server = self.ctx.get_guild(self.ctx.official_server)
-            await message.channel.send(
-                embed=get_embed(
-                    f"You can buy titles only in [『{official_server}』]"
-                    "(https://discord.gg/g4TmVyfwj4).",
-                    embed_type="error",
-                    title="Cannot buy Titles here."
-                )
-            )
-            return
-        if status != "proceed":
-            await message.channel.send(
-                embed=get_embed(
-                    status,
-                    embed_type="error",
-                    title="Unable to Purchase item."
-                )
-            )
-            return
-        task = item.buy(
-            message=message,
-            quantity=quantity,
-            ctx=self.ctx
-        )
-        quant_str = f"x {quantity}" if quantity > 1 else ''
-        res = (await task) if asyncio.iscoroutinefunction(
-            item.buy
-        ) else task
-        if res != "success":
-            await message.channel.send(
-                embed=get_embed(
-                    f"{res}\nYour account has not been charged.",
-                    embed_type="error",
-                    title="Purchase failed"
-                )
-            )
-            return
-        spent = item.price * quantity
-        if item.__class__ in [BoostItem, PremiumBoostItem]:
-            tier = Loots(message.author).tier
-            spent *= (10 ** (tier - 1))
-        curr = self.chip_emoji
-        if item.premium:
-            spent //= 10
-            curr = self.bond_emoji
+        profile.debit(chips // 10, bonds=True)
+        profile.credit(chips)
         await message.channel.send(
             embed=get_embed(
-                f"Successfully purchased **{item}**{quant_str}.\n"
-                "Your account has been debited: "
-                f"**{spent}** {curr}",
-                title="Success",
-                footer=(
-                    "Your nickname might've not changed if it's too long.\n"
-                    "But the role has been assigned succesfully."
-                    if isinstance(item, Title)
-                    else None
-                ),
-                color=Profiles(message.author).get('embed_color')
+                f"Succesfully converted **{chips // 10}** {self.bond_emoji}"
+                f" into **{chips}** {self.chip_emoji}",
+                title="Redeem Succesfull",
+                color=profile.get('embed_color')
             )
         )
 
-    @model([Profiles, Item])
+    @model([Profiles, Item, Inventory])
     async def cmd_sell(
         self, message: Message,
         args: Optional[List] = None,
@@ -551,163 +492,89 @@ class TradeCommands(Commands):
             )
         )
 
-    @dealer_only
-    @model([Profiles, Trades])
-    @alias(["transfer", "pay"])
-    async def cmd_give(
-        self, message: Message,
-        args: Optional[List] = None,
-        mentions: Optional[List[Member]] = None,
-        **kwargs
-    ):
-        """Transfer credits.
-        $```scss
-        {command_prefix}give quantity @mention
-        ```$
-
-        @`🎲 Dealer Command`
-        Transfer some of your own {pokechip_emoji} to another user.
-        If you're being generous, we respect you.
-        But if found abusing it, you will be blacklisted.@
-
-        ~To give user ABCD#1234 500 chips:
-            ```
-            {command_prefix}give @ABCD#1234 500
-            ```~
-        """
-        if not mentions:
-            await message.channel.send(
-                embed=get_embed(
-                    "Please mention whom you want to give it to.",
-                    embed_type="error",
-                    title="No user mentioned."
-                )
-            )
-            return
-        if not args or (
-            args and (
-                not args[0].isdigit()
-                or int(args[0]) <= 0
-            )
-        ):
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to provide a valid amount.",
-                    embed_type="error",
-                    title="Invalid Amount."
-                )
-            )
-            return
-        if message.author.id == mentions[0].id:
-            await message.channel.send(
-                embed=get_embed(
-                    "Nice try mate, but it wouldn't have made a difference.",
-                    embed_type="error",
-                    title="Invalid User."
-                )
-            )
-            return
-        if mentions[0].bot:
-            await message.channel.send(
-                embed=get_embed(
-                    "We don't allow shady deals with bots.",
-                    embed_type="error",
-                    title="Bot account found."
-                )
-            )
-            return
-        if Blacklist.is_blacklisted(str(mentions[0].id)):
-            await message.channel.send(
-                embed=get_embed(
-                    "That user is blacklisted and cannot receive any chips.",
-                    embed_type="error",
-                    title="Blacklisted User."
-                )
-            )
-            return
-        author_prof = Profiles(message.author)
-        mention_prof = Profiles(mentions[0])
-        amount = int(args[0])
-        if author_prof.get("balance") < amount:
-            await message.channel.send(
-                embed=get_embed(
-                    f"You don't have enough {self.chip_emoji}.",
-                    embed_type="error",
-                    title="Low Balance"
-                )
-            )
-            return
-        author_prof.debit(amount)
-        mention_prof.credit(amount)
-        Trades(
-            message.author,
-            str(mentions[0].id), amount
-        ).save()
-        await message.channel.send(
-            embed=get_embed(
-                f"Amount transferred: **{amount}** {self.chip_emoji}"
-                f"\nRecipient: **{mentions[0]}**",
-                title="Transaction Successful",
-                color=author_prof.get('embed_color')
-            )
-        )
-
-    @model(Profiles)
-    async def cmd_redeem_chips(
+    @model([Item, Profiles])
+    @no_thumb
+    async def cmd_shop(
         self, message: Message,
         args: Optional[List] = None,
         **kwargs
     ):
-        """Convert Bonds to Chips.
+        """Access PokeGambler Shop.
         $```scss
-        {command_prefix}redeem_chips amount
+        {command_prefix}shop [category] [--premium]
         ```$
 
-        @Redeem your pokebonds as x10 pokechips.@
+        @Used to access the **PokeGambler Shop.**
+        If no arguments are provided, a list of categories will be displayed.
+        If a category is provided, list of items will be shown.
+        To access the Premium shop, use the kwarg `--premium` at the end.
+        > You need to own PokeBonds to access this shop.
 
-        ~To redeem 500 chips:
+        There are currently 3 shop categories:
+        ```md
+            1. Titles - Special Purchasable Roles
+            2. Boosts - Temporary Boosts to gain an edge
+            3. Tradables - Purchasable assets of trade
+        ```@
+
+        ~To view the shop categoies:
             ```
-            {command_prefix}redeem_chips 500
+            {command_prefix}shop
+            ```
+        To view the shop for Titles:
+            ```
+            {command_prefix}shop titles
+            ```
+        To view the Premium shop for Gladiators:
+            ```
+            {command_prefix}shop gladiators --premium
             ```~
         """
-        if (
-            not args
-            or not args[0].isdigit()
-            or int(args[0]) < 10
-            or int(args[0]) % 10  # Must be a multiple of 10, 0 -> False
-        ):
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to enter the number of chips to redeem.",
-                    embed_type="error",
-                    title="Invalid Amount"
-                )
-            )
-            return
-        chips = int(args[0])
+        shop = Shop
         profile = Profiles(message.author)
-        if profile.get("pokebonds") < chips // 10:
+        if kwargs.get('premium'):
+            shop = PremiumShop
+            if profile.get("pokebonds") == 0:
+                await message.channel.send(
+                    embed=get_embed(
+                        "This option is available only to users"
+                        " who purchased PokeBonds.",
+                        embed_type="error",
+                        title="Premium Only"
+                    )
+                )
+                return
+        categories = shop.categories
+        shop_alias = shop.alias_map
+        if args and args[0].title() not in shop_alias:
+            cat_str = "\n".join(categories)
             await message.channel.send(
                 embed=get_embed(
-                    f"You cannot afford that many chips.\n"
-                    f"You'll need {chips // 10} {self.bond_emoji} for that.",
+                    "That category does not exist. "
+                    f"Try one of these:\n{cat_str}",
                     embed_type="error",
-                    title="Insufficient Balance"
+                    title="Invalid Category"
                 )
             )
             return
-        profile.debit(chips // 10, bonds=True)
-        profile.credit(chips)
-        await message.channel.send(
-            embed=get_embed(
-                f"Succesfully converted **{chips // 10}** {self.bond_emoji}"
-                f" into **{chips}** {self.chip_emoji}",
-                title="Redeem Succesfull",
-                color=profile.get('embed_color')
+        if not args:
+            embeds = self.__shop_get_catogs(shop, profile)
+        else:
+            emb = self.__shop_get_page(
+                shop,
+                args[0].title(),
+                message.author
             )
-        )
+            embeds = [emb]
+        if kwargs.get("premium"):
+            for emb in embeds:
+                emb.set_image(
+                    url="https://cdn.discordapp.com/attachments/"
+                    "840469669332516904/853990953953525870/pokebond.png"
+                )
+        await self.paginate(message, embeds)
 
-    @model(Inventory)
+    @model([Inventory, Item])
     async def cmd_use(
         self, message: Message,
         args: Optional[List] = None,
@@ -769,61 +636,126 @@ class TradeCommands(Commands):
             )
         )
 
-    def __get_shop_page(
-        self, shop: Type[Shop],
-        catog_str: str, user: Member
-    ) -> Embed:
-        shopname = re.sub('([A-Z]+)', r' \1', shop.__name__).strip()
-        categories = shop.categories
-        catog = categories[shop.alias_map[catog_str]]
-        user_tier = Loots(user).tier
-        if shop.alias_map[catog_str] in [
-            "Tradables", "Consumables", "Gladiators"
-        ]:
-            shop.refresh_tradables()
-        if len(catog.items) < 1:
-            emb = get_embed(
-                    f"`{catog.name} {shopname}` seems to be empty right now.\n"
-                    "Please try again later.",
-                    embed_type="warning",
-                    title="No items found",
-                    thumbnail="https://raw.githubusercontent.com/twitter/"
-                    f"twemoji/master/assets/72x72/{ord(catog.emoji):x}.png"
-                )
-        else:
-            profile = Profiles(user)
-            balance = (
-                f"`{profile.get('pokebonds'):,}` {self.bond_emoji}"
-                if shop is PremiumShop
-                else f"`{profile.get('won_chips'):,}` {self.chip_emoji}"
-            )
-            emb = get_embed(
-                    f"**To buy any item, use `{self.ctx.prefix}buy itemid`**"
-                    f"\n**You currently have: {balance}**",
-                    title=f"{catog} {shopname}",
-                    no_icon=True,
-                    color=profile.get('embed_color')
-                )
-            for item in catog.items:
-                itemid = f"{item.itemid:0>8X}" if isinstance(
-                    item.itemid, int
-                ) else item.itemid
-                price = item.price
-                curr = self.chip_emoji
-                if item.premium:
-                    price //= 10
-                    curr = self.bond_emoji
-                if shop.alias_map[catog_str] == "Boosts":
-                    price *= (10 ** (user_tier - 1))
-                emb.add_field(
-                        name=f"『{itemid}』 _{item}_ "
-                        f"{price:,} {curr}",
-                        value=f"```\n{item.description}\n```",
-                        inline=False
+    async def __buy_get_item(
+        self, message, itemid
+    ) -> Tuple[Shop, Item]:
+        shop = Shop
+        shop.refresh_tradables()
+        try:
+            item = shop.get_item(itemid, force_new=True)
+            if not item:
+                shop = PremiumShop
+                shop.refresh_tradables()
+                item = shop.get_item(itemid, force_new=True)
+            if not item:
+                await message.channel.send(
+                    embed=get_embed(
+                        "This item was not found in the Shop.\n"
+                        "Since the Shop is dynamic, maybe it's too late.",
+                        embed_type="error",
+                        title="Item not in Shop"
                     )
-            # pylint: disable=undefined-loop-variable
-            emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
-        return emb
+                )
+                return shop, None
+            if all([
+                isinstance(item, Title),
+                message.guild.id != self.ctx.official_server
+            ]):
+                official_server = self.ctx.get_guild(self.ctx.official_server)
+                await message.channel.send(
+                    embed=get_embed(
+                        f"You can buy titles only in [『{official_server}』]"
+                        "(https://discord.gg/g4TmVyfwj4).",
+                        embed_type="error",
+                        title="Cannot buy Titles here."
+                    )
+                )
+                return shop, None
+            return shop, item
+        except (ValueError, ZeroDivisionError):
+            await message.channel.send(
+                embed=get_embed(
+                    "The provided ID seems to be of wrong format.\n",
+                    embed_type="error",
+                    title="Invalid Item ID"
+                )
+            )
+            return shop, None
+
+    async def __buy_perform(self, message, quantity, item):
+        task = item.buy(
+            message=message,
+            quantity=quantity,
+            ctx=self.ctx
+        )
+        res = (await task) if asyncio.iscoroutinefunction(
+            item.buy
+        ) else task
+        if res != "success":
+            await message.channel.send(
+                embed=get_embed(
+                    f"{res}\nYour account has not been charged.",
+                    embed_type="error",
+                    title="Purchase failed"
+                )
+            )
+            return False
+        return True
+
+    @staticmethod
+    def __give_santize(message, args, mentions):
+        error_tuple = ()
+        if not mentions:
+            error_tuple = (
+                "No user mentioned.",
+                "Please mention whom you want to give it to."
+            )
+        elif not args or (
+            args and (
+                not args[0].isdigit()
+                or int(args[0]) <= 0
+            )
+        ):
+            error_tuple = (
+                "Invalid amount.",
+                "Please provide a valid amount."
+            )
+        elif message.author.id == mentions[0].id:
+            error_tuple = (
+                "Invalid user.",
+                "Nice try mate, but it wouldn't have made a difference."
+            )
+        elif mentions[0].bot:
+            error_tuple = (
+                "Bot account found.",
+                "We don't allow shady deals with bots."
+            )
+        elif Blacklist.is_blacklisted(str(mentions[0].id)):
+            error_tuple = (
+                "Blacklisted user.",
+                "That user is blacklisted and cannot receive any chips."
+            )
+        return error_tuple
+
+    def __ids_get_embeds(self, message, item_name, ids):
+        embeds = []
+        for idx in range(0, len(ids), 10):
+            cnt_str = f'{idx + 1} - {min(idx + 11, len(ids))} / {len(ids)}'
+            emb = get_embed(
+                f'**{item_name}**『{cnt_str}』',
+                title=f"{message.author.name}'s Item IDs",
+                footer=f"Use 『{self.ctx.prefix}details itemid』"
+                "for detailed view.",
+                color=Profiles(message.author).get('embed_color')
+            )
+            for id_ in ids[idx:idx+10]:
+                emb.add_field(
+                    name="\u200B",
+                    value=f"**{id_}**",
+                    inline=False
+                )
+            embeds.append(emb)
+        return embeds
 
     @staticmethod
     def __open_get_openables(
@@ -916,9 +848,7 @@ class TradeCommands(Commands):
             openable.itemid
             for openable in openables
         ])
-        quant_str = ''
-        if len(openables) > 1:
-            quant_str = f"x{len(openables)} "
+        quant_str = f"x{len(openables)} " if len(openables) > 1 else ''
         await message.channel.send(
             embed=get_embed(
                 content,
@@ -926,3 +856,92 @@ class TradeCommands(Commands):
                 color=profile.get('embed_color')
             )
         )
+
+    def __shop_get_catogs(self, shop, profile):
+        shop.refresh_tradables()
+        categories = {
+            key: catog
+            for key, catog in sorted(
+                shop.categories.items(),
+                key=lambda x: len(x[1].items),
+                reverse=True
+            )
+            if catog.items
+        }
+        catogs = list(categories.values())
+        embeds = []
+        for i in range(0, len(catogs), 3):
+            emb = get_embed(
+                "**To view the items in a specific category:**\n"
+                f"**`{self.ctx.prefix}shop category`**",
+                title="PokeGambler Shop",
+                footer="All purchases except Tradables "
+                "are non-refundable.",
+                color=profile.get('embed_color')
+            )
+            for catog in catogs[i:i+3]:
+                emb.add_field(
+                    name=str(catog),
+                    value=f"```diff\n{dedent(catog.description)}\n"
+                    "To view the items:\n"
+                    f"{self.ctx.prefix}shop {catog.name}\n```",
+                    inline=False
+                )
+            embeds.append(emb)
+        return embeds
+
+    def __shop_get_page(
+        self, shop: Type[Shop],
+        catog_str: str, user: Member
+    ) -> Embed:
+        shopname = re.sub('([A-Z]+)', r' \1', shop.__name__).strip()
+        categories = shop.categories
+        catog = categories[shop.alias_map[catog_str]]
+        user_tier = Loots(user).tier
+        if shop.alias_map[catog_str] in [
+            "Tradables", "Consumables", "Gladiators"
+        ]:
+            shop.refresh_tradables()
+        if len(catog.items) < 1:
+            emb = get_embed(
+                    f"`{catog.name} {shopname}` seems to be empty right now.\n"
+                    "Please try again later.",
+                    embed_type="warning",
+                    title="No items found",
+                    thumbnail="https://raw.githubusercontent.com/twitter/"
+                    f"twemoji/master/assets/72x72/{ord(catog.emoji):x}.png"
+                )
+        else:
+            profile = Profiles(user)
+            balance = (
+                f"`{profile.get('pokebonds'):,}` {self.bond_emoji}"
+                if shop is PremiumShop
+                else f"`{profile.get('won_chips'):,}` {self.chip_emoji}"
+            )
+            emb = get_embed(
+                    f"**To buy any item, use `{self.ctx.prefix}buy itemid`**"
+                    f"\n**You currently have: {balance}**",
+                    title=f"{catog} {shopname}",
+                    no_icon=True,
+                    color=profile.get('embed_color')
+                )
+            for item in catog.items:
+                itemid = f"{item.itemid:0>8X}" if isinstance(
+                    item.itemid, int
+                ) else item.itemid
+                price = item.price
+                curr = self.chip_emoji
+                if item.premium:
+                    price //= 10
+                    curr = self.bond_emoji
+                if shop.alias_map[catog_str] == "Boosts":
+                    price *= (10 ** (user_tier - 1))
+                emb.add_field(
+                        name=f"『{itemid}』 _{item}_ "
+                        f"{price:,} {curr}",
+                        value=f"```\n{item.description}\n```",
+                        inline=False
+                    )
+            # pylint: disable=undefined-loop-variable
+            emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
+        return emb

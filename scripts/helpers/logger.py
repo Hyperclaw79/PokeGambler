@@ -35,6 +35,27 @@ class CustomLogger:
             r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
         )
 
+    def pprint(
+        self, text: str, *args,
+        timestamp: bool = True,
+        **kwargs
+    ):
+        '''
+        Wraps the text and prints it to Stdout.
+        In case of an error (red), logs it to error.log
+        '''
+        if kwargs and kwargs.get("color") == "red":
+            func_name = kwargs.get("wrapped_func")
+            with open(self.error_log_path, 'a', encoding='utf-8') as err_log:
+                err_log.write(
+                    f"[{datetime.now().strftime('%X %p')}] <{func_name}>"
+                    f" {self.ansi_escape.sub('', text)}\n"
+                )
+        if timestamp:
+            text = f"[{datetime.now().strftime('%X %p')}] {text}"
+        colored = self.wrap(text, *args, **kwargs)
+        print(colored)
+
     def wrap(
         self, text: str, *args,
         color: Optional[str] = None,
@@ -51,26 +72,3 @@ class CustomLogger:
             return text
         func = self.color_codings.get(color, chalk.white)
         return func(text)
-
-    def pprint(
-        self, text: str, *args,
-        timestamp: bool = True,
-        **kwargs
-    ):
-        '''
-        Wraps the text and prints it to Stdout.
-        In case of an error (red), logs it to error.log
-        '''
-        if kwargs and kwargs.get("color") == "red":
-            # pylint: disable=protected-access
-            func_name = kwargs.get("wrapped_func")
-            # pylint: disable=invalid-name
-            with open(self.error_log_path, 'a', encoding='utf-8') as f:
-                f.write(
-                    f"[{datetime.now().strftime('%X %p')}] <{func_name}>"
-                    f" {self.ansi_escape.sub('', text)}\n"
-                )
-        if timestamp:
-            text = f"[{datetime.now().strftime('%X %p')}] {text}"
-        colored = self.wrap(text, *args, **kwargs)
-        print(colored)
