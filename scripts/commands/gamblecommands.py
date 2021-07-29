@@ -340,7 +340,7 @@ class GambleCommands(Commands):
                     inline=True
                 )
             if winner:
-                emb.set_image(url=winner.avatar_url_as(size=256))
+                emb.set_image(url=winner.avatar.with_size(256))
             embeds.append(emb)
         await self.paginate(message, embeds)
 

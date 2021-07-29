@@ -570,7 +570,7 @@ class ProfileCommands(Commands):
         badges = profile.get_badges()
         profile = profile.get()
         avatar_byio = BytesIO()
-        await user.avatar_url_as(size=512).save(avatar_byio)
+        await user.avatar.with_size(512).save(avatar_byio)
         avatar = Image.open(avatar_byio)
         name = profile["name"]
         balance = f'{profile["balance"]:,}'
