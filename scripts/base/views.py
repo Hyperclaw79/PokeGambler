@@ -70,7 +70,7 @@ class Confirm(discord.ui.View):
         self.user = None
 
     @discord.ui.button(
-        label='Confirm',
+        label="️️️️✔️",
         style=discord.ButtonStyle.green
     )
     async def confirm(

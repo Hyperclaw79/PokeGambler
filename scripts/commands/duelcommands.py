@@ -17,7 +17,7 @@ from ..base.items import Gladiator, Item
 from ..base.models import (
     Blacklist, DuelActionsModel, Inventory, Profiles, Duels
 )
-from ..base.views import SelectView
+from ..base.views import Confirm, SelectView
 from ..helpers.checks import user_check
 from ..helpers.imageclasses import GladitorMatchHandler
 from ..helpers.utils import (
@@ -402,41 +402,22 @@ class DuelCommands(Commands):
         user: Member, amount: int,
         user_profile: Profiles
     ) -> bool:
-        inv_msg = await message.channel.send(
+        confirm_view = Confirm(
+            check=lambda usr: usr.id == user.id,
+            timeout=60
+        )
+        await message.channel.send(
             content=f"Hey {user.mention}, you have been invited "
             f"to a Gladiator match by **{message.author.name}**",
             embed=get_embed(
-                "React to this message with ☑️ to accept the duel.\n"
                 f"Bet Amount: **{amount}** {self.chip_emoji}",
                 title="Do you accept?",
                 color=user_profile.get("embed_color")
-            )
+            ),
+            view=confirm_view
         )
-        await inv_msg.add_reaction("☑️")
-        await inv_msg.add_reaction("❌")
-        reply = await wait_for(
-            message.channel, self.ctx,
-            "reaction_add", init_msg=inv_msg,
-            check=lambda rctn, usr: all([
-                rctn.emoji in ["☑️", "❌"],
-                rctn.message.id == inv_msg.id,
-                usr.id == user.id
-            ]),
-            timeout=60.0
-        )
-        if reply:
-            rctn, _ = reply
-        await inv_msg.delete()
-        if not reply or rctn.emoji == "❌":
-            await message.channel.send(
-                embed=get_embed(
-                    f"Gladiator Match has been declined by **{user.name}**.",
-                    embed_type="warning",
-                    title="Duel cancelled."
-                )
-            )
-            return False
-        return True
+        await confirm_view.wait()
+        return confirm_view.value is not None
 
     def __duel_get_action(
         self, glads: List[Gladiator],
@@ -511,7 +492,8 @@ class DuelCommands(Commands):
                 options={
                     gld: gld.description.split(' as')[0]
                     for gld in available
-                }
+                },
+                no_response=True
             )
             await dm_send(
                 message, user,
