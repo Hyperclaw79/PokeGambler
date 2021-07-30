@@ -2,7 +2,8 @@
 Trade Commands Module
 """
 
-# pylint: disable=unused-argument, too-many-locals
+# pylint: disable=too-many-locals, too-many-lines
+# pylint: disable=unused-argument
 
 from __future__ import annotations
 import asyncio
@@ -12,21 +13,28 @@ from typing import (
 )
 import re
 
+import discord
+
 from ..base.items import Item, Chest, Lootbag, Rewardbox
 from ..base.models import (
-    Blacklist, Inventory, Loots,
+    Blacklist, CurrencyExchange, Exchanges, Inventory, Loots,
     Profiles, Trades
 )
 from ..base.shop import (
     BoostItem, PremiumBoostItem,
     PremiumShop, Shop, Title
 )
+from ..base.views import Confirm, SelectView
 
-from ..helpers.utils import dedent, get_embed, get_modules
+from ..helpers.utils import (
+    dedent, dm_send, get_embed,
+    get_enum_embed, get_modules,
+    is_admin, is_owner
+)
 
 from .basecommand import (
-    Commands, alias, dealer_only,
-    model, ensure_item, no_thumb
+    Commands, alias, check_completion, dealer_only,
+    model, ensure_item, no_thumb, os_only
 )
 
 if TYPE_CHECKING:
@@ -116,6 +124,37 @@ class TradeCommands(Commands):
             )
         )
 
+    @os_only
+    @check_completion
+    @model(Profiles)
+    @alias("cashin")
+    async def cmd_deposit(
+        self, message: Message,
+        args: Optional[List[str]] = None,
+        **kwargs
+    ):
+        """Deposit other pokebot credits.
+        $```scss
+        {command_prefix}deposit
+        ```$
+
+        @Deposit other currencies to exchange them for Pokechips.@
+        """
+        pokebot, quantity = await self.__get_inputs(message)
+        if pokebot is None:
+            return
+        req_msg, admin = await self.__admin_accept(
+            message, pokebot, quantity
+        )
+        if admin is None:
+            return
+        chips = CurrencyExchange(pokebot.name.upper()).value * quantity
+        thread = await self.__get_thread(message, pokebot, req_msg)
+        await self.__handle_transaction(
+            message, thread,
+            admin, pokebot, chips
+        )
+
     @model(Item)
     @ensure_item
     @alias(['item', 'detail'])
@@ -141,6 +180,44 @@ class TradeCommands(Commands):
 
         item = kwargs["item"]
         await message.channel.send(embed=item.details)
+
+    @alias("rates")
+    async def cmd_exchange_rates(
+        self, message: Message,
+        args: Optional[List] = None,
+        **kwargs
+    ):
+        """Check the exchange rates of pokebot credits.
+        $```scss
+        {command_prefix}exchange_rates [currency]
+        ```$
+
+        @Check the exchange rates for different pokebots credits.@
+
+        ~To check all the exchange rates:
+            ```
+            {command_prefix}exchange_rates
+            ```
+        To check the exchange rates for Pokétwo:
+            ```
+            {command_prefix}rates pokétwo
+            ```~
+        """
+        enums = CurrencyExchange
+        if args:
+            res = enums[args[0]]
+            if res is not enums.DEFAULT:
+                enums = [res]
+        await message.channel.send(
+            embed=get_enum_embed(
+                (
+                    f"{bot.name}: {bot.value}"
+                    for bot in enums
+                    if bot is not CurrencyExchange.DEFAULT
+                ),
+                title="Exchange Rates"
+            )
+        )
 
     @dealer_only
     @model([Profiles, Trades])
@@ -636,6 +713,41 @@ class TradeCommands(Commands):
             )
         )
 
+    @os_only
+    @check_completion
+    @model(Profiles)
+    @alias("cashout")
+    async def cmd_withdraw(
+        self, message: Message,
+        args: Optional[List[str]] = None,
+        **kwargs
+    ):
+        """Withdraw other pokebot credits.
+        $```scss
+        {command_prefix}withdraw
+        ```$
+
+        @Exchange Pokechips as other pokemon bot credits.@
+        """
+        pokebot, quantity = await self.__get_inputs(
+            message, mode="withdraw"
+        )
+        if pokebot is None:
+            return
+        req_msg, admin = await self.__admin_accept(
+            message, pokebot, quantity,
+            mode="withdraw"
+        )
+        if admin is None:
+            return
+        chips = CurrencyExchange(pokebot.name.upper()).value * quantity
+        thread = await self.__get_thread(message, pokebot, req_msg)
+        await self.__handle_transaction(
+            message, thread,
+            admin, pokebot, chips,
+            mode="withdraw"
+        )
+
     async def __buy_get_item(
         self, message, itemid
     ) -> Tuple[Shop, Item]:
@@ -945,3 +1057,149 @@ class TradeCommands(Commands):
             # pylint: disable=undefined-loop-variable
             emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
         return emb
+
+    async def __admin_accept(
+        self, message, pokebot,
+        quantity, mode="deposit"
+    ):
+        admins = discord.utils.get(message.guild.roles, name="Admins")
+        confirm_view = Confirm(
+            check=lambda usr: is_admin(usr) or is_owner(self.ctx, usr),
+            timeout=600
+        )
+        req_msg = await message.channel.send(
+            content=admins.mention,
+            embed=get_embed(
+                title=f"New {mode.title()} Request",
+                content=f"**{message.author}** has requested to {mode} "
+                f"**{quantity:,}**『{pokebot.name}』credits."
+            ),
+            view=confirm_view
+        )
+        await confirm_view.wait()
+        if confirm_view.value is None:
+            await dm_send(
+                message, message.author,
+                embed=get_embed(
+                    "Looks like none of our Admins are free.\n"
+                    "Please try again later.",
+                    embed_type="warning",
+                    title="Unable to Start Transaction."
+                )
+            )
+            return req_msg, None
+        return req_msg, confirm_view.user
+
+    async def __get_inputs(self, message, mode="deposit"):
+        def get_rate(bot: Member) -> int:
+            rate = CurrencyExchange(bot.name.upper()).value
+            return f"Exchange Rate: x{rate} Pokechips"
+        pokebots = discord.utils.get(
+            message.guild.roles,
+            name="Pokebot"
+        ).members
+        choices_view = SelectView(
+            options={
+                bot: get_rate(bot)
+                for bot in pokebots
+            }
+        )
+        opt_msg = await dm_send(
+            message, message.author,
+            content="Which pokemon themed bot's credits"
+            " do you want to exchange?",
+            view=choices_view
+        )
+        await choices_view.wait()
+        pokebot = choices_view.result
+        await opt_msg.delete()
+        if not pokebot:
+            return None, None
+        opt_msg = await dm_send(
+            message, message.author,
+            embed=get_embed(
+                content="```yaml\n>________\n```",
+                title=f"How much do you want to {mode}?"
+            )
+        )
+        reply = await self.ctx.wait_for(
+            "message",
+            check=lambda msg: (
+                msg.channel == opt_msg.channel
+                and msg.author == message.author
+                and msg.content.isdigit()
+            )
+        )
+        quantity = int(reply.content)
+        await opt_msg.edit(
+            embed=get_embed(
+                content="Our admins have been notified.\n"
+                "Please wait till one of them accepts"
+                " or retry after 10 minutes.",
+                title="Request Registered."
+            )
+        )
+        return pokebot, quantity
+
+    async def __get_thread(self, message, pokebot, req_msg):
+        tname = f"Transaction for {message.author.id}"
+        thread = await req_msg.channel.start_thread(
+            name=tname,
+            message=req_msg
+        )
+        await req_msg.delete()
+        await thread.add_user(message.author)
+        await thread.add_user(pokebot)
+        return thread
+
+    # pylint: disable=too-many-arguments
+    async def __handle_transaction(
+        self, message, thread,
+        admin, pokebot, chips,
+        mode="deposit"
+    ):
+        await thread.send(
+            embed=get_embed(
+                title="Starting the transaction."
+            ),
+            content=f"**User**: {message.author.mention}\n"
+            f"**Admin**: {admin.mention}"
+        )
+        await self.ctx.wait_for(
+            "message",
+            check=lambda msg: (
+                msg.channel.id == thread.id
+                and msg.author == admin
+                and "complete" in msg.content.lower()
+            )
+        )
+        content = None
+        if mode == "deposit":
+            content = f"{message.author.mention}, check your balance" + \
+                f" using the `{self.ctx.prefix}balance` command."
+        await thread.send(
+            content=content,
+            embed=get_embed(
+                title=f"Closing the transaction for {message.author}."
+            )
+        )
+        getattr(
+            Profiles(message.author),
+            "credit" if mode == "deposit" else "debit"
+        )(chips)
+        Profiles(admin).credit(int(chips * 0.1))
+        Exchanges(
+            message.author, str(admin.id),
+            str(pokebot.id), chips, mode.title()
+        ).save()
+        await dm_send(
+            message, admin,
+            embed=get_embed(
+                title=f"Credited {int(chips * 0.1):,} chips to"
+                " your account."
+            )
+        )
+        await thread.edit(
+            archived=True,
+            locked=True
+        )

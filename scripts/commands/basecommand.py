@@ -10,9 +10,11 @@ from abc import ABC
 from datetime import datetime
 from functools import wraps
 import json
+import os
 from typing import Callable, List, Optional, TYPE_CHECKING, Union
 
 import discord
+from dotenv import load_dotenv
 
 from ..base.items import Item
 from ..base.models import Inventory, Model, Profiles
@@ -25,6 +27,9 @@ from ..helpers.utils import (
 if TYPE_CHECKING:
     from discord import Embed, Message, Member, File
     from bot import PokeGambler
+
+load_dotenv()
+
 
 # region Decoarators
 
@@ -166,10 +171,12 @@ def check_completion(func: Callable):
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
         async def with_calback(self, message, *args, **kwargs):
-            await func(self, *args, message=message, **kwargs)
-            self.ctx.pending_cmds[
-                func.__name__
-            ].remove(message.author.id)
+            try:
+                await func(self, *args, message=message, **kwargs)
+            finally:
+                self.ctx.pending_cmds[
+                    func.__name__
+                ].remove(message.author.id)
         if self.ctx.pending_cmds.get(func.__name__, None):
             if message.author.id in self.ctx.pending_cmds[func.__name__]:
                 return message.channel.send(
@@ -369,6 +376,27 @@ def no_thumb(func: Callable):
 
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
+
+
+def os_only(func: Callable):
+    '''
+    These commands can only run in the official server.
+    '''
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        if all([
+            message.guild.id != self.ctx.official_server,
+            not os.getenv('IS_LOCAL')
+        ]):
+            return message.channel.send(
+                embed=get_embed(
+                    "This command can only be used in the official server.",
+                    embed_type="error",
+                    title="Invalid Server"
+                )
+            )
         return func(self, *args, message=message, **kwargs)
     return wrapped
 

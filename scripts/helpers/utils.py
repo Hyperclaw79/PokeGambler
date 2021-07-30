@@ -83,18 +83,24 @@ def dedent(message: str) -> str:
 async def dm_send(
     message: Message, user: Member,
     content: Optional[str] = None,
-    embed: Optional[Embed] = None
+    embed: Optional[Embed] = None,
+    **kwargs
 ) -> Message:
     """
     Attempts to send message to the User's DM.
     In case of fallback, sends in the original channel.
     """
     try:
-        msg = await user.send(content=content, embed=embed)
+        msg = await user.send(
+            content=content,
+            embed=embed,
+            **kwargs
+        )
     except discord.Forbidden:
         msg = await message.channel.send(
             content=f"Hey {user.mention},\n{content if content else ''}",
-            embed=embed
+            embed=embed,
+            **kwargs
         )
     return msg
 

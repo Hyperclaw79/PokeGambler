@@ -8,6 +8,7 @@ This module contains a compilation of data models.
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import Enum, EnumMeta
 from inspect import ismethod
 import os
 from typing import (
@@ -18,6 +19,28 @@ from typing import (
 import discord
 
 from ..base.items import Item, DB_CLIENT  # pylint: disable=cyclic-import
+
+
+class CustomEnumMeta(EnumMeta):
+    """
+    Override Enum to allow for case-insensitive enum names.
+    Also adds a DEFAULT value to the Enum.
+    """
+    def __getitem__(cls, name):
+        try:
+            return super().__getitem__(name.upper())
+        except (TypeError, KeyError):
+            return cls.DEFAULT
+
+
+class CurrencyExchange(Enum, metaclass=CustomEnumMeta):
+    """
+    Holds exchange values for different pokebot currencies.
+    """
+    POKÉTWO = 10
+    POKETWO = 10
+    DEFAULT = 1
+    # Add support for more pokebots if required.
 
 
 class NameSetter(type):
@@ -331,6 +354,34 @@ class DuelActionsModel(Model):
             return None
         results = cls.mongo.find(filter_)
         yield from results
+
+
+class Exchanges(Model):
+    """
+    Wrapper for currency exchanges based DB actions
+    """
+
+    def __init__(
+        self, user: discord.Member,
+        admin: str = None,
+        pokebot: str = None,
+        chips: int = None,
+        mode: str = "Deposit",
+    ):
+        super().__init__(user)
+        self.exchanged_at = datetime.now()
+        self.user_id = str(user.id)
+        self.admin = str(admin)
+        self.pokebot = pokebot
+        self.chips = chips
+        self.mode = mode
+
+    @classmethod
+    def exchanges(cls, **kwargs) -> List[Dict]:
+        """
+        Wrapper for getting the completed exchanges.
+        """
+        yield from cls.mongo.find(kwargs)
 
 
 class Inventory(Model):
