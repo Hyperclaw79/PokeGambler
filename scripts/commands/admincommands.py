@@ -17,16 +17,18 @@ from dotenv import load_dotenv
 
 from ..helpers.checks import user_check
 from ..helpers.utils import (
-    get_embed, get_enum_embed,
-    is_admin, is_owner, wait_for
+    dedent, get_embed, is_admin,
+    is_owner, wait_for
 )
 from ..base.models import Blacklist, Inventory, Profiles
 from ..base.items import Item, Rewardbox, Tradable
 from ..base.shop import Shop, PremiumShop
+from ..base.views import SelectView
 from .basecommand import (
     Commands, admin_only, alias,
-    ensure_user, get_profile,
-    ensure_item, model, no_thumb
+    check_completion, ensure_user,
+    ensure_item, get_profile,
+    model, no_thumb
 )
 
 if TYPE_CHECKING:
@@ -335,6 +337,7 @@ class AdminCommands(Commands):
             return
         await message.add_reaction("👍")
 
+    @check_completion
     @no_thumb
     @admin_only
     @model(Item)
@@ -357,32 +360,26 @@ class AdminCommands(Commands):
 
         categories = {}
         self.__create_item_populate_categories(Item, categories, curr_recc=0)
-        inp_msg = await message.channel.send(
-            embed=get_enum_embed(
-                categories,
-                title="Choose the Item Category"
-            )
+        choice_view = SelectView(
+            heading="Choose the Item Category",
+            options={
+                catog: dedent(
+                    cls.__doc__
+                ).split(
+                    '.', maxsplit=1
+                )[0][:49] + '.'
+                for catog, cls in sorted(categories.items())
+            },
         )
-        reply = await wait_for(
-            message.channel, self.ctx, init_msg=inp_msg,
-            check=lambda msg: user_check(msg, message),
-            timeout="inf"
+        await message.channel.send(
+            content="What Item would you like to create?",
+            view=choice_view
         )
-        if reply.content.isdigit():
-            category = list(categories.keys())[int(reply.content) - 1]
-        elif reply.content.title() in categories:
-            category = reply.content.title()
-        else:
-            await message.channel.send(
-                embed=get_embed(
-                    "That's not a valid category.",
-                    embed_type="error",
-                    title="Invalid Category"
-                )
-            )
+        await choice_view.wait()
+        if choice_view.result is None:
             return
+        catogclass = categories[choice_view.result]
         details = {}
-        catogclass = categories[category]
         labels = {"name": "str"}
         labels.update({
             field.name: field.type

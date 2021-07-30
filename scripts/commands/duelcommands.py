@@ -17,11 +17,11 @@ from ..base.items import Gladiator, Item
 from ..base.models import (
     Blacklist, DuelActionsModel, Inventory, Profiles, Duels
 )
-
+from ..base.views import SelectView
 from ..helpers.checks import user_check
 from ..helpers.imageclasses import GladitorMatchHandler
 from ..helpers.utils import (
-    dedent, get_embed, get_enum_embed,
+    dedent, get_embed,
     img2file, wait_for, dm_send
 )
 from .basecommand import (
@@ -127,50 +127,33 @@ class DuelCommands(Commands):
         > *to show up.*@
         """
         levels = ["Normal", "Critical"]
-        dmg_info = ["(dmg < 150)", "(dmg >= 150)"]
-        cost_info = [
-            "(200 Pokechips)",
-            "(200 Pokebonds)"
+        desc_info = [
+            "Damage < 150, Costs: 200 Pokechips",
+            "Damage >= 150, Costs: 200 Pokebonds"
         ]
         charges = ["won_chips", "pokebonds"]
         profile = Profiles(message.author)
-        lvl_msg = await message.channel.send(
-            embed=get_enum_embed(
-                [
-                    f"{lvl} {dmg} {cost}"
-                    for lvl, dmg, cost in zip(
-                        levels, dmg_info, cost_info
-                    )
-                ],
-                title="Choose the action level",
-                color=profile.get("embed_color")
-            )
+        choice_view = SelectView(
+            heading="Choose the action level",
+            options={
+                levels[idx]: desc_info[idx]
+                for idx in range(len(levels))
+            }
         )
-        reply = await wait_for(
-            message.channel, self.ctx, init_msg=lvl_msg,
-            check=lambda msg: user_check(msg, message),
-            timeout="inf"
+        await dm_send(
+            message, message.author,
+            content="Which type of attack do you wanna create?",
+            view=choice_view
         )
-        if (
-            reply.content.isdigit()
-            and 0 < int(reply.content) <= len(levels)
-        ):
-            choice = levels[int(reply.content) - 1]
-        elif reply.content.title() in levels:
-            choice = reply.content.title()
-        else:
-            await message.channel.send(
-                embed=get_embed(
-                    "Please reuse the command.",
-                    embed_type="error",
-                    title="Invalid Choice"
-                )
-            )
+        await choice_view.wait()
+        choice = choice_view.result
+        if choice is None:
             return
         if profile.get(
             charges[levels.index(choice)]
         ) < 200:
-            await message.channel.send(
+            await dm_send(
+                message, message.author,
                 embed=get_embed(
                     "You cannot afford to create that action.",
                     embed_type="error",
@@ -178,7 +161,8 @@ class DuelCommands(Commands):
                 )
             )
             return
-        action_inp_msg = await message.channel.send(
+        action_inp_msg = await dm_send(
+            message, message.author,
             embed=get_embed(
                 dedent(
                     """
@@ -199,12 +183,17 @@ class DuelCommands(Commands):
             )
         )
         reply = await wait_for(
-            message.channel, self.ctx, init_msg=action_inp_msg,
-            check=lambda msg: user_check(msg, message),
+            action_inp_msg.channel, self.ctx,
+            init_msg=action_inp_msg,
+            check=lambda msg: user_check(
+                msg, message,
+                chan=action_inp_msg.channel
+            ),
             timeout="inf"
         )
         if "<g1>" not in reply.content:
-            await message.channel.send(
+            await dm_send(
+                message, message.author,
                 embed=get_embed(
                     "You need to include at least <g1> in the action.\n"
                     "Please reuse the command.",
@@ -228,7 +217,8 @@ class DuelCommands(Commands):
             message.author,
             action[:100], choice
         ).save()
-        await message.channel.send(
+        await dm_send(
+            message, message.author,
             embed=get_embed(
                 "Successfully saved your duel action.\n"
                 "Let's hope it shows up soon.",
@@ -516,45 +506,22 @@ class DuelCommands(Commands):
             gld = Item.from_id(itemid)
             available.append(gld)
         if len(available) > 1:
-            emb = get_enum_embed(
-                map(str, available),
-                title="Choose which gladiator you want to use:",
-                color=profile.get("embed_color")
-            )
-            choice_msg = await dm_send(
-                message, user,
-                embed=emb
-            )
-            reply = await wait_for(
-                choice_msg.channel, self.ctx,
-                init_msg=choice_msg,
-                check=lambda msg: all([
-                    msg.author.id == user.id,
-                    msg.channel.id == choice_msg.channel.id
-                ]),
-                timeout="inf"
-            )
-            if reply.content.lower() not in [
-                str(idx + 1) for idx in range(len(available))
-            ] + [str(glad).lower() for glad in available]:
-                await dm_send(
-                    message, user,
-                    embed=get_embed(
-                        "That's an invalid choice.\n"
-                        "Using the first available one.",
-                        embed_type="warning",
-                        title="Invalid Input"
-                    )
-                )
-                gladiator = available[0]
-            elif reply.content.isdigit():
-                gladiator = available[int(reply.content) - 1]
-            else:
-                gladiator = [
-                    gld
+            choices_view = SelectView(
+                heading="Choose a gladiator:",
+                options={
+                    gld: gld.description.split(' as')[0]
                     for gld in available
-                    if str(gld).lower() == reply.content.lower()
-                ][0]
+                }
+            )
+            await dm_send(
+                message, user,
+                content="Whom do you wanna fight with?",
+                view=choices_view
+            )
+            await choices_view.wait()
+            gladiator = choices_view.result
+            if gladiator is None:
+                gladiator = available[0]
         else:
             gladiator = available[0]
         await dm_send(
@@ -587,7 +554,7 @@ class DuelCommands(Commands):
         if not self.duelactions.normal:
             self.duelactions.refresh()
         gladhandler = GladitorMatchHandler(self.ctx.assets_path)
-        base = await self.__duel_start(message, gladhandler, glads)
+        base, thread = await self.__duel_start(message, gladhandler, glads)
         if base is None:
             return
         emb = discord.Embed()
@@ -607,10 +574,10 @@ class DuelCommands(Commands):
             )
             emb.set_image(url=f"attachment://duel_{idx}.jpg")
             await asyncio.sleep(3.0)
-            await base.delete()
-            base = await message.channel.send(
+            await thread.send(
                 embed=emb, file=round_fl
             )
+        await base.delete()
         winner = max(
             profiles,
             key=lambda x: sum(dmg_dict[x.user.id])
@@ -622,7 +589,7 @@ class DuelCommands(Commands):
         ][0]
         winner_glad = glads[profiles.index(winner)]
         other_glad = glads[profiles.index(other)]
-        await message.channel.send(
+        await thread.send(
             embed=get_embed(
                 f"**{winner.name}**'s『{winner_glad}』"
                 f"destroyed **{other.name}**'s『{other_glad}』",
@@ -638,6 +605,10 @@ class DuelCommands(Commands):
             str(players[1].id), glads[1].name, str(winner.user.id),
             amount
         ).save()
+        await thread.edit(
+            archived=True,
+            locked=True
+        )
 
     @staticmethod
     async def __duel_proceed(
@@ -682,9 +653,21 @@ class DuelCommands(Commands):
                 url="attachment://start.jpg"
             )
             base = await message.channel.send(
-                embed=fresh_emb, file=start_fl
+                content=" vs ".join(
+                    glad.owner.mention
+                    for glad in glads
+                ),
+                embed=fresh_emb,
+                file=start_fl
             )
-            return base
+            thread = await message.channel.start_thread(
+                name=" vs ".join(
+                    f"{glad.owner.name}『{glad}』"
+                    for glad in glads
+                ),
+                message=base
+            )
+            return base, thread
         except StopIteration:
             await message.channel.send(
                 embed=get_embed(
@@ -693,4 +676,4 @@ class DuelCommands(Commands):
                     title="Could Not Start Duel"
                 )
             )
-            return None
+            return None, None

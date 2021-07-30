@@ -359,9 +359,8 @@ class Treasure(Item):
 @dataclass(eq=False)
 class Tradable(Item):
     """
-    Any sellable [Item] is a Tradeable.
+    Any buyable and sellable [Item] is a Tradeable.
     It should have a fixed base price.
-    Tradables can be bought.
     """
     def __init__(self, **kwargs):
         super().__init__(
@@ -394,7 +393,7 @@ class Collectible(Item):
 @dataclass(eq=False)
 class Consumable(Tradable):
     """
-    Consumables can be bought from the shop but cannot be sold back.
+    Items buyable from Shop but can't be sold back.
     """
     def __init__(self, **kwargs):
         super().__init__(
@@ -561,7 +560,7 @@ class LegendaryChest(Chest):
 @dataclass(eq=False)
 class Gladiator(Consumable):
     """
-    Minions that can be bought and used in Gladiator match minigames.
+    Minions that can fight in Gladiator matches.
     """
     def __init__(self, **kwargs):
         kwargs.pop('category', None)
@@ -680,7 +679,7 @@ class Lootbag(Treasure):
 @dataclass(eq=False)
 class Rewardbox(Treasure):
     """
-    Similar to [Lootbag] but with Fixed items and chips.
+    [Lootbag] with fixed items and pokechips.
     """
     def __init__(
         self, chips: Optional[int] = None,

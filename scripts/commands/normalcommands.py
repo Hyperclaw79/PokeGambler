@@ -11,6 +11,7 @@ from typing import Callable, List, Optional, TYPE_CHECKING
 import discord
 
 from ..base.models import CommandData, Profiles
+from ..base.views import LinkView
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
     get_commands, get_embed, get_modules,
@@ -197,7 +198,7 @@ class NormalCommands(Commands):
             dedent(
                 f"""```md
                 # Want to add me to your own server?
-                [Invite me](By clicking the title of this embed).
+                [Invite me](By clicking the button below).
                 * Following features are only allowed in {pg_den}:
                     - Gamble Matches
                     - Buying Titles
@@ -208,9 +209,13 @@ class NormalCommands(Commands):
             image="https://cdn.discordapp.com/attachments/"
             "840469669332516904/861292639857147914/pg_banner.png"
         )
-        inv_emb.url = "https://top.gg/bot/831575371601412136/invite/"
+        invite_view = LinkView(
+            emoji="<:pokegambler:844321894488342559>",
+            url="https://top.gg/bot/831575371601412136/invite/"
+        )
         await message.channel.send(
-            embed=inv_emb
+            embed=inv_emb,
+            view=invite_view
         )
 
     @alias('latency')

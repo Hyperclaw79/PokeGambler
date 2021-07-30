@@ -12,13 +12,13 @@ import discord
 
 class SelectView(discord.ui.View):
     """
-    A Select View that allows the user to choose a Pokemon bot.
+    A Select View that allows the user to choose an option.
     """
     class SelectComponent(discord.ui.Select):
         """
-        A Select Component that allows the user to choose a Pokemon bot.
+        A Select Component that allows the user to choose an option.
         """
-        def __init__(self, options: Dict[str, str]):
+        def __init__(self, heading: str, options: Dict[str, str]):
             opts = [
                 discord.SelectOption(
                     label=str(label),
@@ -27,7 +27,7 @@ class SelectView(discord.ui.View):
                 for label, description in options.items()
             ]
             super().__init__(
-                placeholder="Choose the Pokebot from this list",
+                placeholder=heading,
                 min_values=1, max_values=1,
                 options=opts
             )
@@ -37,9 +37,11 @@ class SelectView(discord.ui.View):
             """
             On Selecting a choice, execute the required function.
             """
-            await interaction.response.send_message(
-                f'Selected {self.values[0]}.'
-            )
+            if not self.view.no_response:
+                await interaction.response.send_message(
+                    f'Selected {self.values[0]}.',
+                    ephemeral=True
+                )
             self.view.result = [
                 key
                 for key in self.opts
@@ -47,9 +49,10 @@ class SelectView(discord.ui.View):
             ][0]
             self.view.stop()
 
-    def __init__(self, **kwargs):
+    def __init__(self, no_response=False, **kwargs):
         super().__init__()
         self.add_item(self.SelectComponent(**kwargs))
+        self.no_response = no_response
         self.result = None
 
 
@@ -85,3 +88,21 @@ class Confirm(discord.ui.View):
         self.value = True
         self.user = interaction.user
         self.stop()
+
+
+class LinkView(discord.ui.View):
+    """
+    A View that allows the user to visit a link.
+    """
+    def __init__(
+        self, url: str,
+        emoji: str, **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.add_item(
+            discord.ui.Button(
+                label='Invite Me',
+                url=url,
+                emoji=emoji
+            )
+        )

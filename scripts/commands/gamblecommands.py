@@ -19,6 +19,7 @@ from ..base.models import (
     Moles, Profiles
 )
 from ..base.shop import BoostItem
+from ..base.views import SelectView
 from ..helpers.checks import user_check, user_rctn
 from ..helpers.imageclasses import BoardGenerator
 from ..helpers.utils import (
@@ -57,7 +58,6 @@ class GambleCommands(Commands):
         self.suits = [
             "joker", "spade", "heart", "club", "diamond"
         ]
-        self.catog_channel = None
         self.match_status = 0  # 1 - open for regs, 2 - in progress
         self.rules = {
             "lower_wins": "Lower number card wins"
@@ -190,17 +190,30 @@ class GambleCommands(Commands):
         )
         if amount is None:
             return
+        valids = ["Heads", "Tails"]
+        choices_view = SelectView(
+            heading="Choose an option",
+            options={
+                opt: ""
+                for opt in valids
+            },
+            no_response=True
+        )
         opt_msg = await message.channel.send(
             embed=get_embed(
-                "```md\n# Options\n1. Heads\n2. Tails\n```",
                 title=f"**Place your bet for {amount}** {self.chip_emoji}",
                 footer=f"⚠️ You'll either get {amount * 2} or "
                 f"lose {amount} pokechips",
                 image="https://cdn.discordapp.com/attachments/"
                 "840469669332516904/843077878816178186/blinker.gif",
                 color=profile.get("embed_color")
-            )
+            ),
+            view=choices_view
         )
+        await choices_view.wait()
+        if choices_view.result is None:
+            return
+        choice = valids.index(choices_view.result)
         idx = random.randint(0, 1)
         img = [
             "https://cdn.discordapp.com/attachments/840469669332516904/"
@@ -208,30 +221,7 @@ class GambleCommands(Commands):
             "https://cdn.discordapp.com/attachments/840469669332516904/"
             "843079660375638046/pokechip.png"
         ][idx]
-        reply = await wait_for(
-            message.channel, self.ctx, init_msg=opt_msg,
-            check=lambda msg: user_check(msg, message),
-            timeout="inf"
-        )
-        if not reply:
-            return
-        reply = reply.content.lower()
-        valids = ['1', '2', 'heads', 'tails']
-        valid_str = ', '.join(valids)
-        if reply not in valids:
-            await message.channel.send(
-                embed=get_embed(
-                    f"You need to choose from: ({valid_str})",
-                    embed_type="error",
-                    title="Invalid Input"
-                )
-            )
-            return
-        choice = (
-            int(reply) - 1 if reply in valids[:2]
-            else valids[2:].index(reply)
-        )
-        msg = f"PokeGambler choose {valids[2:][idx].title()}.\n"
+        msg = f"PokeGambler choose {valids[idx]}.\n"
         if choice == idx:
             amt_mult = 1 + (
                 0.1 * Boosts(
@@ -257,7 +247,7 @@ class GambleCommands(Commands):
             amount, won
         ).save()
         emb = get_embed(msg, title=title, image=img, color=color)
-        await opt_msg.edit(embed=emb)
+        await opt_msg.edit(embed=emb, view=None)
 
     @model(Matches)
     async def cmd_matches(
@@ -522,42 +512,25 @@ class GambleCommands(Commands):
             self.registered.remove(player)
         return profiles
 
-    async def __gamble_create_channel(self, message):
-        if not self.catog_channel:
-            self.catog_channel = [
-                chan
-                for chan in message.guild.categories
-                if chan.name.lower() in (
-                    "pokegambler", "text channels",
-                    "pokégambler", "gamble"
-                )
-            ][0]
+    async def __gamble_create_thread(self, message):
         gamblers = [
             role
             for role in message.guild.roles
             if role.name.lower() == "gamblers"
         ][0]
-        dealers = [
-            role
-            for role in message.guild.roles
-            if role.name.lower() == "dealers"
-        ][0]
-        overwrites = {
-            gamblers: discord.PermissionOverwrite(send_messages=False),
-            message.guild.me: discord.PermissionOverwrite(send_messages=True),
-            dealers: discord.PermissionOverwrite(send_messages=True)
-        }
-        gamble_channel = await message.guild.create_text_channel(
+        gamble_thread = await message.channel.start_thread(
             name="gamble-here",
-            overwrites=overwrites,
-            category=self.catog_channel
+            message=message
         )
-        return gamble_channel, gamblers
+        return gamble_thread, gamblers
 
-    async def __gamble_cleanup(self, gamble_channel, delay=30.0):
+    async def __gamble_cleanup(self, gamble_thread, delay=30.0):
         await asyncio.sleep(delay)
-        if gamble_channel:
-            await gamble_channel.delete()
+        if gamble_thread:
+            await gamble_thread.edit(
+                archived=True,
+                locked=True
+            )
         self.registered = []
         self.match_status = 0
 
@@ -580,7 +553,7 @@ class GambleCommands(Commands):
     async def __gamble_register(self, message, **kwargs):
         fee = kwargs["fee"]
         max_players = max(2, int(kwargs.pop("max_players", 12)))
-        gamble_channel, gamblers = await self.__gamble_create_channel(message)
+        gamble_thread, gamblers = await self.__gamble_create_thread(message)
         rules = ', '.join(
             self.rules[key]
             for key in kwargs
@@ -613,7 +586,7 @@ class GambleCommands(Commands):
         )
         first_embed = register_embed.copy()
         first_embed.description = first_embed.description.replace("<tr>", "10")
-        register_msg = await gamble_channel.send(
+        register_msg = await gamble_thread.send(
             content=f"Hey {gamblers.mention}",
             embed=first_embed,
         )
@@ -637,7 +610,7 @@ class GambleCommands(Commands):
                 )
                 bal = Profiles(usr).get("balance")
                 if bal < fee:
-                    await self.__handle_low_bal(usr, gamble_channel)
+                    await self.__handle_low_bal(usr, gamble_thread)
                     continue
                 self.registered.append(usr)
                 players = ', '.join(player.name for player in self.registered)
@@ -648,7 +621,7 @@ class GambleCommands(Commands):
                 await register_msg.edit(embed=embed)
             except asyncio.TimeoutError:
                 continue
-        return gamble_channel, hot_time
+        return gamble_thread, hot_time
 
     async def __gamble_handle_roll(
         self, message, deck, player,

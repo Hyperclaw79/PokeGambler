@@ -1099,6 +1099,7 @@ class TradeCommands(Commands):
             name="Pokebot"
         ).members
         choices_view = SelectView(
+            heading="Choose the Pokebot from this list",
             options={
                 bot: get_rate(bot)
                 for bot in pokebots
