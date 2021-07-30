@@ -740,7 +740,7 @@ class TradeCommands(Commands):
         )
         if admin is None:
             return
-        chips = CurrencyExchange(pokebot.name.upper()).value * quantity
+        chips = CurrencyExchange(pokebot.name.upper()).value
         thread = await self.__get_thread(message, pokebot, req_msg)
         await self.__handle_transaction(
             message, thread,
