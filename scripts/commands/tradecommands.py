@@ -27,8 +27,8 @@ from ..base.shop import (
 from ..base.views import Confirm, SelectView
 
 from ..helpers.utils import (
-    dedent, dm_send, get_embed,
-    get_enum_embed, get_modules,
+    dedent, dm_send,
+    get_embed, get_modules,
     is_admin, is_owner
 )
 
@@ -208,13 +208,14 @@ class TradeCommands(Commands):
             res = enums[args[0]]
             if res is not enums.DEFAULT:
                 enums = [res]
+        rates_str = '\n'.join(
+            f"```fix\n1 {bot.name} Credit = {bot.value} Pokechips\n```"
+            for bot in enums
+            if bot is not CurrencyExchange.DEFAULT
+        )
         await message.channel.send(
-            embed=get_enum_embed(
-                (
-                    f"{bot.name}: {bot.value}"
-                    for bot in enums
-                    if bot is not CurrencyExchange.DEFAULT
-                ),
+            embed=get_embed(
+                rates_str,
                 title="Exchange Rates"
             )
         )
