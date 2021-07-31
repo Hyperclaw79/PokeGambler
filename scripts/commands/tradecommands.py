@@ -148,7 +148,7 @@ class TradeCommands(Commands):
         )
         if admin is None:
             return
-        chips = CurrencyExchange(pokebot.name.upper()).value * quantity
+        chips = CurrencyExchange[pokebot.name].value * quantity
         thread = await self.__get_thread(message, pokebot, req_msg)
         await self.__handle_transaction(
             message, thread,
@@ -740,7 +740,7 @@ class TradeCommands(Commands):
         )
         if admin is None:
             return
-        chips = CurrencyExchange(pokebot.name.upper()).value
+        chips = CurrencyExchange[pokebot.name].value
         thread = await self.__get_thread(message, pokebot, req_msg)
         await self.__handle_transaction(
             message, thread,
@@ -1092,7 +1092,7 @@ class TradeCommands(Commands):
 
     async def __get_inputs(self, message, mode="deposit"):
         def get_rate(bot: Member) -> int:
-            rate = CurrencyExchange(bot.name.upper()).value
+            rate = CurrencyExchange[bot.name].value
             return f"Exchange Rate: x{rate} Pokechips"
         pokebots = discord.utils.get(
             message.guild.roles,
