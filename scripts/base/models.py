@@ -716,6 +716,35 @@ class Matches(Model):
         return list(cls.mongo.aggregate(pipeline))
 
 
+class Nitro(Model):
+    """
+    Wrapper for Nitro Reward records.
+    """
+    def __init__(
+        self, user: discord.Member,
+        boosters: List[str] = None,
+        rewardboxes: List[str] = None
+    ):
+        super().__init__(user)
+        self.last_rewarded = datetime.now()
+        self.boosters = boosters
+        self.rewardboxes = rewardboxes
+
+    @classmethod
+    def get_last_rewarded(cls):
+        """
+        Returns the last time the user was given a reward.
+        """
+        pipeline = [
+            {"$sort": {"last_rewarded": -1}},
+            {"$limit": 1}
+        ]
+        return next(
+            cls.mongo.aggregate(pipeline),
+            {'last_rewarded': datetime.utcnow() - timedelta(days=31)}
+        )['last_rewarded']
+
+
 class Trades(Model):
     """
     Wrapper for trades based DB actions

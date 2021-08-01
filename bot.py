@@ -19,7 +19,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from scripts.base.models import (
-    Blacklist, CommandData, Inventory, Profiles
+    Blacklist, CommandData, Inventory, Nitro, Profiles
 )
 from scripts.base.items import Item
 
@@ -64,7 +64,6 @@ class PokeGambler(discord.AutoShardedClient):
         self.cooldown_cmds = {}
         self.loot_cd = {}
         self.pending_cmds = {}
-        self.nitro_rewarded = False
         # Classes
         self.logger = CustomLogger(
             self.error_log_path
@@ -376,20 +375,22 @@ class PokeGambler(discord.AutoShardedClient):
 
     @tasks.loop(hours=24)
     async def __reward_nitro_boosters(self):
-        day = datetime.utcnow().day
-        if day > 5 and self.nitro_rewarded:
-            self.nitro_rewarded = False
-        elif day == 5 and not self.nitro_rewarded:
+        # pylint: disable=no-member
+        if all([
+            (
+                datetime.utcnow() - Nitro.get_last_rewarded()
+            ).days >= 30,
+            datetime.utcnow().day == 1,
+            not os.getenv("IS_LOCAL")
+        ]):
             DummyMessage = namedtuple('Message', ['channel'])
-            # pylint: disable=no-member
             official_server = self.get_guild(self.official_server)
             boosters = official_server.premium_subscribers
-            # BETA: Remove owner from boosters.
-            boosters.append(
-                official_server.get_member(
-                    self.owner_id
-                )
+            owner = official_server.get_member(
+                self.owner_id
             )
+            rewarded = []
+            rewardboxes = []
             for booster in boosters:
                 profile = Profiles(booster)
                 nitro_box = Item.from_name(
@@ -416,7 +417,9 @@ class PokeGambler(discord.AutoShardedClient):
                         color=profile.get('embed_color')
                     )
                 )
-            self.nitro_rewarded = True
+                rewarded.append(booster.id)
+                rewardboxes.append(nitro_box.itemid)
+            Nitro(owner, rewarded, rewardboxes).save()
 
     async def __pre_command_checks(self, message):
         on_cooldown = await self.__handle_cd(message)
