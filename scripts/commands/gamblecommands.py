@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import math
 import random
-from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
 
 import discord
@@ -19,7 +18,7 @@ from ..base.models import (
     Moles, Profiles
 )
 from ..base.shop import BoostItem
-from ..base.views import SelectView
+from ..base.views import GambleCounter, SelectView
 from ..helpers.checks import user_check, user_rctn
 from ..helpers.imageclasses import BoardGenerator
 from ..helpers.utils import (
@@ -58,12 +57,12 @@ class GambleCommands(Commands):
         self.suits = [
             "joker", "spade", "heart", "club", "diamond"
         ]
-        self.match_status = 0  # 1 - open for regs, 2 - in progress
         self.rules = {
             "lower_wins": "Lower number card wins"
         }
         self.boardgen = BoardGenerator(self.ctx.assets_path)
 
+    @check_completion
     @dealer_only
     @model([Profiles, Matches, Loots])
     @alias(["deal", "roll"])
@@ -97,17 +96,6 @@ class GambleCommands(Commands):
             {command_prefix}gamble --lower_wins
             ```~
         """
-        if self.match_status != 0:
-            await message.channel.send(
-                embed=get_embed(
-                    "A match/registration/cleanup is in progress, "
-                    "please wait and try again later.",
-                    embed_type="warning",
-                    title="Unable to start match"
-                )
-            )
-            return
-        self.match_status = 1
         kwargs.pop("mentions", [])
         try:
             fee = max(int(args[0]), 50) if args else 50
@@ -127,7 +115,6 @@ class GambleCommands(Commands):
             )
             await self.__gamble_cleanup(gamble_channel, delay=10.0)
             return
-        self.match_status = 2
         lower_wins = kwargs.get("lower_wins", False)
         joker_chance = 0.2 if hot_time else 0.05
         num_cards = len(self.registered)
@@ -155,7 +142,11 @@ class GambleCommands(Commands):
             deal_cost=fee,
             by_joker=is_joker
         ).save()
-        await self.__gamble_cleanup(gamble_channel, delay=30.0)
+        await self.__gamble_cleanup(
+            gamble_channel,
+            delay=30.0,
+            completed=True
+        )
 
     @model([Flips, Profiles])
     @alias(["flip", "chipflip", "flips"])
@@ -388,7 +379,7 @@ class GambleCommands(Commands):
         multiplier = [3, 4, 10, 50, 100][level]
         profile = Profiles(message.author)
         if profile.get("balance") < cost:
-            await self.__handle_low_bal(message.author, message.channel)
+            await self.handle_low_bal(message.author, message.channel)
             await message.add_reaction("❌")
             return
         board, board_img = self.boardgen.get_board(level)
@@ -442,7 +433,8 @@ class GambleCommands(Commands):
             file=img2file(board_img, f"{rolled}.jpg")
         )
 
-    async def __handle_low_bal(self, usr, gamble_channel):
+    async def handle_low_bal(self, usr, gamble_channel):
+        """Handle low balance."""
         low_bal_embed = get_embed(
             "Every user gets 100 chips as a starting bonus.\n"
             "You can buy more or exchange for other bot credits.",
@@ -488,7 +480,7 @@ class GambleCommands(Commands):
             )
             return None
         if profile.get("balance") < amount:
-            await self.__handle_low_bal(message.author, message.channel)
+            await self.handle_low_bal(message.author, message.channel)
             await message.add_reaction("❌")
             return None
         return amount
@@ -524,15 +516,20 @@ class GambleCommands(Commands):
         )
         return gamble_thread, gamblers
 
-    async def __gamble_cleanup(self, gamble_thread, delay=30.0):
+    async def __gamble_cleanup(
+        self, gamble_thread,
+        delay=30.0, completed=False
+    ):
         await asyncio.sleep(delay)
         if gamble_thread:
-            await gamble_thread.edit(
-                archived=True,
-                locked=True
-            )
+            if completed:
+                await gamble_thread.edit(
+                    archived=True,
+                    locked=True
+                )
+            else:
+                await gamble_thread.delete()
         self.registered = []
-        self.match_status = 0
 
     def __gamble_get_decks(self, num_cards, joker_chance):
         dealed_deck = {
@@ -584,43 +581,19 @@ class GambleCommands(Commands):
             footer="React with ➕ (within 30 secs) "
             "to be included in the match."
         )
+        gamble_view = GambleCounter(
+            self, register_embed,
+            fee, max_players
+        )
         first_embed = register_embed.copy()
         first_embed.description = first_embed.description.replace("<tr>", "10")
-        register_msg = await gamble_thread.send(
+        await gamble_thread.send(
             content=f"Hey {gamblers.mention}",
             embed=first_embed,
+            view=gamble_view
         )
-        await register_msg.add_reaction("➕")
-        now = datetime.now()
-        while all([
-            (datetime.now() - now).total_seconds() < 30,
-            len(self.registered) < max_players
-        ]):
-            try:
-                _, usr = await self.ctx.wait_for(
-                    "reaction_add",
-                    check=lambda rctn, usr: all([
-                        rctn.message.id == register_msg.id,
-                        rctn.emoji == "➕",
-                        usr.id != self.ctx.user.id,
-                        usr not in self.registered,
-                        not usr.bot
-                    ]),
-                    timeout=(30 - (datetime.now() - now).total_seconds())
-                )
-                bal = Profiles(usr).get("balance")
-                if bal < fee:
-                    await self.__handle_low_bal(usr, gamble_thread)
-                    continue
-                self.registered.append(usr)
-                players = ', '.join(player.name for player in self.registered)
-                embed = self.__gamble_prep_reg_embed(
-                    register_embed, players,
-                    fee, now, max_players
-                )
-                await register_msg.edit(embed=embed)
-            except asyncio.TimeoutError:
-                continue
+        await gamble_view.wait()
+        self.registered = gamble_view.registration_list
         return gamble_thread, hot_time
 
     async def __gamble_handle_roll(
@@ -762,35 +735,3 @@ class GambleCommands(Commands):
                 winner, fee, profiles
             )
         )
-
-    def __gamble_prep_reg_embed(
-        self, register_embed, players,
-        fee, now, max_players
-    ):
-        embed = register_embed.copy()
-        embed.description = register_embed.description.replace(
-            "<tr>",
-            str(
-                10 + 5 * math.floor(
-                    max(0, len(self.registered) - 12) / 3
-                )
-            )
-        )
-        rem_secs = int(30 - (datetime.now() - now).total_seconds())
-        embed.set_footer(
-            text=f"React with ➕ (within {rem_secs} secs)"
-            " to be included in the match."
-        )
-        embed.add_field(
-            name=f"Current Participants "
-            f"『{len(self.registered)}/{max_players}』",
-            value=players,
-            inline=False
-        )
-        embed.add_field(
-            name="Pokechips in the pot",
-            value=f"{fee * len(self.registered)} "
-            f"{self.chip_emoji}",
-            inline=False
-        )
-        return embed

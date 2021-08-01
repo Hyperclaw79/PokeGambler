@@ -5,9 +5,18 @@ Compilation of Discord UI Views
 # pylint: disable=unused-argument, no-member
 # pylint: disable=too-few-public-methods
 
-from typing import Callable, Dict, Optional
+from __future__ import annotations
+from datetime import datetime
+import math
+from typing import (
+    Callable, Dict,
+    Optional, TYPE_CHECKING
+)
 
 import discord
+
+if TYPE_CHECKING:
+    from ..commands.gamblecommands import GambleCommands
 
 
 class SelectView(discord.ui.View):
@@ -106,3 +115,104 @@ class LinkView(discord.ui.View):
                 emoji=emoji
             )
         )
+
+
+class GambleCounter(discord.ui.View):
+    """
+    Tracks and updates the registration list
+    for a gamble match.
+    """
+
+    # pylint: disable=too-many-arguments
+
+    def __init__(
+        self, gamble_cmd: GambleCommands,
+        reg_embed: discord.Embed,
+        fee: Optional[int] = 50,
+        max_players: Optional[int] = 12,
+        timeout: Optional[float] = 30.0
+    ):
+        super().__init__(timeout=timeout)
+        self.registration_list = []
+        self.start_time = datetime.now()
+        self.gamble_cmd = gamble_cmd
+        self.reg_embed = reg_embed
+        self.fee = fee
+        self.max_players = max_players
+
+    @property
+    def deadline(self):
+        """
+        Returns the deadline for the registration.
+        """
+        return int(
+            30 - (
+                datetime.now() - self.start_time
+            ).total_seconds()
+        )
+
+    @property
+    def transaction_fee(self):
+        """
+        Returns the transaction fee for the registration.
+        """
+        return str(
+            10 + 5 * math.floor(
+                max(0, len(self.registration_list) - 12) / 3
+            )
+        )
+
+    @discord.ui.button(label='➕')
+    async def register_user(
+        self, button: discord.ui.Button,
+        interaction: discord.Interaction
+    ):
+        """
+        Register a user to the list.
+        """
+        # pylint: disable=import-outside-toplevel
+        from .models import Profiles
+
+        usr = interaction.user
+        bal = Profiles(usr).get("balance")
+        if bal < self.fee:
+            await self.gamble_cmd.handle_low_bal(
+                usr, (await interaction.original_message().channel)
+            )
+            return
+        self.registration_list.append(interaction.user)
+        await interaction.response.edit_message(
+            embed=self.prep_embed(),
+            view=self
+        )
+        if len(self.registration_list) == self.max_players:
+            self.stop()
+
+    def prep_embed(self):
+        """
+        Returns the embed for the registration list.
+        """
+        embed = self.reg_embed.copy()
+        embed.description = self.reg_embed.description.replace(
+            "<tr>", self.transaction_fee
+        )
+        embed.set_footer(
+            text=f"Press ➕ (within {self.deadline} secs)"
+            " to be included in the match."
+        )
+        embed.add_field(
+            name=f"Current Participants "
+            f"『{len(self.registration_list)}/{self.max_players}』",
+            value=', '.join(
+                player.name
+                for player in self.registration_list
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name="Pokechips in the pot",
+            value=f"{self.fee * len(self.registration_list)} "
+            f"{self.gamble_cmd.chip_emoji}",
+            inline=False
+        )
+        return embed
