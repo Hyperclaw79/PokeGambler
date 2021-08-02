@@ -25,6 +25,7 @@ from ..helpers.utils import (
     get_embed, get_enum_embed,
     img2file, wait_for
 )
+from ..helpers.validators import MinMaxValidator
 from .basecommand import (
     Commands, alias, check_completion,
     dealer_only, model, no_thumb
@@ -456,29 +457,13 @@ class GambleCommands(Commands):
     ):
         amount = default
         if args:
-            try:
-                amount = int(args[0])
-            except (ZeroDivisionError, ValueError):
-                await message.channel.send(
-                    embed=get_embed(
-                        f"Amount will be defaulted to {default} chips.",
-                        embed_type="warning",
-                        title="Invalid Input"
-                    )
-                )
-        if any([
-            amount < min_chips,
-            amount > max_chips
-        ]):
-            await message.channel.send(
-                embed=get_embed(
-                    f"Amount should be more than {min_chips} and "
-                    f"less than {max_chips} chips.",
-                    embed_type="error",
-                    title="Invalid Input"
-                )
-            )
-            return None
+            proceed = await MinMaxValidator(
+                min_chips, max_chips,
+                message=message,
+                dm_user=True
+            ).validate(args[0])
+            if not proceed:
+                return None
         if profile.get("balance") < amount:
             await self.handle_low_bal(message.author, message.channel)
             await message.add_reaction("❌")

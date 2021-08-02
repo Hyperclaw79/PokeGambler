@@ -20,6 +20,9 @@ from ..helpers.utils import (
     dedent, get_embed, is_admin,
     is_owner, wait_for
 )
+from ..helpers.validators import (
+    ImageUrlValidator, IntegerValidator
+)
 from ..base.models import Blacklist, Inventory, Profiles
 from ..base.items import Item, Rewardbox, Tradable
 from ..base.shop import Shop, PremiumShop
@@ -370,6 +373,7 @@ class AdminCommands(Commands):
                 )[0][:49] + '.'
                 for catog, cls in sorted(categories.items())
             },
+            no_response=True
         )
         await message.channel.send(
             content="What Item would you like to create?",
@@ -380,23 +384,43 @@ class AdminCommands(Commands):
             return
         catogclass = categories[choice_view.result]
         details = {}
-        labels = {"name": "str"}
+        labels = {
+            "name": {
+                "dtype": str,
+                "validator": None
+            }
+        }
         labels.update({
-            field.name: field.type
+            field.name: {
+                "dtype": field.type,
+                "validator": None
+            }
             for field in fields(catogclass)
             if all([
                 field.default is MISSING,
                 field.name != 'category'
             ])
         })
+        labels['asset_url']['validator'] = ImageUrlValidator
         if issubclass(catogclass, Tradable):
-            labels.update({"price": int})
+            labels.update({
+                "price": {
+                    "dtype": int,
+                    "validator": IntegerValidator
+                }
+            })
         if catogclass is Rewardbox:
             labels.update({
-                "chips": int,
-                "items": str
+                "chips": {
+                    "dtype": int,
+                    "validator": IntegerValidator
+                },
+                "items": {
+                    "dtype": str,
+                    "validator": None
+                }
             })
-        for col, dtype in labels.items():
+        for col, params in labels.items():
             inp_msg = await message.channel.send(
                 embed=get_embed(
                     f"Please enter a value for `{col}`:\n>_",
@@ -408,16 +432,14 @@ class AdminCommands(Commands):
                 check=lambda msg: user_check(msg, message),
                 timeout="inf"
             )
-            if dtype == int:
-                if not reply.content.isdigit():
-                    await message.channel.send(
-                        embed=get_embed(
-                            f"{col.title()} must be an integer.",
-                            embed_type="error",
-                            title=f"Invalid {col.title()}"
-                        )
-                    )
+            if params["validator"] is not None:
+                # pylint: disable=not-callable
+                proceed = await params["validator"](
+                    message=message
+                ).validate(reply.content)
+                if not proceed:
                     return
+            if params["dtype"] == int:
                 details[col] = int(reply.content)
             elif col == "items":
                 details[col] = [

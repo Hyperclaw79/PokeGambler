@@ -24,6 +24,10 @@ from ..helpers.utils import (
     dedent, get_embed,
     img2file, wait_for, dm_send
 )
+from ..helpers.validators import (
+    MaxLengthValidator, MinValidator,
+    RegexValidator
+)
 from .basecommand import (
     Commands, alias, check_completion,
     cooldown, model, needs_ticket, no_thumb
@@ -191,16 +195,18 @@ class DuelCommands(Commands):
             ),
             timeout="inf"
         )
-        if "<g1>" not in reply.content:
-            await dm_send(
-                message, message.author,
-                embed=get_embed(
-                    "You need to include at least <g1> in the action.\n"
-                    "Please reuse the command.",
-                    embed_type="error",
-                    title="No Gladiator 1 Placeholder"
-                )
-            )
+        proceed = await RegexValidator(
+            pattern=r"<g1>\s.+",
+            message=message,
+            on_error={
+                "title": "No Gladiator 1 Placeholder",
+                "description": "You need to include at "
+                "least <g1> in the action.\n"
+                "Please reuse the command."
+            },
+            dm_user=True
+        ).validate(reply.content)
+        if not proceed:
             return
         action = "\n".join(reply.content.splitlines()[:2])
         # Ensure there's only one placeholder for each gladiator.
@@ -367,22 +373,21 @@ class DuelCommands(Commands):
             ]),
             timeout="inf"
         )
+        proceed = await MaxLengthValidator(
+            10,
+            message=message,
+            on_error={
+                "title": "Invalid Nickname",
+                "description": "That name is not allowed, keep it simple."
+            },
+            dm_user=True
+        ).validate(reply.content)
+        if not proceed:
+            return
         new_name = re.sub(
             r"[^\x00-\x7F]+", "",
             reply.content[:10].title()
         ).strip()
-        if not new_name:
-            await dm_send(
-                message,
-                message.author,
-                embed=get_embed(
-                    "That name is not allowed, keep it simple.\n"
-                    "Please reuse the command later.",
-                    embed_type="error",
-                    title="Invalid Nickname"
-                )
-            )
-            return
         glad.rename(new_name)
         inv = Inventory(message.author)
         tickets = kwargs["tickets"]
@@ -437,7 +442,12 @@ class DuelCommands(Commands):
         user_profile: Profiles,
         args: Optional[List] = None
     ) -> int:
-        if args and args[0].isdigit() and int(args[0]) > 50:
+        if args:
+            proceed = await MinValidator(
+                50, message=message
+            ).validate(args[0])
+            if not proceed:
+                return 0
             amount = int(args[0])
         else:
             amount = 50

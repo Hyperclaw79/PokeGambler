@@ -8,7 +8,6 @@ from __future__ import annotations
 import random
 from datetime import datetime, timedelta
 from io import BytesIO
-import re
 from typing import Dict, List, Optional, TYPE_CHECKING
 
 from PIL import Image
@@ -29,6 +28,7 @@ from ..helpers.utils import (
     LineTimer, dm_send, get_embed, get_formatted_time,
     get_modules, img2file, wait_for
 )
+from ..helpers.validators import HexValidator, ImageUrlValidator
 from ..helpers.checks import user_check
 
 from .basecommand import (
@@ -335,16 +335,15 @@ class ProfileCommands(Commands):
             check=lambda msg: user_check(msg, message, inp_msg.channel),
             timeout="inf"
         )
-        if not re.match(r'#?[0-9A-Fa-f]{6}', reply.content):
-            await dm_send(
-                message, message.author,
-                embed=get_embed(
-                    "You need to enter a valid hex code.\n"
-                    "Please retry the command.",
-                    title="Invalid hexadecimal code.",
-                    embed_type="error"
-                )
-            )
+        proceed = await HexValidator(
+            message=message,
+            on_error={
+                "title": "Invalid Hexadecimal Color Code",
+                "description": "You need to enter a valid hex code."
+            },
+            dm_user=True
+        ).validate(reply.content)
+        if not proceed:
             return
         hexcode = reply.content.lstrip('#')
         profile.update(
@@ -684,19 +683,17 @@ class ProfileCommands(Commands):
                 )
                 return None
             return reply.attachments[0].proxy_url
-        patt = r"(https?:\/\/.*\.(?:png|jp[e]?g)+\S*)"
-        matches = re.findall(patt, reply.content)
-        if not matches:
-            await dm_send(
-                message, message.author,
-                embed=get_embed(
-                    "Please make sure it's a png or a jpeg image.",
-                    embed_type="error",
-                    title="Invalid Image"
-                )
-            )
+        proceed = await ImageUrlValidator(
+            message=message,
+            on_error={
+                "title": "Invalid Image",
+                "description": "Please make sure it's a png or a jpeg image."
+            },
+            dm_user=True
+        ).validate(reply.content)
+        if not proceed:
             return None
-        return matches[0]
+        return reply.content
 
     def __lb_get_minigame_lb(self, mg_name: str, user: Member) -> List[Dict]:
         def _commands(module):

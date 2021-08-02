@@ -31,6 +31,7 @@ from ..helpers.utils import (
     get_embed, get_modules,
     is_admin, is_owner
 )
+from ..helpers.validators import MinMaxValidator
 
 from .basecommand import (
     Commands, alias, check_completion, dealer_only,
@@ -1132,6 +1133,17 @@ class TradeCommands(Commands):
                 and msg.content.isdigit()
             )
         )
+        bounds = (1000, 2_500_000)
+        if mode == "withdraw":
+            bounds = (10000, 250_000)
+        proceed = await MinMaxValidator(
+            *bounds,
+            message=message,
+            dm_user=True
+        ).validate(reply.content)
+        if not proceed:
+            await opt_msg.delete()
+            return None, None
         quantity = int(reply.content)
         await opt_msg.edit(
             embed=get_embed(
