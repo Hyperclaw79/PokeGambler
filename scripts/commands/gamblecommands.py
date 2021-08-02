@@ -18,12 +18,12 @@ from ..base.models import (
     Moles, Profiles
 )
 from ..base.shop import BoostItem
-from ..base.views import GambleCounter, SelectView
-from ..helpers.checks import user_check, user_rctn
+from ..base.views import GambleCounter, MultiSelectView, SelectView
+from ..helpers.checks import user_rctn
 from ..helpers.imageclasses import BoardGenerator
 from ..helpers.utils import (
     get_embed, get_enum_embed,
-    img2file, wait_for
+    img2file
 )
 from ..helpers.validators import MinMaxValidator
 from .basecommand import (
@@ -361,50 +361,82 @@ class GambleCommands(Commands):
             {command_prefix}mole --difficulty 5
             ```~
         """
+        boards = [
+            f"{i + 3}x{i + 3}"
+            for i in range(5)
+        ]
+        costs = [50, 100, 150, 200, 250]
+        multipliers = [3, 4, 10, 50, 100]
         level = kwargs.get("difficulty", kwargs.get("level", 1))
-        if any([
-            not str(level).isdigit(),
-            str(level).isdigit() and int(level) not in range(1, 6)
-        ]):
-            await message.channel.send(
-                embed=get_embed(
-                    "You need to choose a number between 1 and 5.",
-                    embed_type="error",
-                    title="Invalid Input"
-                )
-            )
+        choice_view = SelectView(
+            heading="Select the Level",
+            options={
+                (i + 1): f"Board: {boards[i]}\t"
+                f"Cost: {costs[i]}\t"
+                f"Reward Multiplier: x{multipliers[i]}"
+                for i in range(5)
+            },
+            no_response=True
+        )
+        level_inp = await message.channel.send(
+            "Which difficulty do you wanna play in?",
+            view=choice_view
+        )
+        await choice_view.dispatch(self)
+        if not choice_view.result:
             return
-        level = int(level) - 1
-        valids = self.boardgen.get_valids(level)
-        cost = [50, 100, 150, 200, 250][level]
-        multiplier = [3, 4, 10, 50, 100][level]
+        await level_inp.delete()
+        level = choice_view.result - 1
+        letters, numbers = self.boardgen.get_valids(level)
+        cost = costs[level]
+        multiplier = multipliers[level]
         profile = Profiles(message.author)
         if profile.get("balance") < cost:
             await self.handle_low_bal(message.author, message.channel)
             await message.add_reaction("❌")
             return
         board, board_img = self.boardgen.get_board(level)
+        multi_select_view = MultiSelectView(
+            kwarg_list=[
+                {
+                    "heading": "Select the Column",
+                    "options": {
+                        letter: ""
+                        for letter in letters
+                    }
+                },
+                {
+                    "heading": "Select the Row",
+                    "options": {
+                        number: ""
+                        for number in numbers
+                    }
+                }
+            ]
+        )
+        emb = get_embed(
+            title=f"**Difficulty: {level + 1} ({board})**",
+            content="```\nChoose a tile.\n```",
+            image=f"attachment://{board}.jpg"
+        )
+        emb.add_field(
+            name="Cost",
+            value=f"**{cost} {self.chip_emoji}**"
+        )
         opt_msg = await message.channel.send(
-            content=f"**Difficulty: {level + 1} ({board})**\n"
-            f"**Cost: {cost} {self.chip_emoji}** \n"
-            "> Choose a tile:",
-            file=img2file(board_img, f"{board}.jpg")
+            embed=emb,
+            file=img2file(board_img, f"{board}.jpg"),
+            view=multi_select_view
         )
-        reply = await wait_for(
-            message.channel, self.ctx, init_msg=opt_msg,
-            check=lambda msg: user_check(msg, message),
-            timeout="inf"
-        )
-        if reply.content.title() not in valids:
-            await message.channel.send(
-                embed=get_embed(
-                    "You can only choose one of the displayed tiles.",
-                    embed_type="error",
-                    title="Invalid Input"
-                )
-            )
+        await multi_select_view.dispatch(self)
+        if not multi_select_view.results:
             return
-        choice = reply.content.title()
+        choice = "".join(
+            sorted(
+                multi_select_view.results,
+                reverse=True
+            )
+        )
         rolled, board_img = self.boardgen.get(level)
         await opt_msg.delete()
         if choice == rolled:

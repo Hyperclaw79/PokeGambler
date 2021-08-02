@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 import math
 from typing import (
-    Callable, Dict,
+    Callable, Dict, List,
     Optional, TYPE_CHECKING
 )
 
@@ -59,6 +59,17 @@ class SelectComponent(discord.ui.Select):
         """
         On Selecting a choice, execute the required function.
         """
+        if isinstance(self.view, MultiSelectView):
+            self.view.results.append(
+                [
+                    key
+                    for key in self.opts
+                    if str(key) == self.values[0]
+                ][0]
+            )
+            if len(self.view.results) == len(self.view.children):
+                self.view.stop()
+            return
         if not self.view.no_response:
             await interaction.response.send_message(
                 f'Selected {self.values[0]}.',
@@ -78,10 +89,24 @@ class SelectView(BaseView):
     """
     def __init__(self, no_response=False, **kwargs):
         super().__init__()
-        self.timeout = kwargs.pop('timeout', None)
+        self.timeout = kwargs.pop('timeout', 180)
         self.add_item(SelectComponent(**kwargs))
         self.no_response = no_response
         self.result = None
+
+
+class MultiSelectView(BaseView):
+    """
+    A Multi Select View that requires the user to
+    choose all Selects before proceeding.
+    """
+    def __init__(self, kwarg_list: List[Dict], **kwargs):
+        super().__init__()
+        self.timeout = kwargs.pop('timeout', 180)
+        self.no_response = True
+        self.results = []
+        for kwargs in kwarg_list:
+            self.add_item(SelectComponent(**kwargs))
 
 
 class Confirm(BaseView):

@@ -8,7 +8,7 @@ import os
 import random
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 
 from PIL import (
     Image, ImageDraw,
@@ -170,15 +170,22 @@ class BoardGenerator(AssetGenerator):
         )
 
     @staticmethod
-    def get_valids(level: Optional[int] = 0) -> List:
+    def get_valids(
+        level: Optional[int] = 0
+    ) -> Tuple[Generator, Generator]:
         """
         Returns a list of possible tile names for given difficulty level.
         """
-        return [
-            f"{chr(65+i)}{j}"
-            for i in range(level + 3)
-            for j in range(1, level + 4)
-        ]
+        return (
+            (
+                f"{chr(65+i)}"
+                for i in range(level + 3)
+            ),
+            (
+                str(j)
+                for j in range(1, level + 4)
+            )
+        )
 
 
 class GladitorMatchHandler(AssetGenerator):
