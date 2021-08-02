@@ -379,7 +379,7 @@ class AdminCommands(Commands):
             content="What Item would you like to create?",
             view=choice_view
         )
-        await choice_view.wait()
+        await choice_view.dispatch(self)
         if choice_view.result is None:
             return
         catogclass = categories[choice_view.result]

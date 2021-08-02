@@ -1078,17 +1078,18 @@ class TradeCommands(Commands):
             ),
             view=confirm_view
         )
-        await confirm_view.wait()
+        await confirm_view.dispatch(self)
         if confirm_view.value is None:
-            await dm_send(
-                message, message.author,
-                embed=get_embed(
-                    "Looks like none of our Admins are free.\n"
-                    "Please try again later.",
-                    embed_type="warning",
-                    title="Unable to Start Transaction."
+            if confirm_view.notify:
+                await dm_send(
+                    message, message.author,
+                    embed=get_embed(
+                        "Looks like none of our Admins are free.\n"
+                        "Please try again later.",
+                        embed_type="warning",
+                        title="Unable to Start Transaction."
+                    )
                 )
-            )
             return req_msg, None
         return req_msg, confirm_view.user
 
@@ -1113,7 +1114,7 @@ class TradeCommands(Commands):
             " do you want to exchange?",
             view=choices_view
         )
-        await choices_view.wait()
+        await choices_view.dispatch(self)
         pokebot = choices_view.result
         await opt_msg.delete()
         if not pokebot:

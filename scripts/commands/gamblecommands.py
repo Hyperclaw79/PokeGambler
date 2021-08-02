@@ -202,7 +202,7 @@ class GambleCommands(Commands):
             ),
             view=choices_view
         )
-        await choices_view.wait()
+        await choices_view.dispatch(self)
         if choices_view.result is None:
             return
         choice = valids.index(choices_view.result)
@@ -577,7 +577,7 @@ class GambleCommands(Commands):
             embed=first_embed,
             view=gamble_view
         )
-        await gamble_view.wait()
+        await gamble_view.dispatch(self)
         self.registered = gamble_view.registration_list
         return gamble_thread, hot_time
 

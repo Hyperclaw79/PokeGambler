@@ -64,6 +64,7 @@ class PokeGambler(discord.AutoShardedClient):
         self.cooldown_cmds = {}
         self.loot_cd = {}
         self.pending_cmds = {}
+        self.views = {}
         # Classes
         self.logger = CustomLogger(
             self.error_log_path
@@ -244,6 +245,15 @@ class PokeGambler(discord.AutoShardedClient):
                 f"scripts.commands.{module_type}commands"
             )
         cmd_class = getattr(module, f"{module_type.title()}Commands")
+        if cmd_class.__name__ not in self.views:
+            self.views[cmd_class.__name__] = []
+        for view in self.views[cmd_class.__name__]:
+            if not view.is_finished():
+                view.notify = False
+                view.stop()
+        for locked_cmd in list(self.pending_cmds):
+            if locked_cmd in dir(cmd_class):
+                self.pending_cmds.pop(locked_cmd)
         cmd_obj = cmd_class(ctx=self)
         setattr(self, f"{module_type}commands", cmd_obj)
         return cmd_obj

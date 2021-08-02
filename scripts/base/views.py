@@ -16,56 +16,75 @@ from typing import (
 import discord
 
 if TYPE_CHECKING:
+    from ..commands.basecommand import Commands
     from ..commands.gamblecommands import GambleCommands
 
 
-class SelectView(discord.ui.View):
+class BaseView(discord.ui.View):
+    """
+    The overriden Base class for Views.
+    """
+    notify: bool = True
+
+    async def dispatch(self, module: Commands) -> bool:
+        """
+        Overriden method to track all views.
+        """
+        module.ctx.views[module.__class__.__name__].append(self)
+        timedout = await super().wait()
+        module.ctx.views[module.__class__.__name__].remove(self)
+        return timedout
+
+
+class SelectComponent(discord.ui.Select):
+    """
+    A Select Component that allows the user to choose an option.
+    """
+    def __init__(self, heading: str, options: Dict[str, str]):
+        opts = [
+            discord.SelectOption(
+                label=str(label),
+                description=str(description)
+            )
+            for label, description in options.items()
+        ]
+        super().__init__(
+            placeholder=heading,
+            min_values=1, max_values=1,
+            options=opts
+        )
+        self.opts = options
+
+    async def callback(self, interaction: discord.Interaction):
+        """
+        On Selecting a choice, execute the required function.
+        """
+        if not self.view.no_response:
+            await interaction.response.send_message(
+                f'Selected {self.values[0]}.',
+                ephemeral=True
+            )
+        self.view.result = [
+            key
+            for key in self.opts
+            if str(key) == self.values[0]
+        ][0]
+        self.view.stop()
+
+
+class SelectView(BaseView):
     """
     A Select View that allows the user to choose an option.
     """
-    class SelectComponent(discord.ui.Select):
-        """
-        A Select Component that allows the user to choose an option.
-        """
-        def __init__(self, heading: str, options: Dict[str, str]):
-            opts = [
-                discord.SelectOption(
-                    label=str(label),
-                    description=str(description)
-                )
-                for label, description in options.items()
-            ]
-            super().__init__(
-                placeholder=heading,
-                min_values=1, max_values=1,
-                options=opts
-            )
-            self.opts = options
-
-        async def callback(self, interaction: discord.Interaction):
-            """
-            On Selecting a choice, execute the required function.
-            """
-            if not self.view.no_response:
-                await interaction.response.send_message(
-                    f'Selected {self.values[0]}.',
-                    ephemeral=True
-                )
-            self.view.result = [
-                key
-                for key in self.opts
-                if str(key) == self.values[0]
-            ][0]
-            self.view.stop()
-
     def __init__(self, no_response=False, **kwargs):
         super().__init__()
-        self.add_item(self.SelectComponent(**kwargs))
+        self.timeout = kwargs.pop('timeout', None)
+        self.add_item(SelectComponent(**kwargs))
         self.no_response = no_response
         self.result = None
 
 
-class Confirm(discord.ui.View):
+class Confirm(BaseView):
     """
     A simple View that gives us a confirmation menu.
     """
@@ -99,7 +118,7 @@ class Confirm(discord.ui.View):
         self.stop()
 
 
-class LinkView(discord.ui.View):
+class LinkView(BaseView):
     """
     A View that allows the user to visit a link.
     """
@@ -117,7 +136,7 @@ class LinkView(discord.ui.View):
         )
 
 
-class GambleCounter(discord.ui.View):
+class GambleCounter(BaseView):
     """
     Tracks and updates the registration list
     for a gamble match.

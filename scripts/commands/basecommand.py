@@ -174,9 +174,10 @@ def check_completion(func: Callable):
             try:
                 await func(self, *args, message=message, **kwargs)
             finally:
-                self.ctx.pending_cmds[
-                    func.__name__
-                ].remove(message.author.id)
+                if func.__name__ in self.ctx.pending_cmds:
+                    self.ctx.pending_cmds[
+                        func.__name__
+                    ].remove(message.author.id)
         if self.ctx.pending_cmds.get(func.__name__, None):
             if message.author.id in self.ctx.pending_cmds[func.__name__]:
                 return message.channel.send(

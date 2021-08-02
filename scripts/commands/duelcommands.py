@@ -149,7 +149,7 @@ class DuelCommands(Commands):
             content="Which type of attack do you wanna create?",
             view=choice_view
         )
-        await choice_view.wait()
+        await choice_view.dispatch(self)
         choice = choice_view.result
         if choice is None:
             return
@@ -421,7 +421,7 @@ class DuelCommands(Commands):
             ),
             view=confirm_view
         )
-        await confirm_view.wait()
+        await confirm_view.dispatch(self)
         return confirm_view.value is not None
 
     def __duel_get_action(
@@ -510,7 +510,7 @@ class DuelCommands(Commands):
                 content="Whom do you wanna fight with?",
                 view=choices_view
             )
-            await choices_view.wait()
+            await choices_view.dispatch(self)
             gladiator = choices_view.result
             if gladiator is None:
                 gladiator = available[0]
