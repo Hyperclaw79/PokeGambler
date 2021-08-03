@@ -233,8 +233,8 @@ class ProfileCommands(Commands):
             1 - Everyone starts here.
             2 - Win 10 gamble matches.
             3 - Win 100 gamble matches.
-        You can maintain a daily streak. Get 1K chips for every 5 day streak.
-        `BETA boost is current active: x2 chips`@
+        You can maintain a daily streak.
+        Get more (scalable) chips for every 5 day streak.@
         """
         profile = Profiles(message.author)
         loot_model = Loots(message.author)
@@ -280,7 +280,6 @@ class ProfileCommands(Commands):
         loot = random.randint(5, 10) * boost * (10 ** tier)
         if daily_streak % 5 == 0 and daily_streak > 0:
             loot += 100 * (daily_streak / 5)
-        loot *= 2  # BETA x2 Bonus
         chest = Chest.get_chest(tier=tier)
         chest.save()
         Inventory(message.author).save(chest.itemid)
@@ -490,10 +489,9 @@ class ProfileCommands(Commands):
 
         @Search the void for free {pokechip_emoji}.
         The number of chips is randomly choosen from 5 to 10.
-        `Chip Amount Boost incoming soon`
-        `BETA boost is current active: x2 chips`
+        `Loot Increase Boost can be purchased from Boosts shop.`
         There is a cooldown of 10 minutes between loots.
-        `Cooldown Reduction Boost incoming soon`@
+        `Cooldown Reduction Boost can be purchased from Boosts shop.`@
         """
         on_cooldown = self.ctx.loot_cd.get(message.author, None)
         perm_boosts = Boosts(
@@ -520,8 +518,6 @@ class ProfileCommands(Commands):
                 10 ** (tier - 1)
             ) * loot_mult
         )
-        loot *= 2  # BETA x2 Bonus
-        tr_mult *= 2  # BETA x2 Bonus
         embed = None
         if random.uniform(0, 1.0) <= tr_mult:
             embed = self.__loot_handle_treasure(message, profile, tier)
