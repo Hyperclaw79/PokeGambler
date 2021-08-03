@@ -144,6 +144,57 @@ class PokeGambler(discord.AutoShardedClient):
     def run(self, *args, **kwargs):
         super().run(os.getenv('TOKEN'), *args, **kwargs)
 
+    async def on_guild_join(self, guild: discord.Guild):
+        """
+        On_guild_join event from Discord API.
+        """
+        image = None
+        if guild.banner:
+            image = guild.banner.url
+        elif guild.splash:
+            image = guild.splash.url
+        elif guild.icon:
+            image = guild.icon.url
+        emb = get_embed(
+            embed_type="info",
+            title=f"Added to {guild}.",
+            image=image
+        )
+        for attr in (
+            "description", "owner",
+            "member_count", "created_at"
+        ):
+            emb.add_field(
+                name=attr.replace("_", " ").title(),
+                value=str(getattr(guild, attr))
+            )
+        if guild.large:
+            emb.color = discord.Colour.gold()
+        # pylint: disable=no-member
+        jq_log_channel = discord.utils.get(
+            self.get_guild(
+                self.official_server
+            ).text_channels,
+            name="joined_guilds_log"
+        )
+        await jq_log_channel.send(embed=emb)
+        chan = guild.system_channel or discord.utils.get(
+            guild.text_channels, name="general"
+        )
+        if chan:
+            try:
+                await chan.send(
+                    embed=get_embed(
+                        title="Thanks for adding me!",
+                        content=f"See `{self.prefix}info` to get started.",
+                        image="https://media.discordapp.net/attachments/"
+                        "840469669332516904/861292639857147914/pg_banner.png"
+                        "?width=640&height=360"
+                    )
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+
     async def on_ready(self):
         """
         On_ready event from Discord API.

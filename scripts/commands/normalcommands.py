@@ -332,6 +332,8 @@ class NormalCommands(Commands):
                     {self.ctx.prefix}commands
                 For usage guide of these commands:
                     {self.ctx.prefix}help
+                    🛈 Check the help for every command before using it.
+
                 🛈 Also keep an eye out for sudden gambling matches.
                 ```
                 """
