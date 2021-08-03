@@ -12,7 +12,6 @@ import discord
 
 from ..base.models import CommandData, Profiles
 from ..base.views import LinkView
-from ..helpers.paginator import Paginator
 from ..helpers.utils import (
     get_commands, get_embed, get_modules,
     dedent, showable_command
@@ -156,20 +155,16 @@ class NormalCommands(Commands):
                 )
                 return
         embeds = []
-        for i, cmd in enumerate(commands):
-            if len(args) > 0:
-                emb = self.__help_generate_embed(cmd, keep_footer=True)
-            else:
-                emb = self.__help_generate_embed(cmd)
-                emb.set_footer(text=f"{i+1}/{len(commands)}")
+        for cmd in commands:
+            emb = self.__help_generate_embed(
+                cmd, keep_footer=bool(args)
+            )
             embeds.append(emb)
-        base = await message.channel.send(
-            content='**PokeGambler Commands List:**\n',
-            embed=embeds[0]
+        embeds.sort(key=lambda x: x.title)
+        await self.paginate(
+            message, embeds,
+            content="**PokeGambler Commands List:**"
         )
-        if len(embeds) > 1:
-            pager = Paginator(self.ctx, message, base, embeds)
-            await pager.run(content='**PokeGambler Commands List:**\n')
 
     @model([Profiles, CommandData])
     async def cmd_info(self, message: Message, **kwargs):

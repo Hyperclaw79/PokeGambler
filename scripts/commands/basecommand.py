@@ -489,7 +489,8 @@ class Commands(ABC):
     async def paginate(
         self, message: Message,
         embeds: List[Embed],
-        files: Optional[List[File]] = None
+        files: Optional[List[File]] = None,
+        content: Optional[str] = None
     ):
         """
         Convenience method for conditional pagination.
@@ -500,19 +501,26 @@ class Commands(ABC):
             ) or self.ctx.get_channel(
                 self.ctx.img_upload_channel
             )
-            msg = await asset_chan.send(file=files[0])
-            embeds[0].set_image(
-                url=msg.attachments[0].proxy_url
+            if not embeds:
+                embeds = [discord.Embed() for _ in files]
+            msg = await asset_chan.send(files=files)
+            for idx, embed in enumerate(embeds):
+                embed.set_image(
+                    url=msg.attachments[idx].proxy_url
+                )
+        sendables = {
+            "embed": embeds[0]
+        }
+        if content:
+            sendables["content"] = content
+        if len(embeds) == 1:
+            await message.channel.send(**sendables)
+        else:
+            for idx, embed in enumerate(embeds):
+                if embed.footer.text is discord.Embed.Empty:
+                    embed.set_footer(text=f"{idx+1}/{len(embeds)}")
+            sendables["view"] = Paginator(
+                embeds, content=content
             )
-        base = await message.channel.send(embed=embeds[0])
-        if len(embeds) > 1:
-            if not embeds[0].footer:
-                for idx, emb in enumerate(embeds):
-                    emb.set_footer(
-                        text=f"{idx + 1} / {len(embeds)}"
-                    )
-            pager = Paginator(
-                self.ctx, message, base,
-                embeds, files
-            )
-            await pager.run()
+            await message.channel.send(**sendables)
+            await sendables["view"].wait()

@@ -15,7 +15,6 @@ import discord
 
 from ..base.models import CommandData, DB_CLIENT
 from ..helpers.checks import user_check
-from ..helpers.paginator import Paginator
 from ..helpers.utils import (
     get_embed, get_enum_embed,
     get_modules, wait_for
@@ -151,12 +150,7 @@ class ControlCommands(Commands):
             )
             return
         embeds = [self.__cmd_hist_parse(cmd) for cmd in history]
-        base = await message.channel.send(embed=embeds[0])
-        if len(embeds) > 1:
-            for idx, emb in enumerate(embeds):
-                emb.title += f" ({idx + 1}/{len(embeds)})"
-            pager = Paginator(self.ctx, message, base, embeds)
-            await pager.run()
+        await self.paginate(message, embeds)
 
     @owner_only
     @no_log
