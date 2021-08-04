@@ -1,0 +1,16 @@
+name: Greetings
+
+on: [pull_request, issues]
+
+jobs:
+  greeting:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+    - uses: actions/first-interaction@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        issue-message: 'Hey there! Make sure you read any closed issues before opening a new one, to prevent duplicates.'
+        pr-message: 'Hey there! Glad to see you contribute! I shall review it, and if everything looks good, it will be added.'
