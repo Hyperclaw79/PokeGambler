@@ -125,7 +125,7 @@ class PokeGambler(discord.AutoShardedClient):
             if message.mentions:
                 kwargs["mentions"] = message.mentions
             try:
-                if "no_log" not in dir(method):
+                if "no_log" not in dir(method) or not os.getenv('IS_LOCAL'):
                     cmd_data = CommandData(
                         message.author, message,
                         cmd.replace("cmd_", ""), args, option_dict
