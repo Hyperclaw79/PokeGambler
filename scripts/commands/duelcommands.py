@@ -142,7 +142,8 @@ class DuelCommands(Commands):
             options={
                 levels[idx]: desc_info[idx]
                 for idx in range(len(levels))
-            }
+            },
+            check=lambda x: x.user.id == message.author.id
         )
         await dm_send(
             message, message.author,
@@ -408,7 +409,7 @@ class DuelCommands(Commands):
         user_profile: Profiles
     ) -> bool:
         confirm_view = Confirm(
-            check=lambda usr: usr.id == user.id,
+            check=lambda intcn: intcn.user.id == user.id,
             timeout=60
         )
         await message.channel.send(
@@ -503,7 +504,8 @@ class DuelCommands(Commands):
                     gld: gld.description.split(' as')[0]
                     for gld in available
                 },
-                no_response=True
+                no_response=True,
+                check=lambda x: x.id == message.author.id
             )
             await dm_send(
                 message, user,

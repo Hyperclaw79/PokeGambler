@@ -189,7 +189,8 @@ class GambleCommands(Commands):
                 opt: ""
                 for opt in valids
             },
-            no_response=True
+            no_response=True,
+            check=lambda x: x.user.id == message.author.id
         )
         opt_msg = await message.channel.send(
             embed=get_embed(
@@ -376,7 +377,8 @@ class GambleCommands(Commands):
                 f"Reward Multiplier: x{multipliers[i]}"
                 for i in range(5)
             },
-            no_response=True
+            no_response=True,
+            check=lambda x: x.id == message.author.id
         )
         level_inp = await message.channel.send(
             "Which difficulty do you wanna play in?",
@@ -412,7 +414,8 @@ class GambleCommands(Commands):
                         for number in numbers
                     }
                 }
-            ]
+            ],
+            check=lambda x: x.id == message.author.id
         )
         emb = get_embed(
             title=f"**Difficulty: {level + 1} ({board})**",

@@ -26,6 +26,13 @@ class BaseView(discord.ui.View):
     """
     notify: bool = True
 
+    def __init__(
+        self, timeout: Optional[float] = 180.0,
+        check: Optional[Callable] = None
+    ):
+        super().__init__(timeout=timeout)
+        self.check = check
+
     async def dispatch(self, module: Commands) -> bool:
         """
         Overriden method to track all views.
@@ -59,6 +66,11 @@ class SelectComponent(discord.ui.Select):
         """
         On Selecting a choice, execute the required function.
         """
+        if (
+            self.view.check is not None
+            and not self.view.check(interaction)
+        ):
+            return
         if isinstance(self.view, MultiSelectView):
             self.view.results.append(
                 [
@@ -88,8 +100,9 @@ class SelectView(BaseView):
     A Select View that allows the user to choose an option.
     """
     def __init__(self, no_response=False, **kwargs):
-        super().__init__()
-        self.timeout = kwargs.pop('timeout', 180)
+        timeout = kwargs.pop('timeout', 180)
+        check = kwargs.pop('check', None)
+        super().__init__(timeout=timeout, check=check)
         self.add_item(SelectComponent(**kwargs))
         self.no_response = no_response
         self.result = None
@@ -101,8 +114,9 @@ class MultiSelectView(BaseView):
     choose all Selects before proceeding.
     """
     def __init__(self, kwarg_list: List[Dict], **kwargs):
-        super().__init__()
-        self.timeout = kwargs.pop('timeout', 180)
+        timeout = kwargs.pop('timeout', 180)
+        check = kwargs.pop('check', None)
+        super().__init__(timeout=timeout, check=check)
         self.no_response = True
         self.results = []
         for kwargs in kwarg_list:
@@ -113,13 +127,9 @@ class Confirm(BaseView):
     """
     A simple View that gives us a confirmation menu.
     """
-    def __init__(
-        self, check: Optional[Callable] = None,
-        **kwargs
-    ):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.value = None
-        self.check = check
         self.user = None
 
     @discord.ui.button(
@@ -135,7 +145,7 @@ class Confirm(BaseView):
         """
         if (
             self.check is not None
-            and not self.check(interaction.user)
+            and not self.check(interaction)
         ):
             return
         self.value = True

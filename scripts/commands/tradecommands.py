@@ -1066,7 +1066,7 @@ class TradeCommands(Commands):
     ):
         admins = discord.utils.get(message.guild.roles, name="Admins")
         confirm_view = Confirm(
-            check=lambda usr: is_admin(usr) or is_owner(self.ctx, usr),
+            check=lambda intcn: is_admin(intcn.user) or is_owner(self.ctx, intcn.user),
             timeout=600
         )
         req_msg = await message.channel.send(
@@ -1106,7 +1106,8 @@ class TradeCommands(Commands):
             options={
                 bot: get_rate(bot)
                 for bot in pokebots
-            }
+            },
+            check=lambda x: x.user.id == message.author.id
         )
         opt_msg = await dm_send(
             message, message.author,

@@ -373,7 +373,8 @@ class AdminCommands(Commands):
                 )[0][:49] + '.'
                 for catog, cls in sorted(categories.items())
             },
-            no_response=True
+            no_response=True,
+            check=lambda x: x.user.id == message.author.id
         )
         await message.channel.send(
             content="What Item would you like to create?",
