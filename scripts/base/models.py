@@ -200,14 +200,12 @@ class CommandData(Model):
     def __init__(
         self, user: discord.Member,
         message: discord.Message,
-        command: str, args: List, kwargs: Dict
+        command: str, admin_cmd: bool,
+        args: List, kwargs: Dict
     ):
         super().__init__(user)
         self.user_id = str(user.id)
-        self.user_is_admin = "admins" in [
-            role.name.lower()
-            for role in self.user.roles
-        ]
+        self.admin_cmd = admin_cmd
         self.used_at = datetime.now()
         self.channel = str(message.channel.id)
         self.guild = str(message.guild.id)
@@ -236,7 +234,7 @@ class CommandData(Model):
                                 weeks=1
                             )
                         },
-                        'user_is_admin': False
+                        'admin_cmd': False
                     }
                 }, {
                     '$group': {
@@ -269,7 +267,7 @@ class CommandData(Model):
                                 weeks=1
                             )
                         },
-                        'user_is_admin': False
+                        'admin_cmd': False
                     }
                 }, {
                     '$group': {
@@ -301,7 +299,7 @@ class CommandData(Model):
                                 weeks=1
                             )
                         },
-                        'user_is_admin': False
+                        'admin_cmd': False
                     }
                 }, {
                     '$group': {

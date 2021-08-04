@@ -128,7 +128,9 @@ class PokeGambler(discord.AutoShardedClient):
                 if "no_log" not in dir(method) or not os.getenv('IS_LOCAL'):
                     cmd_data = CommandData(
                         message.author, message,
-                        cmd.replace("cmd_", ""), args, option_dict
+                        cmd.replace("cmd_", ""),
+                        hasattr(method, "admin_only"),
+                        args, option_dict
                     )
                     cmd_data.save()
                 task = method(**kwargs)

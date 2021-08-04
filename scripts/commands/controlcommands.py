@@ -139,7 +139,7 @@ class ControlCommands(Commands):
             ```
         To retrieve latest commands used by admins:
             ```
-            {command_prefix}cmd_hist --user_is_admin
+            {command_prefix}cmd_hist --admin_cmd
             ```~
         """
         if kwargs:
@@ -530,7 +530,7 @@ class ControlCommands(Commands):
 
     def __cmd_hist_parse(self, cmd):
         user = self.ctx.get_user(int(cmd["user_id"]))
-        is_admin = cmd["user_is_admin"]
+        is_admin = cmd["admin_cmd"]
         channel = self.ctx.get_channel(int(cmd["channel"]))
         guild = self.ctx.get_guild(int(cmd["guild"]))
         timestamp = cmd["used_at"].strftime("%Y-%m-%d %H:%M:%S")
