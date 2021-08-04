@@ -495,32 +495,45 @@ class Commands(ABC):
         """
         Convenience method for conditional pagination.
         """
+        if not embeds and not files:
+            if content:
+                await message.channel.send(content=content)
+            return
         if files:
-            asset_chan = message.guild.get_channel(
-                self.ctx.img_upload_channel
-            ) or self.ctx.get_channel(
-                self.ctx.img_upload_channel
+            embeds = await self.__handle_files(
+                message, embeds, files
             )
-            if not embeds:
-                embeds = [discord.Embed() for _ in files]
-            msg = await asset_chan.send(files=files)
-            for idx, embed in enumerate(embeds):
-                embed.set_image(
-                    url=msg.attachments[idx].proxy_url
-                )
+        if len(embeds) == 1:
+            await message.channel.send(
+                content=content,
+                embed=embeds[0]
+            )
+            return
         sendables = {
             "embed": embeds[0]
         }
         if content:
             sendables["content"] = content
-        if len(embeds) == 1:
-            await message.channel.send(**sendables)
-        else:
-            for idx, embed in enumerate(embeds):
-                if embed.footer.text is discord.Embed.Empty:
-                    embed.set_footer(text=f"{idx+1}/{len(embeds)}")
-            sendables["view"] = Paginator(
-                embeds, content=content
+        for idx, embed in enumerate(embeds):
+            if embed.footer.text is discord.Embed.Empty:
+                embed.set_footer(text=f"{idx+1}/{len(embeds)}")
+        sendables["view"] = Paginator(
+            embeds, content=content
+        )
+        await message.channel.send(**sendables)
+        await sendables["view"].wait()
+
+    async def __handle_files(self, message, embeds, files):
+        asset_chan = message.guild.get_channel(
+            self.ctx.img_upload_channel
+        ) or self.ctx.get_channel(
+            self.ctx.img_upload_channel
+        )
+        if not embeds:
+            embeds = [discord.Embed() for _ in files]
+        msg = await asset_chan.send(files=files)
+        for idx, embed in enumerate(embeds):
+            embed.set_image(
+                url=msg.attachments[idx].proxy_url
             )
-            await message.channel.send(**sendables)
-            await sendables["view"].wait()
+        return embeds
