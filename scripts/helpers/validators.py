@@ -95,7 +95,7 @@ class IntegerValidator(Validator):
         super().__init__(**kwargs)
 
     def check(self, value) -> bool:
-        return str(value).isdigit()
+        return str(value).replace(',', '').isdigit()
 
 
 class MaxValidator(IntegerValidator):

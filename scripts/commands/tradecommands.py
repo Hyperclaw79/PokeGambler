@@ -1120,11 +1120,15 @@ class TradeCommands(Commands):
         await opt_msg.delete()
         if not pokebot:
             return None, None
+        bounds = (1000, 2_500_000)
+        if mode == "withdraw":
+            bounds = (10000, 250_000)
         opt_msg = await dm_send(
             message, message.author,
             embed=get_embed(
                 content="```yaml\n>________\n```",
-                title=f"How much do you want to {mode}?"
+                title=f"How much do you want to {mode}?",
+                footer=f"Min: {bounds[0]:,}, Max: {bounds[1]:,}"
             )
         )
         reply = await self.ctx.wait_for(
@@ -1132,12 +1136,8 @@ class TradeCommands(Commands):
             check=lambda msg: (
                 msg.channel == opt_msg.channel
                 and msg.author == message.author
-                and msg.content.isdigit()
             )
         )
-        bounds = (1000, 2_500_000)
-        if mode == "withdraw":
-            bounds = (10000, 250_000)
         proceed = await MinMaxValidator(
             *bounds,
             message=message,
