@@ -623,14 +623,22 @@ class TradeCommands(Commands):
                     )
                 )
                 return
+        shop.refresh_tradables()
         categories = shop.categories
         shop_alias = shop.alias_map
         if args and args[0].title() not in shop_alias:
-            cat_str = "\n".join(categories)
+            cat_str = "\n".join(
+                f"+ {catog}" if shop.categories[catog].items
+                else f"- {catog} (To Be Implemented)"
+                for catog in sorted(
+                    categories,
+                    key=lambda x: -len(shop.categories[x].items)
+                )
+            )
             await message.channel.send(
                 embed=get_embed(
                     "That category does not exist. "
-                    f"Try one of these:\n{cat_str}",
+                    f"Try one of these:\n```diff\n{cat_str}\n```",
                     embed_type="error",
                     title="Invalid Category"
                 )
@@ -972,7 +980,6 @@ class TradeCommands(Commands):
         )
 
     def __shop_get_catogs(self, shop, profile):
-        shop.refresh_tradables()
         categories = {
             key: catog
             for key, catog in sorted(
