@@ -47,10 +47,15 @@ class SelectComponent(discord.ui.Select):
     """
     A Select Component that allows the user to choose an option.
     """
-    def __init__(self, heading: str, options: Dict[str, str]):
+    def __init__(
+        self, heading: str,
+        options: Dict[str, str],
+        serializer: Optional[Callable] = str
+    ):
+        self.serializer = serializer
         opts = [
             discord.SelectOption(
-                label=str(label),
+                label=serializer(label),
                 description=str(description)
             )
             for label, description in options.items()
@@ -76,7 +81,7 @@ class SelectComponent(discord.ui.Select):
                 [
                     key
                     for key in self.opts
-                    if str(key) == self.values[0]
+                    if self.serializer(key) == self.values[0]
                 ][0]
             )
             if len(self.view.results) == len(self.view.children):
@@ -90,7 +95,7 @@ class SelectComponent(discord.ui.Select):
         self.view.result = [
             key
             for key in self.opts
-            if str(key) == self.values[0]
+            if self.serializer(key) == self.values[0]
         ][0]
         self.view.stop()
 
@@ -99,7 +104,7 @@ class SelectView(BaseView):
     """
     A Select View that allows the user to choose an option.
     """
-    def __init__(self, no_response=False, **kwargs):
+    def __init__(self, no_response=True, **kwargs):
         timeout = kwargs.pop('timeout', 180)
         check = kwargs.pop('check', None)
         super().__init__(timeout=timeout, check=check)

@@ -113,6 +113,13 @@ class Model(metaclass=NameSetter):
         """
         self.mongo.insert_one(dict(self))
 
+    @classmethod
+    def purge(cls):
+        """
+        Deletes all entries in the Collection.
+        """
+        cls.mongo.delete_many({})
+
 
 # region Models
 
@@ -837,6 +844,21 @@ class Boosts(UnlockedModel):
         self.fortune_burst: int = 0
         self.flipster: int = 0
 
+    @classmethod
+    def reset_all(cls: Type[Boosts]):
+        """
+        Resets all Unlocked Models.
+        """
+        cls.mongo.update_many(
+            {"user_id": {"$exists": True}},
+            {"$set": {
+                "lucky_looter": 0,
+                "loot_lust": 0,
+                "fortune_burst": 0,
+                "flipster": 0
+            }}
+        )
+
 
 class Loots(UnlockedModel):
     """
@@ -850,6 +872,23 @@ class Loots(UnlockedModel):
             datetime.now() - timedelta(days=1)
         )
         self.daily_streak: int = 0
+
+    @classmethod
+    def reset_all(cls: Type[Loots]):
+        """
+        Resets all the Loots.
+        """
+        cls.mongo.update_many(
+            {"user_id": {"$exists": True}},
+            {"$set": {
+                "tier": 1,
+                "earned": 0,
+                "daily_claimed_on": datetime.now() - timedelta(
+                    days=1
+                ),
+                "daily_streak": 0
+            }}
+        )
 
 
 class Profiles(UnlockedModel):
@@ -1092,6 +1131,24 @@ class Profiles(UnlockedModel):
             }
         ])
         yield from res
+
+    @classmethod
+    def reset_all(cls: Type[Profiles]):
+        """
+        Resets all the Profiles.
+        """
+        cls.mongo.update_many(
+            {"user_id": {"$exists": True}},
+            {"$set": {
+                "balance": 100,
+                "num_matches": 0,
+                "num_wins": 0,
+                "pokebonds": 0,
+                "won_chips": 100,
+                "background": None,
+                "embed_color": None
+            }}
+        )
 
     def _default(self):
         init_dict = {

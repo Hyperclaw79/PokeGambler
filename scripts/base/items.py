@@ -265,6 +265,16 @@ class Item(ABC):
         ]))
 
     @classmethod
+    def insert_many(cls, items: List[Dict]):
+        """
+        Inserts many items at once.
+        """
+        for item in items:
+            if "created_on" not in item:
+                item["created_on"] = datetime.now()
+        cls.mongo.insert_many(items)
+
+    @classmethod
     def list_items(
         cls: Type[Item],
         category: str = "Tradable",
@@ -309,6 +319,13 @@ class Item(ABC):
             item["itemid"] = item.pop("_id")
             modded_items.append(item)
         return modded_items
+
+    @classmethod
+    def purge(cls):
+        """
+        Purges the Items collection.
+        """
+        cls.mongo.delete_many({})
 
     @classmethod
     def _new_item(

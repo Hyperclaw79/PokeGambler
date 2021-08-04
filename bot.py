@@ -49,7 +49,7 @@ class PokeGambler(discord.AutoShardedClient):
         # pylint: disable=assigning-non-slot
         intents.presences = False
         super().__init__(intents=intents)
-        self.version = "v0.9.0"
+        self.version = "v1.0.0"
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
         self.__update_configs()

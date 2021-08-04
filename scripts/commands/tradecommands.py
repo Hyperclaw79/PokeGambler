@@ -1073,7 +1073,10 @@ class TradeCommands(Commands):
     ):
         admins = discord.utils.get(message.guild.roles, name="Admins")
         confirm_view = Confirm(
-            check=lambda intcn: is_admin(intcn.user) or is_owner(self.ctx, intcn.user),
+            check=lambda intcn: any([
+                is_admin(intcn.user),
+                is_owner(self.ctx, intcn.user)
+            ]),
             timeout=600
         )
         req_msg = await message.channel.send(

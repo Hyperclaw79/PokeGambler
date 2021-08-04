@@ -5,7 +5,6 @@ Control Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
-from datetime import datetime
 from io import BytesIO
 import json
 import time
@@ -13,7 +12,12 @@ from typing import List, Optional, TYPE_CHECKING
 
 import discord
 
-from ..base.models import CommandData, DB_CLIENT
+from ..base.items import Item
+from ..base.models import (
+    CommandData, Minigame,
+    Model, UnlockedModel
+)
+from ..base.views import SelectView
 from ..helpers.checks import user_check
 from ..helpers.utils import (
     get_embed, get_enum_embed,
@@ -174,9 +178,6 @@ class ControlCommands(Commands):
             {command_prefix}export_items --pretty 3
             ```~
         """
-        # pylint: disable=import-outside-toplevel
-        from ..base.items import Item
-
         items = Item.get_unique_items()
         for item in items:
             item.pop("created_on", None)
@@ -222,9 +223,7 @@ class ControlCommands(Commands):
         )
         data_bytes = await user_inp.attachments[0].read()
         data = json.loads(data_bytes.decode())
-        for item in data:
-            item["created_on"] = datetime.now()
-        DB_CLIENT.items.insert_many(data)
+        Item.insert_many(data)
         await user_inp.add_reaction("👍")
 
     @owner_only
@@ -253,20 +252,42 @@ class ControlCommands(Commands):
             {command_prefix}prg_tbl
             ```~
         """
-        if args:
-            dropped = DB_CLIENT.drop_collection(args[0])
-            if not dropped['ok']:
-                await message.channel.send(
-                    embed=get_embed(
-                        f"The {args[0]} table does not exist in the database.",
-                        embed_type="error",
-                        title="Invalid Table Name"
-                    )
-                )
-                return
+        to_delete = [
+            cls
+            for cls in Model.__subclasses__()
+            if cls not in (UnlockedModel, Minigame)
+        ] + [Item]
+        to_reset = UnlockedModel.__subclasses__()
+        to_delete.extend(Minigame.__subclasses__())
+        if kwargs.get("all", False):
+            collections = to_delete + to_reset
         else:
-            for collection in DB_CLIENT.list_collection_names():
-                DB_CLIENT.drop_collection(collection)
+            choices_view = SelectView(
+                heading="Select a Collection",
+                options={
+                    opt: ""
+                    for opt in sorted(
+                        to_delete + to_reset,
+                        key=lambda x: x.__name__
+                    )
+                },
+                serializer=lambda x: x.__name__
+            )
+            await message.channel.send(
+                "Which table do you wanna purge?",
+                view=choices_view
+            )
+            await choices_view.wait()
+            cltn = choices_view.result
+            if not cltn:
+                return
+            collections = [cltn]
+        for cls in collections:
+            purger = (
+                cls.purge if cls in to_delete
+                else cls.reset_all
+            )
+            purger()
         await message.add_reaction("👍")
 
     @owner_only
