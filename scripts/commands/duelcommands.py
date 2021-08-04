@@ -44,13 +44,7 @@ class DuelActions:
     """
     def __init__(self, ctx: PokeGambler):
         self.ctx = ctx
-        self.normal = []
-        self.crit = []
-        for action in DuelActionsModel.get_actions():
-            if action["level"] == "Normal":
-                self.normal.append(action["action"])
-            else:
-                self.crit.append(action["action"])
+        self.refresh()
         if not self.normal or not self.crit:
             self.normal = [
                 "<g1> kicks <g2> to the ground.",

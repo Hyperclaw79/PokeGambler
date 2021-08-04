@@ -669,6 +669,7 @@ class PremiumShop(Shop):
     The subclass of Shop for premium-only items.
     """
     categories: Dict[str, ShopCategory] = {
+        **Shop.categories,
         "Titles": ShopCategory(
             "Titles",
             """
@@ -723,34 +724,6 @@ class PremiumShop(Shop):
                     200, "🎲", premium=True
                 )
             ])
-        ),
-        "Tradables": ShopCategory(
-            "Tradables",
-            """
-            These are the items in the PokeGambler world which can be
-            bought, sold and traded with players.
-            Might even contain player created Items.
-            """,
-            "📦",
-            Listing()
-        ),
-        "Consumables": ShopCategory(
-            "Consumables",
-            """
-            These items exists solely for your consumption.
-            They cannot be sold back to the shop.
-            """,
-            "🛒",
-            Listing()
-        ),
-        "Gladiators": ShopCategory(
-            "Gladiators",
-            """
-            These champions of the old have been cloned for you.
-            You can buy them to make them fight in brutal gladiator fights.
-            """,
-            "💀",
-            Listing()
         )
     }
     premium = True
