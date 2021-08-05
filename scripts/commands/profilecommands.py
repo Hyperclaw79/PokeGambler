@@ -476,6 +476,14 @@ class ProfileCommands(Commands):
                 )
                 embeds.append(emb)
                 files.append(lb_fl)
+        if not embeds:
+            await message.channel.send(
+                embed=get_embed(
+                    "No matches were played yet.",
+                    embed_type="warning"
+                )
+            )
+            return
         with LineTimer(self.logger, "Leaderboard Pagination"):
             await self.paginate(message, embeds, files)
 
