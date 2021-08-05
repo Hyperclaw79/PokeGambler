@@ -177,7 +177,7 @@ class GambleCommands(Commands):
         """
         profile = Profiles(message.author)
         amount = await self.__flip_input_handler(
-            message, args, profile, default=50,
+            message, args, profile,
             min_chips=50, max_chips=9999
         )
         if amount is None:
@@ -487,10 +487,10 @@ class GambleCommands(Commands):
             )
 
     async def __flip_input_handler(
-        self, message, args, profile,
-        default, min_chips, max_chips
+        self, message, args,
+        profile, min_chips, max_chips
     ):
-        amount = default
+        amount = min_chips
         if args:
             proceed = await MinMaxValidator(
                 min_chips, max_chips,
@@ -499,6 +499,7 @@ class GambleCommands(Commands):
             ).validate(args[0])
             if not proceed:
                 return None
+            amount = int(args[0])
         if profile.get("balance") < amount:
             await self.handle_low_bal(message.author, message.channel)
             await message.add_reaction("❌")
