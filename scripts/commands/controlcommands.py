@@ -641,5 +641,4 @@ class ControlCommands(Commands):
             view=choices_view
         )
         await choices_view.wait()
-        cltn = choices_view.result
-        return cltn
+        return choices_view.result
