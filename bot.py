@@ -443,7 +443,7 @@ class PokeGambler(discord.AutoShardedClient):
             (
                 datetime.utcnow() - Nitro.get_last_rewarded()
             ).days >= 30,
-            datetime.utcnow().day == 1,
+            datetime.utcnow().day == 5,
             not os.getenv("IS_LOCAL")
         ]):
             DummyMessage = namedtuple('Message', ['channel'])
