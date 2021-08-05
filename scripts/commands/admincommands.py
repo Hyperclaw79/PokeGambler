@@ -674,10 +674,15 @@ class AdminCommands(Commands):
         self, catog: Type[Item],
         categories: Dict, curr_recc: int
     ):
-        if getattr(catog, '__module__', None) != "scripts.base.items":
-            return
         for subcatog in catog.__subclasses__():
-            if subcatog.__name__ != 'Chest':
+            if all([
+                subcatog.__name__ != 'Chest',
+                getattr(
+                    subcatog,
+                    '__module__',
+                    None
+                ) == "scripts.base.items"
+            ]):
                 categories[subcatog.__name__] = subcatog
                 curr_recc += 1
                 self.__create_item_populate_categories(

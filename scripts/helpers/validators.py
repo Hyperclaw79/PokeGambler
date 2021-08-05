@@ -223,6 +223,7 @@ class ImageUrlValidator(RegexValidator):
     Validates an image URL.
     """
     error_embed_title = "Invalid image URL"
+    error_embed_desc = "Only Png and JPG images are supported."
 
     def __init__(self, **kwargs):
         super().__init__(
