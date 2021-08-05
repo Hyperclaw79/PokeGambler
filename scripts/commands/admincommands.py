@@ -322,6 +322,17 @@ class AdminCommands(Commands):
         if not profile:
             return
         try:
+            if not is_owner(self.ctx, message.author):
+                kwargs.pop('pokebonds', None)
+                if int(kwargs.get('num_wins', "0")) > 1:
+                    await message.channel.send(
+                        embed=get_embed(
+                            "You cannot update more than 1 win at a time.",
+                            embed_type="error",
+                            title="Invalid User"
+                        )
+                    )
+                    return
             profile.update(**kwargs)
         except Exception as excp:  # pylint: disable=broad-except
             await message.channel.send(
@@ -338,7 +349,16 @@ class AdminCommands(Commands):
                 timestamp=True
             )
             return
-        await message.add_reaction("👍")
+        if kwargs:
+            await message.add_reaction("👍")
+            return
+        await message.channel.send(
+            embed=get_embed(
+                "There was nothing to update....",
+                embed_type="warning",
+                title="Update failed"
+            )
+        )
 
     @check_completion
     @no_thumb
