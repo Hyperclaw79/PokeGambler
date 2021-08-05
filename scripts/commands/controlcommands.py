@@ -8,7 +8,10 @@ from __future__ import annotations
 from io import BytesIO
 import json
 import time
-from typing import List, Optional, TYPE_CHECKING
+from typing import (
+    List, Optional, TYPE_CHECKING,
+    Tuple, Type, Union
+)
 
 import discord
 
@@ -228,6 +231,52 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
+    async def cmd_latest(self, message: Message, **kwargs):
+        """Returns the latest documents.
+         $```scss
+        {command_prefix}latest [--limit limit]
+        ```$
+
+        @`👑 Owner Command`
+        Returns the latest entires from a collection.@
+        """
+        locked, unlocked = self.__get_collections()
+        cltn = await self.__get_model_view(
+            message, (locked + unlocked)
+        )
+        if not cltn:
+            return
+        limit = int(kwargs.get("limit", 5))
+        documents = cltn.latest(limit=limit)
+        if not documents:
+            await message.channel.send(
+                embed=get_embed(
+                    title="No documents found.",
+                    embed_type="warning"
+                )
+            )
+            return
+        embeds = []
+        for doc in documents:
+            emb = get_embed(
+                title=f"Latest entries from {cltn.__name__}"
+            )
+            for key, val in doc.items():
+                if key in [
+                    "background", "asset_url"
+                ]:
+                    if val:
+                        emb.set_thumbnail(url=val)
+                    continue
+                emb.add_field(
+                    name=key,
+                    value=str(val)
+                )
+            embeds.append(emb)
+        await self.paginate(message, embeds)
+
+    @owner_only
+    @no_log
     @alias('prg_tbl')
     async def cmd_purge_tables(
         self, message: Message,
@@ -252,39 +301,19 @@ class ControlCommands(Commands):
             {command_prefix}prg_tbl
             ```~
         """
-        to_delete = [
-            cls
-            for cls in Model.__subclasses__()
-            if cls not in (UnlockedModel, Minigame)
-        ] + [Item]
-        to_reset = UnlockedModel.__subclasses__()
-        to_delete.extend(Minigame.__subclasses__())
+        locked, unlocked = self.__get_collections()
         if kwargs.get("all", False):
-            collections = to_delete + to_reset
+            collections = locked + unlocked
         else:
-            choices_view = SelectView(
-                heading="Select a Collection",
-                options={
-                    opt: ""
-                    for opt in sorted(
-                        to_delete + to_reset,
-                        key=lambda x: x.__name__
-                    )
-                },
-                serializer=lambda x: x.__name__
+            cltn = await self.__get_model_view(
+                message, (locked + unlocked)
             )
-            await message.channel.send(
-                "Which table do you wanna purge?",
-                view=choices_view
-            )
-            await choices_view.wait()
-            cltn = choices_view.result
             if not cltn:
                 return
             collections = [cltn]
         for cls in collections:
             purger = (
-                cls.purge if cls in to_delete
+                cls.purge if cls in locked
                 else cls.reset_all
             )
             purger()
@@ -579,3 +608,38 @@ class ControlCommands(Commands):
             text=f"Command was used at {timestamp}."
         )
         return emb
+
+    @staticmethod
+    def __get_collections() -> Tuple[List]:
+        locked = [
+            cls
+            for cls in Model.__subclasses__()
+            if cls not in (UnlockedModel, Minigame)
+        ] + [Item]
+        unlocked = UnlockedModel.__subclasses__()
+        locked.extend(Minigame.__subclasses__())
+        return locked, unlocked
+
+    async def __get_model_view(
+        self, message: Message,
+        models: List[Union[Type[Item], Type[Model]]],
+        content: str = None
+    ) -> Union[Union[Type[Item], Type[Model]]]:
+        choices_view = SelectView(
+            heading="Select a Collection",
+            options={
+                opt: ""
+                for opt in sorted(
+                    models,
+                    key=lambda x: x.__name__
+                )
+            },
+            serializer=lambda x: x.__name__
+        )
+        await message.channel.send(
+            "Which table do you wanna select?",
+            view=choices_view
+        )
+        await choices_view.wait()
+        cltn = choices_view.result
+        return cltn

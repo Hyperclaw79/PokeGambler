@@ -265,6 +265,35 @@ class Item(ABC):
         ]))
 
     @classmethod
+    def latest(
+        cls: Type[Item],
+        limit: Optional[int] = 5
+    ) -> List[Dict]:
+        """
+        Returns the latest items from the DB.
+        """
+        return list(
+            cls.mongo.aggregate([
+                {
+                    "$match": {
+                        "category": {"$ne": "Chest"}
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$name",
+                        "items": {"$first": "$$ROOT"}
+                    }
+                },
+                {"$replaceRoot": {"newRoot": "$items"}},
+                {"$set": {"itemid": "$_id"}},
+                {"$unset": "_id"},
+                {"$sort": {"created_on": -1}},
+                {"$limit": limit}
+            ])
+        )
+
+    @classmethod
     def insert_many(cls, items: List[Dict]):
         """
         Inserts many items at once.

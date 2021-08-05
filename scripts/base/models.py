@@ -114,6 +114,22 @@ class Model(metaclass=NameSetter):
         self.mongo.insert_one(dict(self))
 
     @classmethod
+    def latest(
+        cls: Type[Model],
+        limit: Optional[int] = 5
+    ) -> List[Dict]:
+        """
+        Returns the latest douments from the DB for a model.
+        """
+        return list(
+            cls.mongo.aggregate([
+                {"$sort": {"_id": -1}},
+                {"$limit": limit},
+                {"$unset": "_id"}
+            ])
+        )
+
+    @classmethod
     def purge(cls):
         """
         Deletes all entries in the Collection.
