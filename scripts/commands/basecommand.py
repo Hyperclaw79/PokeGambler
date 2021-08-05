@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 
 from ..base.items import Item
 from ..base.models import Inventory, Model, Profiles
+from ..base.shop import PremiumShop, Shop
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
     get_embed, is_admin,
@@ -341,10 +342,17 @@ def needs_ticket(name: str):
             inv = Inventory(message.author)
             tickets = inv.from_name(name)
             if not tickets:
+                Shop.refresh_tradables()
+                PremiumShop.refresh_tradables()
+                itemid = Shop.from_name(name) or PremiumShop.from_name(name)
+                embed_content = "You do not have any renaming tickets.\n" + \
+                    "You can buy one from the Consumables Shop."
+                if itemid:
+                    embed_content += f"\nUse `{self.ctx.prefix}buy" + \
+                        f" {itemid}` to buy it."
                 return message.channel.send(
                     embed=get_embed(
-                        "You do not have any renaming tickets.\n"
-                        "You can buy one from the Consumables Shop.",
+                        embed_content,
                         embed_type="error",
                         title="Insufficient Tickets"
                     )

@@ -75,8 +75,18 @@ class Listing(Queue):
     def __len__(self) -> int:
         return len(self.queue)
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         return f"Listing({list(self)})"
+
+    @property
+    def name_id_map(self) -> Dict[str, str]:
+        """
+        Returns a mapping between item names and their ids.
+        """
+        return {
+            item.name: item.itemid
+            for item in self
+        }
 
     def fetch(self) -> ShopItem:
         """
@@ -121,6 +131,17 @@ class ShopCategory:
 
     def __str__(self) -> str:
         return f"『{self.emoji}』 {self.name}"
+
+    def copy(self) -> ShopCategory:
+        """
+        Returns a copy of the ShopCategory.
+        """
+        return self.__class__(
+            name=self.name,
+            description=self.description,
+            emoji=self.emoji,
+            items=Listing(list(self.items))
+        )
 
 
 @dataclass
@@ -562,6 +583,16 @@ class Shop:
         cls.categories[category.name] = category
 
     @classmethod
+    def from_name(cls: Type[Shop], name: str) -> str:
+        """
+        Returns the itemid of the item with given name.
+        """
+        for catog in cls.categories.values():
+            if catog.items.name_id_map.get(name) is not None:
+                return catog.items.name_id_map[name]
+        return None
+
+    @classmethod
     def get_item(
         cls: Type[Shop], itemid: str,
         force_new: bool = False
@@ -669,7 +700,10 @@ class PremiumShop(Shop):
     The subclass of Shop for premium-only items.
     """
     categories: Dict[str, ShopCategory] = {
-        **Shop.categories,
+        **{
+            key: catog.copy()
+            for key, catog in Shop.categories.items()
+        },
         "Titles": ShopCategory(
             "Titles",
             """

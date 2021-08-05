@@ -2,6 +2,8 @@
 The Main Module which serves as the brain of the code.
 """
 
+# pylint: disable=no-member
+
 from collections import namedtuple
 import difflib
 import importlib
@@ -18,12 +20,13 @@ from discord import Message
 from discord.ext import tasks
 from dotenv import load_dotenv
 
+from scripts.base.cardgen import CardGambler
 from scripts.base.models import (
-    Blacklist, CommandData, Inventory, Nitro, Profiles
+    Blacklist, CommandData, Inventory,
+    Nitro, Profiles
 )
 from scripts.base.items import Item
-
-from scripts.base.cardgen import CardGambler
+from scripts.base.shop import PremiumShop, Shop
 from scripts.helpers.logger import CustomLogger
 # pylint: disable=cyclic-import
 from scripts.helpers.utils import (
@@ -172,7 +175,6 @@ class PokeGambler(discord.AutoShardedClient):
             )
         if guild.large:
             emb.color = discord.Colour.gold()
-        # pylint: disable=no-member
         jq_log_channel = discord.utils.get(
             self.get_guild(
                 self.official_server
@@ -202,84 +204,18 @@ class PokeGambler(discord.AutoShardedClient):
         On_ready event from Discord API.
         """
         if not getattr(self, "owner", False):
-            # pylint: disable=no-member
             self.owner = self.get_user(self.owner_id)
         headers = get_rand_headers()
         self.sess = aiohttp.ClientSession(loop=self.loop, headers=headers)
-        pretty = {
-            itbl: prettify_discord(
-                self,
-                **{
-                    "iterable": getattr(self, itbl),
-                    "mode": itbl.split("_")[1].rstrip("s")
-                }
-            )
-            for itbl in [
-                "blacklist_channels", "whitelist_channels",
-                "blacklist_guilds", "whitelist_guilds"
-            ]
-        }
+        self.__pprinter()
         self.ready = True
-        ver_ascii = get_ascii(self.version)
-        self.logger.pprint(
-            """
-                \t██████╗  █████╗ ██╗  ██╗███████╗
-                \t██╔══██╗██╔══██╗██║ ██╔╝██╔════╝
-                \t██████╔╝██║  ██║█████═╝ █████╗
-                \t██╔═══╝ ██║  ██║██╔═██╗ ██╔══╝
-                \t██║     ╚█████╔╝██║ ╚██╗███████╗
-                \t╚═╝      ╚════╝ ╚═╝  ╚═╝╚══════╝
-            """,
-            color=["yellow", "bold"],
-            timestamp=False
-        )
-        self.logger.pprint(
-            """
-                ██████╗  █████╗  ███╗   ███╗██████╗ ██╗     ███████╗██████╗
-                ██╔════╝ ██╔══██╗████╗ ████║██╔══██╗██║     ██╔════╝██╔══██╗
-                ██║  ██╗ ███████║██╔████╔██║██████╦╝██║     █████╗  ██████╔╝
-                ██║  ╚██╗██╔══██║██║╚██╔╝██║██╔══██╗██║     ██╔══╝  ██╔══██╗
-                ╚██████╔╝██║  ██║██║ ╚═╝ ██║██████╦╝███████╗███████╗██║  ██║
-                 ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝
-            """,
-            color=["red"],
-            timestamp=False
-        )
-        self.logger.pprint(
-            f"\n{ver_ascii}\n",
-            color=["green", "bold"],
-            timestamp=False
-        )
-        # pylint: disable=no-member
-        print(
-            f"\t{self.logger.wrap('Owner:', color='blue')} "
-            f"{self.owner} ({self.owner_id})\n\n"
-            f"\t{self.logger.wrap('Bot Name:', color='blue')} {self.user}\n\n"
-            f"\t{self.logger.wrap('Command Prefix:', color='blue')} "
-            f"{self.prefix}\n\n"
-            f"\t{self.logger.wrap('Blacklisted Channels', color='blue')}\n"
-            "\t~~~~~~~~~~~~~~~~~~~~\n"
-            f"\t{pretty['blacklist_channels']}\n\n"
-            f"\t{self.logger.wrap('Whitelisted Channels', color='blue')}\n"
-            "\t~~~~~~~~~~~~~~~~~~~~\n"
-            f"\t{pretty['whitelist_channels']}\n\n"
-            f"\t{self.logger.wrap('Blacklisted Servers', color='blue')}\n"
-            "\t~~~~~~~~~~~~~~~~~~~\n"
-            f"\t{pretty['blacklist_guilds']}\n\n"
-            f"\t{self.logger.wrap('Whitelisted Servers', color='blue')}\n"
-            "\t~~~~~~~~~~~~~~~~~~~\n"
-            f"\t{pretty['whitelist_guilds']}\n\n"
-            f"\t{self.logger.wrap('Default Channel Mode:', color='blue')} "
-            f"{self.channel_mode}\n\n"
-            f"\t{self.logger.wrap('Default Guild Mode:', color='blue')} "
-            f"{self.guild_mode}\n\n"
-        )
         game = discord.Game(
             f"with the strings of fate. | Check: {self.prefix}info"
         )
-        await self.change_presence(activity=game)
         await online_now(self)
-        # pylint: disable=no-member
+        Shop.refresh_tradables()
+        PremiumShop.refresh_tradables()
+        await self.change_presence(activity=game)
         self.__reward_nitro_boosters.start()
 
     def load_commands(
@@ -438,7 +374,6 @@ class PokeGambler(discord.AutoShardedClient):
 
     @tasks.loop(hours=24)
     async def __reward_nitro_boosters(self):
-        # pylint: disable=no-member
         if all([
             (
                 datetime.utcnow() - Nitro.get_last_rewarded()
@@ -460,7 +395,6 @@ class PokeGambler(discord.AutoShardedClient):
                     "Nitro Booster Reward Box",
                     force_new=True
                 )
-                # pylint: disable=no-member
                 Inventory(booster).save(nitro_box.itemid)
                 chan = discord.utils.get(
                     official_server.channels,
@@ -483,6 +417,74 @@ class PokeGambler(discord.AutoShardedClient):
                 rewarded.append(booster.id)
                 rewardboxes.append(nitro_box.itemid)
             Nitro(owner, rewarded, rewardboxes).save()
+
+    def __pprinter(self):
+        pretty = {
+            itbl: prettify_discord(
+                self,
+                **{
+                    "iterable": getattr(self, itbl),
+                    "mode": itbl.split("_")[1].rstrip("s")
+                }
+            )
+            for itbl in [
+                "blacklist_channels", "whitelist_channels",
+                "blacklist_guilds", "whitelist_guilds"
+            ]
+        }
+        ver_ascii = get_ascii(self.version)
+        self.logger.pprint(
+            """
+                \t██████╗  █████╗ ██╗  ██╗███████╗
+                \t██╔══██╗██╔══██╗██║ ██╔╝██╔════╝
+                \t██████╔╝██║  ██║█████═╝ █████╗
+                \t██╔═══╝ ██║  ██║██╔═██╗ ██╔══╝
+                \t██║     ╚█████╔╝██║ ╚██╗███████╗
+                \t╚═╝      ╚════╝ ╚═╝  ╚═╝╚══════╝
+            """,
+            color=["yellow", "bold"],
+            timestamp=False
+        )
+        self.logger.pprint(
+            """
+                ██████╗  █████╗  ███╗   ███╗██████╗ ██╗     ███████╗██████╗
+                ██╔════╝ ██╔══██╗████╗ ████║██╔══██╗██║     ██╔════╝██╔══██╗
+                ██║  ██╗ ███████║██╔████╔██║██████╦╝██║     █████╗  ██████╔╝
+                ██║  ╚██╗██╔══██║██║╚██╔╝██║██╔══██╗██║     ██╔══╝  ██╔══██╗
+                ╚██████╔╝██║  ██║██║ ╚═╝ ██║██████╦╝███████╗███████╗██║  ██║
+                 ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝
+            """,
+            color=["red"],
+            timestamp=False
+        )
+        self.logger.pprint(
+            f"\n{ver_ascii}\n",
+            color=["green", "bold"],
+            timestamp=False
+        )
+        print(
+            f"\t{self.logger.wrap('Owner:', color='blue')} "
+            f"{self.owner} ({self.owner_id})\n\n"
+            f"\t{self.logger.wrap('Bot Name:', color='blue')} {self.user}\n\n"
+            f"\t{self.logger.wrap('Command Prefix:', color='blue')} "
+            f"{self.prefix}\n\n"
+            f"\t{self.logger.wrap('Blacklisted Channels', color='blue')}\n"
+            "\t~~~~~~~~~~~~~~~~~~~~\n"
+            f"\t{pretty['blacklist_channels']}\n\n"
+            f"\t{self.logger.wrap('Whitelisted Channels', color='blue')}\n"
+            "\t~~~~~~~~~~~~~~~~~~~~\n"
+            f"\t{pretty['whitelist_channels']}\n\n"
+            f"\t{self.logger.wrap('Blacklisted Servers', color='blue')}\n"
+            "\t~~~~~~~~~~~~~~~~~~~\n"
+            f"\t{pretty['blacklist_guilds']}\n\n"
+            f"\t{self.logger.wrap('Whitelisted Servers', color='blue')}\n"
+            "\t~~~~~~~~~~~~~~~~~~~\n"
+            f"\t{pretty['whitelist_guilds']}\n\n"
+            f"\t{self.logger.wrap('Default Channel Mode:', color='blue')} "
+            f"{self.channel_mode}\n\n"
+            f"\t{self.logger.wrap('Default Guild Mode:', color='blue')} "
+            f"{self.guild_mode}\n\n"
+        )
 
     async def __pre_command_checks(self, message):
         on_cooldown = await self.__handle_cd(message)
@@ -553,7 +555,6 @@ class PokeGambler(discord.AutoShardedClient):
             timestamp=True,
             color="red"
         )
-        # pylint: disable=no-member
         err_msg = f"```py\n{tb_obj}\n```"
         if len(err_msg) > 2000:
             err_fl = discord.File(
