@@ -239,13 +239,14 @@ class GambleCounter(BaseView):
                 usr, (await interaction.original_message().channel)
             )
             return
-        self.registration_list.append(interaction.user)
-        await interaction.response.edit_message(
-            embed=self.prep_embed(),
-            view=self
-        )
-        if len(self.registration_list) == self.max_players:
-            self.stop()
+        if interaction.user not in self.registration_list:
+            self.registration_list.append(interaction.user)
+            await interaction.response.edit_message(
+                embed=self.prep_embed(),
+                view=self
+            )
+            if len(self.registration_list) == self.max_players:
+                self.stop()
 
     def prep_embed(self):
         """
