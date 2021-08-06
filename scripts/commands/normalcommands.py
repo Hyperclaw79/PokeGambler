@@ -206,7 +206,8 @@ class NormalCommands(Commands):
         )
         invite_view = LinkView(
             emoji="<:pokegambler:844321894488342559>",
-            url="https://top.gg/bot/831575371601412136/invite/"
+            url="https://discordapp.com/oauth2/authorize?client_id="
+            f"{self.ctx.user.id}&scope=bot&permissions=259711691856"
         )
         await message.channel.send(
             embed=inv_emb,
@@ -340,13 +341,16 @@ class NormalCommands(Commands):
             ),
             inline=False
         )
+        server_owner = self.ctx.get_guild(
+            self.ctx.official_server
+        ).owner
         emb.add_field(
             name="**Owners**",
             value=dedent(
-                """
+                f"""
                 ```yaml
-                Bot Owner: Hyperclaw79#3476
-                Official Server Owner: justrilrx#9692
+                Bot Owner: {self.ctx.owner}
+                Official Server Owner: {server_owner}
                 ```
                 """
             ),
