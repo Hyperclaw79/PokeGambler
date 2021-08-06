@@ -499,7 +499,7 @@ class DuelCommands(Commands):
                     for gld in available
                 },
                 no_response=True,
-                check=lambda x: x.id == message.author.id
+                check=lambda x: x.user.id == message.author.id
             )
             await dm_send(
                 message, user,
