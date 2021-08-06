@@ -289,7 +289,7 @@ def is_dealer(user: Member) -> bool:
         for role in user.roles
     ]
     return all([
-        "dealer" in roles,
+        "dealers" in roles,
         user.guild.id == int(os.getenv('OFFICIAL_SERVER'))
     ])
 
