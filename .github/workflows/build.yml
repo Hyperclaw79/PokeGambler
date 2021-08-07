@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - main
+      - wip
     paths-ignore:
       - README.MD
       - .gitignore
@@ -37,6 +38,7 @@ jobs:
       if: github.event_name == 'release'
       run: |
         echo "TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+        echo "SECRET_VERSION=latest" >> $GITHUB_ENV
 
     - name: Checkout
       uses: actions/checkout@v2
@@ -111,6 +113,8 @@ jobs:
       if: github.event_name == 'release'
       run: |
         echo "TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+        echo "SECRET_VERSION=latest" >> $GITHUB_ENV
+        echo "FOLDER=prod" >> $GITHUB_ENV
 
     - name: Checkout
       uses: actions/checkout@v2
