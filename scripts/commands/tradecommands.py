@@ -657,7 +657,7 @@ class TradeCommands(Commands):
             for emb in embeds:
                 emb.set_image(
                     url="https://cdn.discordapp.com/attachments/"
-                    "840469669332516904/853990953953525870/pokebond.png"
+                    "874623706339618827/874627340523700234/pokebond.png"
                 )
         await self.paginate(message, embeds)
 

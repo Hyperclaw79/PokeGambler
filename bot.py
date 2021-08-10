@@ -192,7 +192,7 @@ class PokeGambler(discord.AutoShardedClient):
                         title="Thanks for adding me!",
                         content=f"See `{self.prefix}info` to get started.",
                         image="https://media.discordapp.net/attachments/"
-                        "840469669332516904/861292639857147914/pg_banner.png"
+                        "874623706339618827/874628993939308554/pg_banner.png"
                         "?width=640&height=360"
                     )
                 )

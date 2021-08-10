@@ -298,7 +298,7 @@ class ProfileCommands(Commands):
             daily_claimed_on=datetime.today()
         )
         await message.channel.send(
-            f"**Daily loot of {int(loot)} <a:blinker:843844481220083783> "
+            f"**Daily loot of {int(loot)} {self.chip_emoji} "
             "added to your balance.**",
             embed=embed
         )
@@ -532,7 +532,7 @@ class ProfileCommands(Commands):
         profile.credit(loot)
         loot_model.update(earned=earned + loot)
         await message.channel.send(
-            f"**You found {loot} <a:blinker:843844481220083783>! "
+            f"**You found {loot} {self.chip_emoji}! "
             "Added to your balance.**",
             embed=embed
         )

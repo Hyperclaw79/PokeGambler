@@ -10,7 +10,7 @@ It has a dedicated currency and profile systems.
 
 Earned Pokechips may be cashed out for other pokemon-themed bot credits.
 
-![banner](https://media.discordapp.net/attachments/840469669332516904/861292639857147914/pg_banner.png?width=640&height=360)
+![banner](https://media.discordapp.net/attachments/874623706339618827/874628993939308554/pg_banner.png?width=640&height=360)
 
 ## Getting Started
 
@@ -39,14 +39,14 @@ They can be used by admins and Dealers (purchasable as an in-game title).
 
 There are two major currencies in the world of Pokegambler:
 
-### PokeChips ![pokechips](https://media.discordapp.net/attachments/840469669332516904/840469820172140564/pokechip_shadowed.png?width=32&height=32)
+### PokeChips ![pokechips](https://media.discordapp.net/attachments/874623706339618827/874629983765688361/pokechip_shadowed.png?width=32&height=32)
 
 These can be won, looted, claimed and given in exchange for poketwo credits (cash-ins).
 
 Most of the economy, minigames and Shop is driven by these.
 
 
-### PokeBonds ![pokebonds](https://media.discordapp.net/attachments/840469669332516904/853990953953525870/pokebond.png?width=72&height=30)
+### PokeBonds ![pokebonds](https://media.discordapp.net/attachments/874623706339618827/874627340523700234/pokebond.png?width=72&height=30)
 
 These are purchasable premium currency.
 
@@ -84,19 +84,19 @@ Maximum Tier is T3 as of now.
          <td>1</td>
          <td>0</td>
          <td>x1</td>
-         <td><img aria-label=":common:" src="https://cdn.discordapp.com/emojis/844318491745845328.png?v=1" alt=":common:" draggable="false" class="emoji"></td>
+         <td><img aria-label=":common:" src="https://cdn.discordapp.com/emojis/874626457438158868.png?v=1" alt=":common:" draggable="false" class="emoji"></td>
       </tr>
       <tr>
          <td>2</td>
          <td>10</td>
          <td>x10</td>
-         <td><img aria-label=":common:" src="https://cdn.discordapp.com/emojis/844318490885357578.png?v=1" alt=":common:" draggable="false" class="emoji"></td>
+         <td><img aria-label=":gold:" src="https://cdn.discordapp.com/emojis/874626456993534042.png?v=1" alt=":gold:" draggable="false" class="emoji"></td>
       </tr>
       <tr>
          <td>3</td>
          <td>100</td>
          <td>x100</td>
-         <td><img aria-label=":common:" src="https://cdn.discordapp.com/emojis/844318490638680135.png?v=1" alt=":common:" draggable="false" class="emoji"></td>
+         <td><img aria-label=":legendary:" src="https://cdn.discordapp.com/emojis/874626456918061096.png?v=1" alt=":legendary:" draggable="false" class="emoji"></td>
       </tr>
    </tbody>
 </table>
@@ -117,4 +117,4 @@ Be sure to check these out when you start playing.
 
 Well, that's it for now, have fun!
 
-![logo](https://media.discordapp.net/attachments/840469669332516904/840469820180529202/pokegambler_logo.png?width=120&height=120)
+![logo](https://media.discordapp.net/attachments/874623706339618827/874629454251581451/pokegambler_logo.png?width=120&height=120)

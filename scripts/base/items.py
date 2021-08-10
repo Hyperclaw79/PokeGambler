@@ -543,8 +543,8 @@ class CommonChest(Chest):
             Does not contain any other items."""
         )
         asset_url: str = "https://cdn.discordapp.com/attachments/" + \
-            "840469669332516904/844316817593860126/common.png"
-        emoji: str = "<:common:844318491745845328>"
+            "874623706339618827/874628500437467196/common.png"
+        emoji: str = "<:common:874626457438158868>"
         tier: int = 1
         super().__init__(
             description=description,
@@ -566,8 +566,8 @@ class GoldChest(Chest):
             Does not contain any other items."""
         )
         asset_url: str = "https://cdn.discordapp.com/attachments/" + \
-            "840469669332516904/844316818167824424/gold.png"
-        emoji: str = "<:gold:844318490885357578>"
+            "874623706339618827/874628501876137984/gold.png"
+        emoji: str = "<:gold:874626456993534042>"
         tier: int = 2
         super().__init__(
             description=description,
@@ -589,8 +589,8 @@ class LegendaryChest(Chest):
             Has a small chance of containing [Collectible]s."""
         )
         asset_url: str = "https://cdn.discordapp.com/attachments/" + \
-            "840469669332516904/844318374217121822/legendary.png"
-        emoji: str = "<:legendary:844318490638680135>"
+            "874623706339618827/874628502924693584/legendary.png"
+        emoji: str = "<:legendary:874626456918061096>"
         tier: int = 3
         super().__init__(
             description=description,

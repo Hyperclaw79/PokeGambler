@@ -209,10 +209,10 @@ class GambleCommands(Commands):
         choice = valids.index(choices_view.result)
         idx = random.randint(0, 1)
         img = [
-            "https://cdn.discordapp.com/attachments/840469669332516904/"
-            "843079658274422814/logochip.png",
-            "https://cdn.discordapp.com/attachments/840469669332516904/"
-            "843079660375638046/pokechip.png"
+            "https://cdn.discordapp.com/attachments/874623706339618827/"
+            "874627863960252466/logochip.png",
+            "https://cdn.discordapp.com/attachments/874623706339618827/"
+            "874627865520504842/pokechip.png"
         ][idx]
         msg = f"PokeGambler choose {valids[idx]}.\n"
         if choice == idx:

@@ -327,7 +327,7 @@ async def online_now(ctx: PokeGambler):
     body = {
         "username": "PokeGambler Status Monitor",
         "content": "\n".join([
-            "<:online:841643544581111808>\t**Online**",
+            "<:online:874626019607334922>\t**Online**",
             "PokeGambler is back online, you can use commands again.",
             "\u200B\n\u200B\n"
         ])

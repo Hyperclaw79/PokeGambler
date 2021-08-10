@@ -192,7 +192,7 @@ jobs:
         changelog=$([[ $changes ]] && echo \`\`\`md$"\n"# Changelog"\n"$changes\`\`\` || echo "")
         curl -X POST 'https://discord.com/api/webhooks/${{ steps.secrets.outputs.DISCORD_WEBHOOK_CHANNEL }}/${{ steps.secrets.outputs.DISCORD_WEBHOOK_TOKEN }}' \
         -H 'Content-Type: application/json' \
-        -d '{"content": "<:update:841643547908243476>\t**Restart Initiated**\nPokeGambler will be updating now.\n\u200b'"$changelog"'\n\u200b\n", "username": "PokeGambler Status Monitor"}'
+        -d '{"content": "<:update:874626019846402110>\t**Restart Initiated**\nPokeGambler will be updating now.\n\u200b'"$changelog"'\n\u200b\n", "username": "PokeGambler Status Monitor"}'
 
     - name: Deploy to GKE
       run: |-

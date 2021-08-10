@@ -202,7 +202,7 @@ class NormalCommands(Commands):
             ),
             title="Invite Link",
             image="https://cdn.discordapp.com/attachments/"
-            "840469669332516904/861292639857147914/pg_banner.png"
+            "874623706339618827/874628993939308554/pg_banner.png"
         )
         invite_view = LinkView(
             emoji="<:pokegambler:844321894488342559>",
@@ -267,7 +267,7 @@ class NormalCommands(Commands):
             if "no_thumb" not in dir(cmd):
                 emb.set_thumbnail(
                     url="https://cdn.discordapp.com/attachments/"
-                    "840469669332516904/840469820180529202/"
+                    "874623706339618827/874629454251581451/"
                     "pokegambler_logo.png"
                 )
         else:
@@ -319,7 +319,7 @@ class NormalCommands(Commands):
             ),
             title="**Welcome to PokeGambler**",
             image="https://cdn.discordapp.com/attachments/"
-            "840469669332516904/861292639857147914/pg_banner.png"
+            "874623706339618827/874628993939308554/pg_banner.png"
         )
         emb.add_field(
             name="**Getting Started**",
@@ -363,7 +363,7 @@ class NormalCommands(Commands):
             title="**Welcome to PokeGambler**",
             content="\u200B",
             image="https://cdn.discordapp.com/attachments/"
-            "840469669332516904/861292639857147914/pg_banner.png"
+            "874623706339618827/874628993939308554/pg_banner.png"
         )
         official_server = self.ctx.get_guild(self.ctx.official_server)
         emb.add_field(

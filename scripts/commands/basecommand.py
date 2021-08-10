@@ -463,8 +463,8 @@ class Commands(ABC):
         self.logger = ctx.logger
         self.enabled = kwargs.get('enabled', True)
         self.alias = []
-        self.chip_emoji = "<:pokechip:840469159242760203>"
-        self.bond_emoji = "<:pokebond:853991200628932608>"
+        self.chip_emoji = "<a:blinker:874624466771120188>"
+        self.bond_emoji = "<:pokebond:874625119010586635>"
         cmds = [
             getattr(self, attr)
             for attr in dir(self)
