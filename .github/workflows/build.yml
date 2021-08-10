@@ -12,6 +12,7 @@ on:
       - README.MD
       - .gitignore
       - .github/**
+      - '!.github/workflows/build.yml'
   release:
     tags:
       - v*.*.*
@@ -197,6 +198,7 @@ jobs:
     - name: Deploy to GKE
       run: |-
         cd deployments/${{ env.FOLDER }}
+        ../../kustomize edit add annotation commit_sha:${{ github.sha }} --force
         ../../kustomize edit set image gcr.io/PROJECT_ID/IMAGE:TAG=gcr.io/pokegambler/pokegambler:${{ env.TAG }}
         ../../kustomize build . | kubectl apply -f -
         kubectl rollout status deployment/pokegambler-${{ env.FOLDER }}
