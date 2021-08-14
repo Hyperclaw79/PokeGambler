@@ -1169,7 +1169,7 @@ class TradeCommands(Commands):
 
     async def __get_thread(self, message, pokebot, req_msg):
         tname = f"Transaction for {message.author.id}"
-        thread = await req_msg.channel.start_thread(
+        thread = await req_msg.channel.create_thread(
             name=tname,
             message=req_msg
         )

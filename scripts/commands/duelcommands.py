@@ -648,7 +648,7 @@ class DuelCommands(Commands):
                 embed=fresh_emb,
                 file=start_fl
             )
-            thread = await message.channel.start_thread(
+            thread = await message.channel.create_thread(
                 name=" vs ".join(
                     f"{glad.owner.name}『{glad}』"
                     for glad in glads

@@ -1,7 +1,7 @@
-aiohttp>=3.7.4
-colorama>=0.4.4
-git+https://github.com/Rapptz/discord.py
-python-dotenv>=0.12.0
-pychalk>=2.0.1
-pymongo[srv]>=3.11.4
-Pillow>=8.2.0
+aiohttp==3.7.4
+colorama==0.4.4
+git+https://github.com/Rapptz/discord.py.git@1e17b7fceaf7173b1666465e639d1bebaa126683
+python-dotenv==0.12.0
+pychalk==2.0.1
+pymongo[srv]==3.11.4
+Pillow==8.2.0

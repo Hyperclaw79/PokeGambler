@@ -531,7 +531,7 @@ class GambleCommands(Commands):
             for role in message.guild.roles
             if role.name.lower() == "gamblers"
         ][0]
-        gamble_thread = await message.channel.start_thread(
+        gamble_thread = await message.channel.create_thread(
             name="gamble-here",
             message=message
         )
