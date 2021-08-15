@@ -565,7 +565,6 @@ class DuelCommands(Commands):
             await thread.send(
                 embed=emb, file=round_fl
             )
-        await base.delete()
         winner = max(
             profiles,
             key=lambda x: sum(dmg_dict[x.user.id])
