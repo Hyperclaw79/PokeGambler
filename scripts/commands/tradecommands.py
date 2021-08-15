@@ -1197,40 +1197,44 @@ class TradeCommands(Commands):
             content=f"**User**: {message.author.mention}\n"
             f"**Admin**: {admin.mention}"
         )
-        await self.ctx.wait_for(
+        response = await self.ctx.wait_for(
             "message",
             check=lambda msg: (
                 msg.channel.id == thread.id
                 and msg.author == admin
-                and "complete" in msg.content.lower()
+                and any(
+                    keyword in msg.content.lower()
+                    for keyword in ("complete", "cancel")
+                )
             )
         )
-        content = None
-        if mode == "deposit":
-            content = f"{message.author.mention}, check your balance" + \
-                f" using the `{self.ctx.prefix}balance` command."
-        await thread.send(
-            content=content,
-            embed=get_embed(
-                title=f"Closing the transaction for {message.author}."
+        if response.content.lower() == "complete":
+            content = None
+            if mode == "deposit":
+                content = f"{message.author.mention}, check your balance" + \
+                    f" using the `{self.ctx.prefix}balance` command."
+            await thread.send(
+                content=content,
+                embed=get_embed(
+                    title=f"Closing the transaction for {message.author}."
+                )
             )
-        )
-        getattr(
-            Profiles(message.author),
-            "credit" if mode == "deposit" else "debit"
-        )(chips)
-        Profiles(admin).credit(int(chips * 0.1))
-        Exchanges(
-            message.author, str(admin.id),
-            str(pokebot.id), chips, mode.title()
-        ).save()
-        await dm_send(
-            message, admin,
-            embed=get_embed(
-                title=f"Credited {int(chips * 0.1):,} chips to"
-                " your account."
+            getattr(
+                Profiles(message.author),
+                "credit" if mode == "deposit" else "debit"
+            )(chips)
+            Profiles(admin).credit(int(chips * 0.1))
+            Exchanges(
+                message.author, str(admin.id),
+                str(pokebot.id), chips, mode.title()
+            ).save()
+            await dm_send(
+                message, admin,
+                embed=get_embed(
+                    title=f"Credited {int(chips * 0.1):,} chips to"
+                    " your account."
+                )
             )
-        )
         await thread.edit(
             archived=True,
             locked=True
