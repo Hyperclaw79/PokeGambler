@@ -34,7 +34,7 @@ from ..helpers.utils import (
 from ..helpers.validators import MinMaxValidator
 
 from .basecommand import (
-    Commands, alias, check_completion, dealer_only,
+    Commands, alias, check_completion, cooldown, dealer_only,
     model, ensure_item, no_thumb, os_only
 )
 
@@ -127,6 +127,7 @@ class TradeCommands(Commands):
 
     @os_only
     @check_completion
+    @cooldown(24 * 3600)
     @model(Profiles)
     @alias("cashin")
     async def cmd_deposit(
@@ -725,6 +726,7 @@ class TradeCommands(Commands):
 
     @os_only
     @check_completion
+    @cooldown(24 * 3600)
     @model(Profiles)
     @alias("cashout")
     async def cmd_withdraw(
@@ -750,11 +752,10 @@ class TradeCommands(Commands):
         )
         if admin is None:
             return
-        chips = CurrencyExchange[pokebot.name].value
         thread = await self.__get_thread(message, pokebot, req_msg)
         await self.__handle_transaction(
             message, thread,
-            admin, pokebot, chips,
+            admin, pokebot, quantity,
             mode="withdraw"
         )
 
@@ -1131,12 +1132,14 @@ class TradeCommands(Commands):
         if not pokebot:
             return None, None
         bounds = (1000, 2_500_000)
+        curr = f"({pokebot.name} credits)"
         if mode == "withdraw":
             bounds = (10000, 250_000)
+            curr = "Pokechips"
         opt_msg = await dm_send(
             message, message.author,
             embed=get_embed(
-                content="```yaml\n>________\n```",
+                content=f"```yaml\n>________ {curr}\n```",
                 title=f"How much do you want to {mode}?",
                 footer=f"Min: {bounds[0]:,}, Max: {bounds[1]:,}"
             )
