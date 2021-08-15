@@ -11,7 +11,10 @@ from datetime import datetime
 from functools import wraps
 import json
 import os
-from typing import Callable, List, Optional, TYPE_CHECKING, Union
+from typing import (
+    Callable, List, Optional,
+    TYPE_CHECKING, Union
+)
 
 import discord
 from dotenv import load_dotenv
@@ -24,6 +27,7 @@ from ..helpers.utils import (
     get_embed, is_admin,
     is_dealer, is_owner
 )
+from ..helpers.validators import HexValidator, IntegerValidator
 
 if TYPE_CHECKING:
     from discord import Embed, Message, Member, File
@@ -225,6 +229,16 @@ def ensure_item(func: Callable):
                     title="No Item ID"
                 )
             )
+        if not HexValidator(
+            message=message
+        ).check(args[0]):
+            return message.channel.send(
+                embed=get_embed(
+                    "You need to provide a valid item ID.",
+                    embed_type="error",
+                    title="Invalid ID"
+                )
+            )
         item = Item.from_id(args[0])
         if not item:
             return message.channel.send(
@@ -253,6 +267,16 @@ def ensure_user(func: Callable):
                     "You need to provide a user ID.",
                     embed_type="error",
                     title="No User ID"
+                )
+            )
+        if not IntegerValidator(
+            message=message
+        ).check(kwargs["args"][0]):
+            return message.channel.send(
+                embed=get_embed(
+                    "You need to provide a valid user ID.",
+                    embed_type="error",
+                    title="Invalid ID"
                 )
             )
         if not message.guild.get_member(int(kwargs["args"][0])):
