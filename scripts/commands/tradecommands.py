@@ -1131,10 +1131,13 @@ class TradeCommands(Commands):
         await opt_msg.delete()
         if not pokebot:
             return None, None
-        bounds = (1000, 2_500_000)
+        already_exchanged = Exchanges(
+            user=message.author
+        ).get_daily_exchanges(mode.title())
+        bounds = (1000, 2_500_000 - already_exchanged)
         curr = f"({pokebot.name} credits)"
         if mode == "withdraw":
-            bounds = (10000, 250_000)
+            bounds = (10000, 250_000 - already_exchanged)
             curr = "Pokechips"
         opt_msg = await dm_send(
             message, message.author,

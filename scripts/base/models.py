@@ -397,6 +397,39 @@ class Exchanges(Model):
         self.chips = chips
         self.mode = mode
 
+    def get_daily_exchanges(self, mode: str) -> int:
+        """
+        Wrapper for get_daily_exchanges DB call.
+        """
+        pipeline = [
+            {
+                "$match": {
+                    "user_id": str(self.user.id),
+                    "exchanged_at": {
+                        "$gt": datetime.now().replace(
+                            hour=0,
+                            minute=0,
+                            second=0
+                        )
+                    },
+                    "mode": mode
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$user_id",
+                    "total_chips": {"$sum": "$chips"}
+                }
+            }
+        ]
+        result = next(
+            self.mongo.aggregate(pipeline),
+            None
+        )
+        if result:
+            return result["total_chips"]
+        return 0
+
     @classmethod
     def exchanges(cls, **kwargs) -> List[Dict]:
         """
