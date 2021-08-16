@@ -608,8 +608,9 @@ class GambleCommands(Commands):
         )
         first_embed = register_embed.copy()
         first_embed.description = first_embed.description.replace("<tr>", "10")
+        # Isolate the ping since it gets silenced on edit.
+        await gamble_thread.send(content=f"Hey {gamblers.mention}")
         await gamble_thread.send(
-            content=f"Hey {gamblers.mention}",
             embed=first_embed,
             view=gamble_view
         )

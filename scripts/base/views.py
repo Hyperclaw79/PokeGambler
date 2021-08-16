@@ -236,7 +236,7 @@ class GambleCounter(BaseView):
         bal = Profiles(usr).get("balance")
         if bal < self.fee:
             await self.gamble_cmd.handle_low_bal(
-                usr, (await interaction.original_message().channel)
+                usr, interaction.message.channel
             )
             return
         if interaction.user not in self.registration_list:
