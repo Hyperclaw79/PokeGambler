@@ -1,0 +1,26 @@
+name: Issues Monitor
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  notifier:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bug Notifier
+        if: contains(github.event.issue.labels.*.name, 'bug')
+        uses: appleboy/discord-action@0.0.3
+        with:
+          webhook_id: 876696158993514516
+          webhook_token: ${{secrets.BUG_WEBHOOK_TOKEN}}
+          message: "New Bug reported\n${{github.event.issue.html_url}}"
+          color: "#ff3333"
+      - name: Feature Notifier
+        if: contains(github.event.issue.labels.*.name, 'enhancement')
+        uses: appleboy/discord-action@0.0.3
+        with:
+          webhook_id: 876701624641409044
+          webhook_token: ${{secrets.FEATURE_WEBHOOK_TOKEN}}
+          message: "New Feature Requested\n${{github.event.issue.html_url}}"
+          color: "#0099FF"
