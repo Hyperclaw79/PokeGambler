@@ -116,38 +116,40 @@ class GambleCommands(Commands):
             )
             await self.__gamble_cleanup(gamble_channel, delay=10.0)
             return
-        lower_wins = kwargs.get("lower_wins", False)
-        joker_chance = 0.2 if hot_time else 0.05
-        num_cards = len(self.registered)
-        dealed_deck, closed_decks = self.__gamble_get_decks(
-            num_cards, joker_chance
-        )
-        profiles = self.__gamble_charge_player(dealed_deck, fee)
-        for deck, (player, card) in zip(closed_decks, dealed_deck.items()):
-            joker_found = await self.__gamble_handle_roll(
-                message, deck, player, card,
-                gamble_channel, dealed_deck
+        try:
+            lower_wins = kwargs.get("lower_wins", False)
+            joker_chance = 0.2 if hot_time else 0.05
+            num_cards = len(self.registered)
+            dealed_deck, closed_decks = self.__gamble_get_decks(
+                num_cards, joker_chance
             )
-            if joker_found:
-                break
-        winner, is_joker = await self.__gamble_handle_winner(
-            dealed_deck, gamble_channel,
-            profiles, lower_wins, fee
-        )
-        Matches(
-            message.author,
-            started_by=str(message.author.id),
-            participants=list(profiles),
-            winner=str(winner.id),
-            lower_wins=lower_wins,
-            deal_cost=fee,
-            by_joker=is_joker
-        ).save()
-        await self.__gamble_cleanup(
-            gamble_channel,
-            delay=30.0,
-            completed=True
-        )
+            profiles = self.__gamble_charge_player(dealed_deck, fee)
+            for deck, (player, card) in zip(closed_decks, dealed_deck.items()):
+                joker_found = await self.__gamble_handle_roll(
+                    message, deck, player, card,
+                    gamble_channel, dealed_deck
+                )
+                if joker_found:
+                    break
+            winner, is_joker = await self.__gamble_handle_winner(
+                dealed_deck, gamble_channel,
+                profiles, lower_wins, fee
+            )
+            Matches(
+                message.author,
+                started_by=str(message.author.id),
+                participants=list(profiles),
+                winner=str(winner.id),
+                lower_wins=lower_wins,
+                deal_cost=fee,
+                by_joker=is_joker
+            ).save()
+        finally:
+            await self.__gamble_cleanup(
+                gamble_channel,
+                delay=30.0,
+                completed=True
+            )
 
     @model([Flips, Profiles])
     @alias(["flip", "chipflip", "flips"])
@@ -525,18 +527,6 @@ class GambleCommands(Commands):
             self.registered.remove(player)
         return profiles
 
-    async def __gamble_create_thread(self, message):
-        gamblers = [
-            role
-            for role in message.guild.roles
-            if role.name.lower() == "gamblers"
-        ][0]
-        gamble_thread = await message.channel.create_thread(
-            name="gamble-here",
-            message=message
-        )
-        return gamble_thread, gamblers
-
     async def __gamble_cleanup(
         self, gamble_thread,
         delay=30.0, completed=False
@@ -550,6 +540,10 @@ class GambleCommands(Commands):
                 )
             else:
                 await gamble_thread.delete()
+            gamblers = self.__get_gambler_role(gamble_thread)
+            await gamble_thread.parent.set_permissions(
+                gamblers, send_messages=True
+            )
         self.registered = []
 
     def __gamble_get_decks(self, num_cards, joker_chance):
@@ -568,10 +562,17 @@ class GambleCommands(Commands):
         ]
         return dealed_deck, closed_decks
 
-    async def __gamble_register(self, message, **kwargs):
+    async def __gamble_register(self, message: Message, **kwargs):
         fee = kwargs["fee"]
         max_players = max(2, int(kwargs.pop("max_players", 12)))
-        gamble_thread, gamblers = await self.__gamble_create_thread(message)
+        gamblers = self.__get_gambler_role(message.channel)
+        await message.channel.set_permissions(
+            gamblers, send_messages=False
+        )
+        gamble_thread = await message.channel.create_thread(
+            name="gamble-here",
+            message=message
+        )
         rules = ', '.join(
             self.rules[key]
             for key in kwargs
@@ -603,19 +604,24 @@ class GambleCommands(Commands):
             "to be included in the match."
         )
         gamble_view = GambleCounter(
-            self, register_embed,
-            fee, max_players
+            self, gamble_thread,
+            register_embed, fee,
+            max_players
         )
         first_embed = register_embed.copy()
         first_embed.description = first_embed.description.replace("<tr>", "10")
         # Isolate the ping since it gets silenced on edit.
-        await gamble_thread.send(content=f"Hey {gamblers.mention}")
-        await gamble_thread.send(
+        cnt_msg = await message.channel.send(
+            content=f"Hey {gamblers.mention}"
+        )
+        emb_msg = await message.channel.send(
             embed=first_embed,
             view=gamble_view
         )
         await gamble_view.dispatch(self)
         self.registered = gamble_view.registration_list
+        await cnt_msg.delete()
+        await emb_msg.delete()
         return gamble_thread, hot_time
 
     async def __gamble_handle_roll(
@@ -757,3 +763,11 @@ class GambleCommands(Commands):
                 winner, fee, profiles
             )
         )
+
+    @staticmethod
+    def __get_gambler_role(channel):
+        return [
+            role
+            for role in channel.guild.roles
+            if role.name.lower() == "gamblers"
+        ][0]

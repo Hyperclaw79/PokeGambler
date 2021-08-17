@@ -186,6 +186,7 @@ class GambleCounter(BaseView):
 
     def __init__(
         self, gamble_cmd: GambleCommands,
+        gamble_thread: discord.Thread,
         reg_embed: discord.Embed,
         fee: Optional[int] = 50,
         max_players: Optional[int] = 12,
@@ -195,6 +196,7 @@ class GambleCounter(BaseView):
         self.registration_list = []
         self.start_time = datetime.now()
         self.gamble_cmd = gamble_cmd
+        self.gamble_thread = gamble_thread
         self.reg_embed = reg_embed
         self.fee = fee
         self.max_players = max_players
@@ -241,6 +243,7 @@ class GambleCounter(BaseView):
             return
         if interaction.user not in self.registration_list:
             self.registration_list.append(interaction.user)
+            await self.gamble_thread.add_user(interaction.user)
             await interaction.response.edit_message(
                 embed=self.prep_embed(),
                 view=self
