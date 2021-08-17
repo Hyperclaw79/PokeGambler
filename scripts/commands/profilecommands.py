@@ -20,16 +20,17 @@ from ..base.models import (
 )
 from ..base.shop import BoostItem
 
+from ..helpers.checks import user_check
 from ..helpers.imageclasses import (
     BadgeGenerator, LeaderBoardGenerator,
     ProfileCardGenerator, WalletGenerator
 )
+from ..helpers.unicodex import Unicodex
 from ..helpers.utils import (
     LineTimer, dm_send, get_embed, get_formatted_time,
     get_modules, img2file, wait_for
 )
 from ..helpers.validators import HexValidator, ImageUrlValidator
-from ..helpers.checks import user_check
 
 from .basecommand import (
     Commands, alias, check_completion,
@@ -288,7 +289,7 @@ class ProfileCommands(Commands):
             f"Claim the chest with `{self.ctx.prefix}open {chest.itemid}`.",
             title="**Daily Chest**",
             thumbnail=chest.asset_url,
-            footer=f"Current Streak: {daily_streak}",
+            footer="You get bonus pokechips for every 5 streak.",
             color=profile.get('embed_color')
         )
         profile.credit(int(loot))
@@ -296,6 +297,11 @@ class ProfileCommands(Commands):
             earned=(earned + loot),
             daily_streak=daily_streak,
             daily_claimed_on=datetime.today()
+        )
+        stk_name, stk_val = Unicodex.format_streak(daily_streak)
+        embed.add_field(
+            name=stk_name,
+            value=stk_val
         )
         await message.channel.send(
             f"**Daily loot of {int(loot)} {self.chip_emoji} "
