@@ -147,6 +147,7 @@ jobs:
           DISCORD_WEBHOOK_CHANNEL:pokegambler/DISCORD_WEBHOOK_CHANNEL/${{ env.SECRET_VERSION }}
           DISCORD_WEBHOOK_TOKEN:pokegambler/DISCORD_WEBHOOK_TOKEN/${{ env.SECRET_VERSION }}
           OFFICIAL_SERVER:pokegambler/OFFICIAL_SERVER/${{ env.SECRET_VERSION }}
+          TOPGG_TOKEN:pokegambler/TOPGG_TOKEN/${{ env.SECRET_VERSION }}
           ADMIN_CMD_LOG_CHANNEL:pokegambler/ADMIN_CMD_LOG_CHANNEL/${{ env.SECRET_VERSION }}
           ANNOUNCEMENT_CHANNEL:pokegambler/ANNOUNCEMENT_CHANNEL/${{ env.SECRET_VERSION }}
           ERROR_LOG_CHANNEL:pokegambler/ERROR_LOG_CHANNEL/${{ env.SECRET_VERSION }}
@@ -170,6 +171,7 @@ jobs:
           --from-literal=TOKEN=${{ steps.secrets.outputs.TOKEN }} \
           --from-literal=DISCORD_WEBHOOK_CHANNEL=${{ steps.secrets.outputs.DISCORD_WEBHOOK_CHANNEL }} \
           --from-literal=DISCORD_WEBHOOK_TOKEN=${{ steps.secrets.outputs.DISCORD_WEBHOOK_TOKEN }} \
+          --from-literal=TOPGG_TOKEN=${{ steps.secrets.outputs.TOPGG_TOKEN }} \
           --from-literal=OFFICIAL_SERVER=${{ steps.secrets.outputs.OFFICIAL_SERVER }} \
           --from-literal=ADMIN_CMD_LOG_CHANNEL=${{ steps.secrets.outputs.ADMIN_CMD_LOG_CHANNEL }} \
           --from-literal=ANNOUNCEMENT_CHANNEL=${{ steps.secrets.outputs.ANNOUNCEMENT_CHANNEL }} \

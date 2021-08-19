@@ -19,6 +19,7 @@ import discord
 from discord import Message
 from discord.ext import tasks
 from dotenv import load_dotenv
+import topgg
 
 from scripts.base.cardgen import CardGambler
 from scripts.base.models import (
@@ -73,6 +74,9 @@ class PokeGambler(discord.AutoShardedClient):
             self.error_log_path
         )
         self.dealer = CardGambler(self.assets_path)
+        self.topgg = topgg.DBLClient(
+            self, os.getenv('TOPGG_TOKEN')
+        )
         # Commands
         for module in os.listdir("scripts/commands"):
             if module.endswith("commands.py"):
@@ -153,6 +157,7 @@ class PokeGambler(discord.AutoShardedClient):
         """
         On_guild_join event from Discord API.
         """
+        await self.topgg.post_guild_count()
         image = None
         if guild.banner:
             image = guild.banner.url
@@ -215,6 +220,7 @@ class PokeGambler(discord.AutoShardedClient):
         await online_now(self)
         Shop.refresh_tradables()
         PremiumShop.refresh_tradables()
+        await self.topgg.post_guild_count()
         await self.change_presence(activity=game)
         self.__reward_nitro_boosters.start()
 

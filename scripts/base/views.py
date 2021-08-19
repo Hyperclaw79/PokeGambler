@@ -164,12 +164,14 @@ class LinkView(BaseView):
     """
     def __init__(
         self, url: str,
-        emoji: str, **kwargs
+        label: str = 'Invite Me',
+        emoji: Optional[str] = None,
+        **kwargs
     ):
         super().__init__(**kwargs)
         self.add_item(
             discord.ui.Button(
-                label='Invite Me',
+                label=label,
                 url=url,
                 emoji=emoji
             )

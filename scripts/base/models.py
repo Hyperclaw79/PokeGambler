@@ -1216,6 +1216,38 @@ class Profiles(UnlockedModel):
         for key, val in init_dict.items():
             setattr(self, key, val)
 
+
+class Votes(UnlockedModel):
+    """
+    Wrapper for Votes based DB actions.
+    """
+
+    def _default(self):
+        self.user_id: str = str(self.user.id)
+        self.last_voted: datetime = (
+            datetime.now() - timedelta(days=1)
+        )
+        self.total_votes: int = 0
+        self.vote_streak: int = 0
+        self.reward_claimed: bool = False
+
+    @classmethod
+    def reset_all(cls: Type[Votes]):
+        """
+        Resets all the Votes.
+        """
+        cls.mongo.update_many(
+            {"user_id": {"$exists": True}},
+            {"$set": {
+                "last_voted": datetime.now() - timedelta(
+                    days=1
+                ),
+                "total_votes": 0,
+                "vote_streak": 0,
+                "reward_claimed": False
+            }}
+        )
+
 # endregion
 
 
