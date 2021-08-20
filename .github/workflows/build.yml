@@ -143,6 +143,7 @@ jobs:
       with:
         secrets: |-
           TOKEN:pokegambler/TOKEN/${{ env.SECRET_VERSION }}
+          IS_PROD:pokegambler/IS_PROD/${{ env.SECRET_VERSION }}
           MONGO_CLUSTER_STRING:pokegambler/MONGO_CLUSTER_STRING/${{ env.SECRET_VERSION }}
           DISCORD_WEBHOOK_CHANNEL:pokegambler/DISCORD_WEBHOOK_CHANNEL/${{ env.SECRET_VERSION }}
           DISCORD_WEBHOOK_TOKEN:pokegambler/DISCORD_WEBHOOK_TOKEN/${{ env.SECRET_VERSION }}
@@ -169,6 +170,7 @@ jobs:
         kubectl delete secret pokegambler-${{ env.FOLDER }} --ignore-not-found
         kubectl create secret generic pokegambler-${{ env.FOLDER }} \
           --from-literal=TOKEN=${{ steps.secrets.outputs.TOKEN }} \
+          --from-literal=IS_PROD=${{ steps.secrets.outputs.IS_PROD }} \
           --from-literal=DISCORD_WEBHOOK_CHANNEL=${{ steps.secrets.outputs.DISCORD_WEBHOOK_CHANNEL }} \
           --from-literal=DISCORD_WEBHOOK_TOKEN=${{ steps.secrets.outputs.DISCORD_WEBHOOK_TOKEN }} \
           --from-literal=TOPGG_TOKEN=${{ steps.secrets.outputs.TOPGG_TOKEN }} \

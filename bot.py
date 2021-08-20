@@ -157,6 +157,8 @@ class PokeGambler(discord.AutoShardedClient):
         """
         On_guild_join event from Discord API.
         """
+        if not self.is_prod:
+            return
         await self.topgg.post_guild_count()
         image = None
         if guild.banner:
@@ -208,6 +210,8 @@ class PokeGambler(discord.AutoShardedClient):
         """
         On_guild_remove event from Discord API.
         """
+        if not self.is_prod:
+            return
         await self.topgg.post_guild_count()
         emb = get_embed(
             embed_type="info",
@@ -404,7 +408,8 @@ class PokeGambler(discord.AutoShardedClient):
                 datetime.utcnow() - Nitro.get_last_rewarded()
             ).days >= 30,
             datetime.utcnow().day == 5,
-            not os.getenv("IS_LOCAL")
+            not os.getenv("IS_LOCAL"),
+            self.is_prod
         ]):
             DummyMessage = namedtuple('Message', ['channel'])
             official_server = self.get_guild(self.official_server)
@@ -547,6 +552,7 @@ class PokeGambler(discord.AutoShardedClient):
         )
         self.prefix = os.getenv('COMMAND_PREFIX', '->')
         self.cooldown_time = int(os.getenv('COOLDOWN_TIME', "5"))
+        self.is_prod = os.getenv('IS_PROD', "False") == "True"
         for cfg_id in (
             "discord_webhook_token",
             "discord_webhook_channel"
