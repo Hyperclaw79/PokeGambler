@@ -204,6 +204,25 @@ class PokeGambler(discord.AutoShardedClient):
             except (discord.Forbidden, discord.HTTPException):
                 pass
 
+    async def on_guild_remove(self, guild: discord.Guild):
+        """
+        On_guild_remove event from Discord API.
+        """
+        await self.topgg.post_guild_count()
+        emb = get_embed(
+            embed_type="info",
+            title=f"Left {guild}.",
+            image=None,
+            color=discord.Colour.dark_red()
+        )
+        jq_log_channel = discord.utils.get(
+            self.get_guild(
+                self.official_server
+            ).text_channels,
+            name="joined_guilds_log"
+        )
+        await jq_log_channel.send(embed=emb)
+
     async def on_ready(self):
         """
         On_ready event from Discord API.
