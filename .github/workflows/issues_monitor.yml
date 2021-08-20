@@ -14,7 +14,7 @@ jobs:
         with:
           webhook_id: "876696158993514516"
           webhook_token: ${{secrets.BUG_WEBHOOK_TOKEN}}
-          message: "New Bug reported\n${{github.event.issue.html_url}}"
+          message: "New :bug: - ${{github.event.issue.title}}\n${{github.event.issue.html_url}}"
           color: "#ff3333"
       - name: Feature Notifier
         if: contains(github.event.issue.labels.*.name, 'enhancement')
@@ -22,5 +22,5 @@ jobs:
         with:
           webhook_id: "876701624641409044"
           webhook_token: ${{secrets.FEATURE_WEBHOOK_TOKEN}}
-          message: "New Feature Requested\n${{github.event.issue.html_url}}"
+          message: "New :thought_balloon: - ${{github.event.issue.title}}\n${{github.event.issue.html_url}}"
           color: "#0099FF"
