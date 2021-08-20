@@ -118,7 +118,7 @@ class MaxValidator(IntegerValidator):
             self.error_embed_title = super().error_embed_title
             self.error_embed_desc = super().error_embed_desc
             return False
-        return int(value) <= self.max_value
+        return int(value.replace(',', '')) <= self.max_value
 
 
 class MinValidator(IntegerValidator):
@@ -141,7 +141,7 @@ class MinValidator(IntegerValidator):
             self.error_embed_title = super().error_embed_title
             self.error_embed_desc = super().error_embed_desc
             return False
-        return int(value) >= self.min_value
+        return int(value.replace(',', '')) >= self.min_value
 
 
 class MinMaxValidator(Validator):

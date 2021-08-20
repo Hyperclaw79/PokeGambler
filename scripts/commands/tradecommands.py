@@ -7,6 +7,7 @@ Trade Commands Module
 
 from __future__ import annotations
 import asyncio
+from datetime import datetime, timedelta
 from typing import (
     List, Optional, TYPE_CHECKING, Tuple,
     Type, Union, Dict
@@ -28,13 +29,13 @@ from ..base.views import Confirm, SelectView
 
 from ..helpers.utils import (
     dedent, dm_send,
-    get_embed, get_modules,
+    get_embed, get_formatted_time, get_modules,
     is_admin, is_owner
 )
 from ..helpers.validators import MinMaxValidator
 
 from .basecommand import (
-    Commands, alias, check_completion, cooldown, dealer_only,
+    Commands, alias, check_completion, dealer_only,
     model, ensure_item, no_thumb, os_only
 )
 
@@ -127,7 +128,6 @@ class TradeCommands(Commands):
 
     @os_only
     @check_completion
-    @cooldown(24 * 3600)
     @model(Profiles)
     @alias("cashin")
     async def cmd_deposit(
@@ -726,7 +726,6 @@ class TradeCommands(Commands):
 
     @os_only
     @check_completion
-    @cooldown(24 * 3600)
     @model(Profiles)
     @alias("cashout")
     async def cmd_withdraw(
@@ -1139,6 +1138,23 @@ class TradeCommands(Commands):
         if mode == "withdraw":
             bounds = (10000, 250_000 - already_exchanged)
             curr = "Pokechips"
+        if bounds[1] < bounds[0]:
+            remaining = (
+                (datetime.now().replace(
+                    hour=0, minute=0, second=0,
+                ) + timedelta(days=1)) - datetime.now()
+            ).total_seconds()
+            rem_str = get_formatted_time(remaining)
+            await dm_send(
+                message, message.author,
+                embed=get_embed(
+                    "You have maxed out for today.\n"
+                    f"Try again after {rem_str}.",
+                    embed_type="warning",
+                    title="Unable to Start Transaction."
+                )
+            )
+            return None, None
         opt_msg = await dm_send(
             message, message.author,
             embed=get_embed(
@@ -1162,7 +1178,7 @@ class TradeCommands(Commands):
         if not proceed:
             await opt_msg.delete()
             return None, None
-        quantity = int(reply.content)
+        quantity = int(reply.content.replace(',', ''))
         await opt_msg.edit(
             embed=get_embed(
                 content="Our admins have been notified.\n"
