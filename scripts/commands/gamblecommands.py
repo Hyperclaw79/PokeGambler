@@ -194,7 +194,7 @@ class GambleCommands(Commands):
             no_response=True,
             check=lambda x: x.user.id == message.author.id
         )
-        opt_msg = await message.channel.send(
+        opt_msg = await message.reply(
             embed=get_embed(
                 title=f"**Place your bet for {amount}** {self.chip_emoji}",
                 footer=f"⚠️ You'll either get {amount * 2} or "
@@ -382,7 +382,7 @@ class GambleCommands(Commands):
             no_response=True,
             check=lambda x: x.user.id == message.author.id
         )
-        level_inp = await message.channel.send(
+        level_inp = await message.reply(
             "Which difficulty do you wanna play in?",
             view=choice_view
         )
@@ -428,7 +428,7 @@ class GambleCommands(Commands):
             name="Cost",
             value=f"**{cost} {self.chip_emoji}**"
         )
-        opt_msg = await message.channel.send(
+        opt_msg = await message.reply(
             embed=emb,
             file=img2file(board_img, f"{board}.jpg"),
             view=multi_select_view
@@ -462,7 +462,7 @@ class GambleCommands(Commands):
             message.author,
             cost, level, won
         ).save()
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 content=content,
                 color=color,

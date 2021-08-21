@@ -90,7 +90,7 @@ class TradeCommands(Commands):
             return
         status = shop.validate(message.author, item, quantity)
         if status != "proceed":
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     status,
                     embed_type="error",
@@ -115,7 +115,7 @@ class TradeCommands(Commands):
                 "if it's too long.\nBut the role has been " + \
                 "assigned succesfully."
         quant_str = f"x {quantity}" if quantity > 1 else ''
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 f"Successfully purchased **{item}**{quant_str}.\n"
                 "Your account has been debited: "
@@ -181,7 +181,7 @@ class TradeCommands(Commands):
         """
 
         item = kwargs["item"]
-        await message.channel.send(embed=item.details)
+        await message.reply(embed=item.details)
 
     @alias("rates")
     async def cmd_exchange_rates(
@@ -215,7 +215,7 @@ class TradeCommands(Commands):
             for bot in enums
             if bot is not CurrencyExchange.DEFAULT
         )
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 rates_str,
                 title="Exchange Rates"
@@ -248,7 +248,7 @@ class TradeCommands(Commands):
         """
         error_tuple = self.__give_santize(message, args, mentions)
         if error_tuple:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     error_tuple[1],
                     embed_type="error",
@@ -260,7 +260,7 @@ class TradeCommands(Commands):
         mention_prof = Profiles(mentions[0])
         amount = int(args[0])
         if author_prof.get("balance") < amount:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     f"You don't have enough {self.chip_emoji}.",
                     embed_type="error",
@@ -308,7 +308,7 @@ class TradeCommands(Commands):
             message.author
         ).from_name(item_name)
         if not ids:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     f'**{item_name}**\nYou have **0** of those.',
                     title=f"{message.author.name}'s Item IDs",
@@ -368,7 +368,7 @@ class TradeCommands(Commands):
                     value="\u200B",
                     inline=True
                 )
-        await message.channel.send(embed=emb)
+        await message.reply(embed=emb)
 
     @model([Loots, Profiles, Chest, Inventory])
     @no_thumb
@@ -420,7 +420,7 @@ class TradeCommands(Commands):
             return
         openables = self.__open_get_openables(message, args)
         if not openables:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "Make sure you actually own this Item.",
                     embed_type="error",
@@ -454,7 +454,7 @@ class TradeCommands(Commands):
             or int(args[0]) < 10
             or int(args[0]) % 10  # Must be a multiple of 10, 0 -> False
         ):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "You need to enter the number of chips to redeem.",
                     embed_type="error",
@@ -465,7 +465,7 @@ class TradeCommands(Commands):
         chips = int(args[0])
         profile = Profiles(message.author)
         if profile.get("pokebonds") < chips // 10:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     f"You cannot afford that many chips.\n"
                     f"You'll need {chips // 10} {self.bond_emoji} for that.",
@@ -476,7 +476,7 @@ class TradeCommands(Commands):
             return
         profile.debit(chips // 10, bonds=True)
         profile.credit(chips)
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 f"Succesfully converted **{chips // 10}** {self.bond_emoji}"
                 f" into **{chips}** {self.chip_emoji}",
@@ -517,7 +517,7 @@ class TradeCommands(Commands):
             itemid = args[0]
             item = inventory.from_id(args[0])
             if not item:
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         "You do not possess that Item.",
                         embed_type="error",
@@ -527,7 +527,7 @@ class TradeCommands(Commands):
                 return
             new_item = Item.from_id(itemid)
             if not new_item.sellable:
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         "You cannot sell that Item.",
                         embed_type="error",
@@ -542,7 +542,7 @@ class TradeCommands(Commands):
             new_item = Item.from_name(name)
             deleted = inventory.delete(name, quantity, is_name=True)
         if deleted == 0:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "Couldn't sell anything cause no items were found.",
                     embed_type="warning",
@@ -562,7 +562,7 @@ class TradeCommands(Commands):
             gained, bonds=bonds
         )
         Shop.refresh_tradables()
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 f"Succesfully sold `{deleted}` of your listed item(s).\n"
                 "Your account has been credited: "
@@ -615,7 +615,7 @@ class TradeCommands(Commands):
         if kwargs.get('premium'):
             shop = PremiumShop
             if profile.get("pokebonds") == 0:
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         "This option is available only to users"
                         " who purchased PokeBonds.",
@@ -636,7 +636,7 @@ class TradeCommands(Commands):
                     key=lambda x: -len(shop.categories[x].items)
                 )
             )
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "That category does not exist. "
                     f"Try one of these:\n```diff\n{cat_str}\n```",
@@ -681,7 +681,8 @@ class TradeCommands(Commands):
             ```~
         """
         if not args or not re.match(r"[0-9a-fA-F]{6}", args[0]):
-            await message.channel.send(
+            await dm_send(
+                message, message.author,
                 embed=get_embed(
                     "You need to enter a valid ticket ID.",
                     embed_type="error",
@@ -699,7 +700,8 @@ class TradeCommands(Commands):
                 content = "You don't have that ticket."
             else:
                 content = "That is not a valid ticket."
-            await message.channel.send(
+            await dm_send(
+                message, message.author,
                 embed=get_embed(
                     content,
                     embed_type="error",
@@ -715,7 +717,8 @@ class TradeCommands(Commands):
                 ) == ticket.name:
                     await command(message, args=args, **kwargs)
                     return
-        await message.channel.send(
+        await dm_send(
+            message, message.author,
             embed=get_embed(
                 "This ticket cannot be used yet.\n"
                 "Stay tuned for future updates.",
@@ -770,7 +773,7 @@ class TradeCommands(Commands):
                 shop.refresh_tradables()
                 item = shop.get_item(itemid, force_new=True)
             if not item:
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         "This item was not found in the Shop.\n"
                         "Since the Shop is dynamic, maybe it's too late.",
@@ -784,7 +787,7 @@ class TradeCommands(Commands):
                 message.guild.id != self.ctx.official_server
             ]):
                 official_server = self.ctx.get_guild(self.ctx.official_server)
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         f"You can buy titles only in [『{official_server}』]"
                         "(https://discord.gg/g4TmVyfwj4).",
@@ -795,7 +798,7 @@ class TradeCommands(Commands):
                 return shop, None
             return shop, item
         except (ValueError, ZeroDivisionError):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "The provided ID seems to be of wrong format.\n",
                     embed_type="error",
@@ -814,7 +817,7 @@ class TradeCommands(Commands):
             item.buy
         ) else task
         if res != "success":
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     f"{res}\nYour account has not been charged.",
                     embed_type="error",
@@ -971,7 +974,7 @@ class TradeCommands(Commands):
             for openable in openables
         ])
         quant_str = f"x{len(openables)} " if len(openables) > 1 else ''
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 content,
                 title=f"Opened {quant_str}{openables[0].name}",

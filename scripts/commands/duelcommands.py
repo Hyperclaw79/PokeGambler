@@ -290,7 +290,8 @@ class DuelCommands(Commands):
             reason = reasons[
                 na_checks.index(True)
             ]
-            await message.channel.send(
+            await dm_send(
+                message, message.author,
                 embed=get_embed(
                     f"You cannot challenge a **{reason}.**",
                     embed_type="error",
@@ -447,7 +448,8 @@ class DuelCommands(Commands):
         else:
             amount = 50
             if user_profile.get('balance') >= 50:
-                await message.channel.send(
+                await dm_send(
+                    message, message.author,
                     embed=get_embed(
                         "Amount of chips not specified, "
                         "will be set to **50**.",

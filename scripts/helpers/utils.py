@@ -97,8 +97,8 @@ async def dm_send(
             **kwargs
         )
     except discord.Forbidden:
-        msg = await message.channel.send(
-            content=f"Hey {user.mention},\n{content if content else ''}",
+        msg = await message.reply(
+            content=f"{content if content else ''}",
             embed=embed,
             **kwargs
         )

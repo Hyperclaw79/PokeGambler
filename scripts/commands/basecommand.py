@@ -529,14 +529,14 @@ class Commands(ABC):
         """
         if not embeds and not files:
             if content:
-                await message.channel.send(content=content)
+                await message.reply(content=content)
             return
         if files:
             embeds = await self.__handle_files(
                 message, embeds, files
             )
         if len(embeds) == 1:
-            await message.channel.send(
+            await message.reply(
                 content=content,
                 embed=embeds[0]
             )
@@ -552,7 +552,7 @@ class Commands(ABC):
         sendables["view"] = Paginator(
             embeds, content=content
         )
-        await message.channel.send(**sendables)
+        await message.reply(**sendables)
         await sendables["view"].wait()
 
     async def __handle_files(self, message, embeds, files):

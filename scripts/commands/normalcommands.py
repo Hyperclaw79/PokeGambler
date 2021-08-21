@@ -70,7 +70,7 @@ class NormalCommands(Commands):
             for module in modules
         }
         if set(command_dict.values()) == {''}:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "Did not find ant commands for the given query.",
                     embed_type="warning",
@@ -91,7 +91,7 @@ class NormalCommands(Commands):
             icon_url="https://emojipedia-us.s3.dualstack.us-west-1."
             "amazonaws.com/thumbs/160/facebook/105/money-bag_1f4b0.png"
         )
-        await message.channel.send(embed=embed)
+        await message.reply(embed=embed)
 
     @alias("?")
     async def cmd_help(
@@ -146,7 +146,7 @@ class NormalCommands(Commands):
                 ])
             ]
             if not commands:
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         f"There's no command called **{args[0].title()}**\n"
                         "Or you don't have access to it.",
@@ -209,7 +209,7 @@ class NormalCommands(Commands):
             url="https://discordapp.com/oauth2/authorize?client_id="
             f"{self.ctx.user.id}&scope=bot&permissions=259711691856"
         )
-        await message.channel.send(
+        await message.reply(
             embed=inv_emb,
             view=invite_view
         )
@@ -224,7 +224,7 @@ class NormalCommands(Commands):
         @Check the current latency of PokeGambler.@
         """
         ping = round(self.ctx.latency * 1000, 2)
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 f"**{ping}** ms",
                 title="Current Latency"

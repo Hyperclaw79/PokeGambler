@@ -125,7 +125,7 @@ class ProfileCommands(Commands):
         badges = profile.get_badges()
         badgestrip = self.bdgen.get(badges)
         discord_file = img2file(badgestrip, "badges.png", ext="PNG")
-        await message.channel.send(file=discord_file)
+        await message.reply(file=discord_file)
 
     @alias(["bal", "chips"])
     @model(Profiles)
@@ -142,7 +142,6 @@ class ProfileCommands(Commands):
             {command_prefix}bal
             ```~
         """
-        user = message.author
         profile = (
             await get_profile(message,  message.author)
         ).get()
@@ -157,8 +156,7 @@ class ProfileCommands(Commands):
         }
         wallet = self.walletgen.get(data)
         discord_file = img2file(wallet, "wallet.png", ext="PNG")
-        await message.channel.send(
-            content=user.mention,
+        await message.reply(
             file=discord_file
         )
 
@@ -198,7 +196,7 @@ class ProfileCommands(Commands):
                 for bst in perm_boosts.values()
             )
         ):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "You don't have any active boosts.",
                     title="No Boosts",
@@ -219,7 +217,7 @@ class ProfileCommands(Commands):
                 value=get_desc(val),
                 inline=False
             )
-        await message.channel.send(embed=emb)
+        await message.reply(embed=emb)
 
     @model([Loots, Profiles, Chest, Inventory])
     @alias('dl')
@@ -263,8 +261,7 @@ class ProfileCommands(Commands):
                 ).total_seconds()
             )
             await message.add_reaction("⌛")
-            await message.channel.send(
-                content=str(message.author.mention),
+            await message.reply(
                 embed=get_embed(
                     f"Please wait {time_remaining} before claiming Daily.",
                     embed_type="warning",
@@ -304,7 +301,7 @@ class ProfileCommands(Commands):
             name=stk_name,
             value=stk_val
         )
-        await message.channel.send(
+        await message.reply(
             f"**Daily loot of {int(loot)} {self.chip_emoji} "
             "added to your balance.**",
             embed=embed
@@ -405,7 +402,7 @@ class ProfileCommands(Commands):
                     message.author
                 )
                 if lbrd is None:
-                    await message.channel.send(
+                    await message.reply(
                         embed=get_embed(
                             "You can choose a minigame name or 'balance'.",
                             embed_type="error",
@@ -453,7 +450,7 @@ class ProfileCommands(Commands):
                     sort_by=sort_by
                 )
             if not leaderboard:
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         "No matches were played yet.",
                         embed_type="warning"
@@ -484,7 +481,7 @@ class ProfileCommands(Commands):
                 embeds.append(emb)
                 files.append(lb_fl)
         if not embeds:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "No matches were played yet.",
                     embed_type="warning"
@@ -538,7 +535,7 @@ class ProfileCommands(Commands):
             embed = self.__loot_handle_treasure(message, profile, tier)
         profile.credit(loot)
         loot_model.update(earned=earned + loot)
-        await message.channel.send(
+        await message.reply(
             f"**You found {loot} {self.chip_emoji}! "
             "Added to your balance.**",
             embed=embed
@@ -597,7 +594,7 @@ class ProfileCommands(Commands):
             ), background=background
         )
         discord_file = img2file(profilecard, "profilecard.jpg")
-        await message.channel.send(file=discord_file)
+        await message.reply(file=discord_file)
 
     @model(Profiles)
     @alias("#")
@@ -632,7 +629,7 @@ class ProfileCommands(Commands):
                 ext="PNG"
             )
         with LineTimer(self.logger, "Send Rank Image"):
-            await message.channel.send(file=discord_file)
+            await message.reply(file=discord_file)
 
     @model([Minigame, Loots, CommandData])
     async def cmd_stats(self, message: Message, **kwargs):
@@ -677,7 +674,7 @@ class ProfileCommands(Commands):
                 name=f"**{key}**",
                 value=f"```rb\n{val}\n```"
             )
-        await message.channel.send(embed=emb)
+        await message.reply(embed=emb)
 
     @model([Profiles, Votes, Loots, Inventory])
     @alias("v")
@@ -740,12 +737,11 @@ class ProfileCommands(Commands):
             label="Vote Now!"
         )
         to_send = {
-            "content": f"Hey {message.author.mention}",
             "embed": emb
         }
         if elapsed >= 12:
             to_send["view"] = vote_button
-        await message.channel.send(**to_send)
+        await message.reply(**to_send)
 
     async def __background_get_url(self, message, reply):
         if len(reply.attachments) > 0:
@@ -825,8 +821,7 @@ class ProfileCommands(Commands):
                 show_hours=False
             )
             await message.add_reaction("⌛")
-            await message.channel.send(
-                content=str(message.author.mention),
+            await message.reply(
                 embed=get_embed(
                     f"Please wait {time_remaining} before looting again.",
                     embed_type="warning",
