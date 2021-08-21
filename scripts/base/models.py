@@ -1232,6 +1232,25 @@ class Votes(UnlockedModel):
         self.reward_claimed: bool = False
 
     @classmethod
+    def most_active_voter(cls: Type[Votes]) -> Dict:
+        """
+        Wrapper for the DB query to get the most active voter.
+        """
+        res = cls.mongo.aggregate([
+            {
+                "$sort": {"total_votes": -1}
+            },
+            {"$limit": 1},
+            {
+                "$project": {
+                    "_id": "$user_id",
+                    "total_votes": "$total_votes"
+                }
+            }
+        ])
+        return next(res, None)
+
+    @classmethod
     def reset_all(cls: Type[Votes]):
         """
         Resets all the Votes.

@@ -10,7 +10,7 @@ from typing import Callable, List, Optional, TYPE_CHECKING
 
 import discord
 
-from ..base.models import CommandData, Profiles
+from ..base.models import CommandData, Profiles, Votes
 from ..base.views import LinkView
 from ..helpers.utils import (
     get_commands, get_embed, get_modules,
@@ -387,6 +387,7 @@ class NormalCommands(Commands):
             "Total Users": Profiles.mongo.count,
             "Total Servers": lambda: len(self.ctx.guilds),
             "Most Active User": self.__info_most_active_user,
+            "Most Voted By": lambda: self.__info_most_active_user(mode="vote"),
             "Most Active Channel": self.__info_most_active_channel,
             "Most Used Command": self.__info_most_used_command
         }
@@ -409,12 +410,17 @@ class NormalCommands(Commands):
         guild = self.ctx.get_guild(int(top_channel['guild']))
         return f"{channel} ({guild})"
 
-    def __info_most_active_user(self):
-        top_user = CommandData.most_active_user()
+    def __info_most_active_user(self, mode: str = "command"):
+        if mode == "vote":
+            top_user = Votes.most_active_voter()
+            metric = "total_votes"
+        else:
+            top_user = CommandData.most_active_user()
+            metric = "num_cmds"
         if top_user is None:
             return None
         user = self.ctx.get_user(int(top_user['_id']))
-        return f"{user} ({top_user['num_cmds']})"
+        return f"{user} ({top_user[metric]})"
 
     def __info_most_used_command(self):
         top_command = CommandData.most_used_command()
