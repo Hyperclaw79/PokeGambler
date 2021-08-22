@@ -214,6 +214,24 @@ def cooldown(secs: int):
     return decorator
 
 
+def ensure_args(func: Callable):
+    '''
+    Ensure that the command has arguments paased to it.
+    '''
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        if not args:
+            return message.channel.send(
+                embed=get_embed(
+                    "Please provide arguments to this command.",
+                    embed_type="error",
+                    title="Missing Arguments"
+                )
+            )
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
+
+
 def ensure_item(func: Callable):
     '''
     Make sure that the Item with the given ID exists already.

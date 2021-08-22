@@ -35,7 +35,7 @@ from ..helpers.utils import (
 from ..helpers.validators import MinMaxValidator
 
 from .basecommand import (
-    Commands, alias, check_completion, dealer_only,
+    Commands, alias, check_completion, dealer_only, ensure_args,
     model, ensure_item, no_thumb, os_only
 )
 
@@ -55,6 +55,7 @@ class TradeCommands(Commands):
     }
 
     @model([Profiles, Loots, Inventory])
+    @ensure_args
     async def cmd_buy(
         self, message: Message,
         args: Optional[List] = None,
@@ -81,8 +82,6 @@ class TradeCommands(Commands):
             {command_prefix}buy 0000FFFF --quantity 10
             ```~
         """
-        if not args:
-            return
         itemid = args[0].lower()
         quantity = int(kwargs.get('quantity', 1))
         shop, item = await self.__buy_get_item(message, itemid)
@@ -284,6 +283,7 @@ class TradeCommands(Commands):
         )
 
     @model(Inventory)
+    @ensure_args
     async def cmd_ids(
         self, message: Message,
         args: Optional[List] = None,
@@ -301,8 +301,6 @@ class TradeCommands(Commands):
             {command_prefix}ids Common Chest
             ```~
         """
-        if not args:
-            return
         item_name = " ".join(arg.title() for arg in args)
         ids = Inventory(
             message.author
@@ -371,6 +369,7 @@ class TradeCommands(Commands):
         await message.reply(embed=emb)
 
     @model([Loots, Profiles, Chest, Inventory])
+    @ensure_args
     @no_thumb
     async def cmd_open(
         self, message: Message,
@@ -416,8 +415,6 @@ class TradeCommands(Commands):
             {command_prefix}open gold chest
             ```~
         """
-        if not args:
-            return
         openables = self.__open_get_openables(message, args)
         if not openables:
             await message.reply(
@@ -486,6 +483,7 @@ class TradeCommands(Commands):
         )
 
     @model([Profiles, Item, Inventory])
+    @ensure_args
     async def cmd_sell(
         self, message: Message,
         args: Optional[List] = None,
@@ -510,8 +508,6 @@ class TradeCommands(Commands):
             ```~
         """
         # pylint: disable=no-member
-        if not args:
-            return
         inventory = Inventory(message.author)
         try:
             itemid = args[0]

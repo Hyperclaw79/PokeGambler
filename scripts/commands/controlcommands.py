@@ -27,7 +27,7 @@ from ..helpers.utils import (
     get_modules, wait_for
 )
 from .basecommand import (
-    model, owner_only, no_log,
+    ensure_args, model, owner_only, no_log,
     alias, Commands
 )
 
@@ -43,6 +43,7 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
+    @ensure_args
     async def cmd_channel(
         self, message: Message,
         args: Optional[List] = None,
@@ -76,8 +77,6 @@ class ControlCommands(Commands):
             {command_prefix}channel reset
             ```~
         """
-        if not args:
-            return
         if len(args) >= 2:
             if args and all(dig.isdigit() for dig in args[1]):
                 if args[0].lower() in ["+", "add", "append"]:
@@ -321,6 +320,7 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
+    @ensure_args
     async def cmd_reload(
         self, message: Message,
         args: Optional[List] = None,
@@ -339,8 +339,6 @@ class ControlCommands(Commands):
             {command_prefix}reload normal
             ```~
         """
-        if not args:
-            return
         module = args[0].lower()
         possible_modules = [
             cmd.replace("commands", "")
@@ -361,6 +359,7 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
+    @ensure_args
     async def cmd_timeit(
         self, message: Message,
         args: Optional[List] = None,
@@ -379,8 +378,6 @@ class ControlCommands(Commands):
             {command_prefix}timeit lb
             ```~
         """
-        if not args:
-            return
         modules = get_modules(self.ctx)
         cmd = args[0].lower()
         for module in modules:
