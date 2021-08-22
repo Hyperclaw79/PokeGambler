@@ -468,7 +468,8 @@ class GambleCommands(Commands):
                 color=color,
                 image=f"attachment://{rolled}.jpg"
             ),
-            file=img2file(board_img, f"{rolled}.jpg")
+            file=img2file(board_img, f"{rolled}.jpg"),
+            view=multi_select_view
         )
 
     async def handle_low_bal(self, usr, gamble_channel):

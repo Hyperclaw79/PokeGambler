@@ -76,15 +76,20 @@ class SelectComponent(discord.ui.Select):
             and not self.view.check(interaction)
         ):
             return
+        value = [
+            key
+            for key in self.opts
+            if self.serializer(key) == self.values[0]
+        ][0]
         if isinstance(self.view, MultiSelectView):
-            self.view.results.append(
-                [
-                    key
-                    for key in self.opts
-                    if self.serializer(key) == self.values[0]
-                ][0]
-            )
-            if len(self.view.results) == len(self.view.children):
+            self.view.results.append(value)
+            self.placeholder = self.values[0]
+            self.disabled = True
+            await interaction.message.edit(view=self.view)
+            if all(
+                child.values
+                for child in self.view.children
+            ):
                 self.view.stop()
             return
         if not self.view.no_response:
@@ -92,11 +97,7 @@ class SelectComponent(discord.ui.Select):
                 f'Selected {self.values[0]}.',
                 ephemeral=True
             )
-        self.view.result = [
-            key
-            for key in self.opts
-            if self.serializer(key) == self.values[0]
-        ][0]
+        self.view.result = value
         self.view.stop()
 
 
