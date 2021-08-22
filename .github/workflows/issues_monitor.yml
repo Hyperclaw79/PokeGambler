@@ -2,14 +2,18 @@ name: Issues Monitor
 
 on:
   issues:
-    types: [labeled]
+    types:
+      - labeled
+      - closed
 
 jobs:
   notifier:
     runs-on: ubuntu-latest
     steps:
       - name: Bug Notifier
-        if: contains(github.event.issue.labels.*.name, 'bug')
+        if: |
+          contains(github.event.issue.labels.*.name, 'bug') &&
+          github.event.issue.state == 'open'
         uses: appleboy/discord-action@0.0.3
         with:
           webhook_id: "876696158993514516"
@@ -17,10 +21,32 @@ jobs:
           message: "New :bug: - ${{github.event.issue.title}}\n${{github.event.issue.html_url}}"
           color: "#ff3333"
       - name: Feature Notifier
-        if: contains(github.event.issue.labels.*.name, 'enhancement')
+        if: |
+          contains(github.event.issue.labels.*.name, 'enhancement') &&
+          github.event.issue.state == 'open'
         uses: appleboy/discord-action@0.0.3
         with:
           webhook_id: "876701624641409044"
           webhook_token: ${{secrets.FEATURE_WEBHOOK_TOKEN}}
           message: "New :thought_balloon: - ${{github.event.issue.title}}\n${{github.event.issue.html_url}}"
           color: "#0099FF"
+      - name: Bug Closed Notifier
+        if: |
+          contains(github.event.issue.labels.*.name, 'bug') &&
+          github.event.issue.state == 'closed'
+        uses: appleboy/discord-action@0.0.3
+        with:
+          webhook_id: "876696158993514516"
+          webhook_token: ${{secrets.BUG_WEBHOOK_TOKEN}}
+          message: "Closed :bug: - ${{github.event.issue.title}}\n${{github.event.issue.html_url}}"
+          color: "#7CFC00"
+      - name: Feature Closed Notifier
+        if: |
+          contains(github.event.issue.labels.*.name, 'enhancement') &&
+          github.event.issue.state == 'closed'
+        uses: appleboy/discord-action@0.0.3
+        with:
+          webhook_id: "876701624641409044"
+          webhook_token: ${{secrets.FEATURE_WEBHOOK_TOKEN}}
+          message: "Closed :thought_balloon: - ${{github.event.issue.title}}\n${{github.event.issue.html_url}}"
+          color: "#7CFC00"
