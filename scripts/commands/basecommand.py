@@ -220,7 +220,7 @@ def ensure_args(func: Callable):
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        if not args:
+        if not kwargs.get("args"):
             return message.channel.send(
                 embed=get_embed(
                     "Please provide arguments to this command.",
