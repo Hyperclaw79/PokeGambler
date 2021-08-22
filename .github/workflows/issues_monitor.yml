@@ -5,11 +5,17 @@ on:
     types:
       - labeled
       - closed
-
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:
   notifier:
     runs-on: ubuntu-latest
     steps:
+      - name: Add to Project
+        if: github.event.issue.state == 'open'
+        uses: srggrs/assign-one-project-github-action@1.2.1
+        with:
+          project: "${{github.event.repository.html_url}}/projects/1"
       - name: Bug Notifier
         if: |
           contains(github.event.issue.labels.*.name, 'bug') &&
