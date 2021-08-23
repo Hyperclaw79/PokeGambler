@@ -872,6 +872,8 @@ class ProfileCommands(Commands):
             streak,
             mode="vote"
         )
+        if votes.reward_claimed:
+            stk_val = stk_val.replace("🎁", "")
         emb.add_field(
             name=stk_name,
             value=stk_val
