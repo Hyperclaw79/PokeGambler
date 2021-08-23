@@ -742,9 +742,22 @@ class GambleCommands(Commands):
         )
         if lower_wins:
             players = players[::-1]
-            if self.conv_table[players[0][1]['card_num']] == 0:
+            idx = 0
+            # Push all non-reactors to the bottom.
+            while self.conv_table[players[0][1]['card_num']] == 0:
                 players.append(players.pop(0))
-        winner = players[0][0]
+                idx += 1
+                # Rare case where no one reacts
+                if idx == len(players):
+                    break
+        winner = None
+        # Force Joker to win in lower_wins mode.
+        for player in players:
+            if player[1]["card_num"] == "Joker":
+                winner = player[0]
+                break
+        if winner is None:
+            winner = players[0][0]
         rolled = [
             dealed_deck[player]["card_img"]
             for player in [
