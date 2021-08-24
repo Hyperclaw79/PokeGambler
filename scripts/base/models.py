@@ -546,7 +546,10 @@ class Inventory(Model):
             },
             {
                 "$match": {
-                    "items.name": name
+                    "items.name": {
+                        "$regex": f"^{name}",
+                        "$options": "i"
+                    }
                 }
             },
             {

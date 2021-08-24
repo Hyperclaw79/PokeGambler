@@ -918,13 +918,17 @@ class TradeCommands(Commands):
                 named_args
             ).title().replace('Chest', '').strip()
             lb_name = " ".join(named_args).title()
-            if chest_name in (
-                chest.__name__.replace('Chest', '')
+            chest_patt = re.compile(
+                fr"{chest_name}.+Chest",
+                re.IGNORECASE
+            )
+            if any (
+                chest_patt.match(chest.__name__)
                 for chest in Chest.__subclasses__()
             ):
                 chests = Inventory(
                     message.author
-                ).from_name(f"{chest_name} Chest")
+                ).from_name(f"{chest_name}.+Chest$")
                 if not chests:
                     raise ValueError(f"No {chest_name} Chests in Inventory.")
                 openables = [

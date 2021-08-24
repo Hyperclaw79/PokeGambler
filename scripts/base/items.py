@@ -216,7 +216,12 @@ class Item(ABC):
         """
         Returns a item of specified name or None.
         """
-        item = cls.mongo.find_one({"name": name})
+        item = cls.mongo.find_one({
+            "name": {
+                "$regex": f"^{name}",
+                "$options": "i"
+            }
+        })
         if not item:
             return None
         return cls._new_item(item, force_new=force_new)
