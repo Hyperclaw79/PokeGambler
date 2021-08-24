@@ -34,7 +34,7 @@ from ..helpers.utils import (
 from ..helpers.validators import HexValidator, ImageUrlValidator
 
 from .basecommand import (
-    Commands, alias, check_completion,
+    Commands, alias, check_completion, cache_images, get_user,
     model, get_profile, needs_ticket
 )
 
@@ -108,6 +108,7 @@ class ProfileCommands(Commands):
 
     @alias("bdg")
     @model(Profiles)
+    @cache_images
     async def cmd_badges(self, message: Message, **kwargs):
         """Check Badge progress.
         $```scss
@@ -125,10 +126,14 @@ class ProfileCommands(Commands):
         badges = profile.get_badges()
         badgestrip = self.bdgen.get(badges)
         discord_file = img2file(badgestrip, "badges.png", ext="PNG")
-        await message.reply(file=discord_file)
+        msg = await message.reply(file=discord_file)
+        self.cmd_badges.__dict__["image_cache"][message.author.id].register(
+            msg.attachments[0].proxy_url
+        )
 
     @alias(["bal", "chips"])
     @model(Profiles)
+    @cache_images
     async def cmd_balance(self, message: Message, **kwargs):
         """Check balance pokechips.
         $```scss
@@ -156,8 +161,11 @@ class ProfileCommands(Commands):
         }
         wallet = self.walletgen.get(data)
         discord_file = img2file(wallet, "wallet.png", ext="PNG")
-        await message.reply(
+        msg = await message.reply(
             file=discord_file
+        )
+        self.cmd_balance.__dict__["image_cache"][message.author.id].register(
+            msg.attachments[0].proxy_url
         )
 
     @model([Boosts, BoostItem, Profiles])
@@ -543,6 +551,8 @@ class ProfileCommands(Commands):
 
     @model([Profiles, Blacklist])
     @alias("pr")
+    @get_user
+    @cache_images
     async def cmd_profile(
         self, message: Message,
         args: Optional[List] = None,
@@ -565,12 +575,7 @@ class ProfileCommands(Commands):
             {command_prefix}pr @Alan#1234
             ```~
         """
-        if args:
-            user = int(args[0])
-        elif kwargs["mentions"]:
-            user = kwargs["mentions"][0]
-        else:
-            user = message.author
+        user = kwargs["selected_user"]
         profile = await get_profile(message, user)
         if not profile:
             return
@@ -594,10 +599,14 @@ class ProfileCommands(Commands):
             ), background=background
         )
         discord_file = img2file(profilecard, "profilecard.jpg")
-        await message.reply(file=discord_file)
+        msg = await message.reply(file=discord_file)
+        self.cmd_profile.__dict__["image_cache"][user.id].register(
+            msg.attachments[0].proxy_url
+        )
 
     @model(Profiles)
     @alias("#")
+    @cache_images
     async def cmd_rank(self, message: Message, **kwargs):
         """Check user rank.
         $```scss
@@ -629,7 +638,10 @@ class ProfileCommands(Commands):
                 ext="PNG"
             )
         with LineTimer(self.logger, "Send Rank Image"):
-            await message.reply(file=discord_file)
+            msg = await message.reply(file=discord_file)
+            self.cmd_rank.__dict__["image_cache"][message.author.id].register(
+                msg.attachments[0].proxy_url
+            )
 
     @model([Minigame, Loots, CommandData])
     async def cmd_stats(self, message: Message, **kwargs):

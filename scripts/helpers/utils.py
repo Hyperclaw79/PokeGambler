@@ -14,6 +14,7 @@ from typing import (
     Callable, Dict, Iterable, List,
     Optional, TYPE_CHECKING, Union
 )
+from cachetools import Cache, TTLCache
 
 import discord
 
@@ -68,6 +69,47 @@ class LineTimer:
                 f"{self.message}{elapsed: 2.2f} secs\n",
                 color="yellow"
             )
+
+
+class ImageCacher:
+    """
+    Caches images created in a command for a user.
+    """
+    def __init__(self, user: discord.Member, **kwargs):
+        self.cache = TTLCache(maxsize=1, ttl=60)
+        self.user = user
+        self.kwargs = kwargs
+
+    @property
+    def keys(self):
+        """
+        Returns a hashable key for the cache.
+        """
+        kwgs = tuple({
+            key: val
+            for key, val in self.kwargs.items()
+            if key not in ["args", "mentions", "selected_user"]
+        })
+        return (self.user.id, kwgs)
+
+    def expire(self):
+        """
+        Expire the cache.
+        """
+        Cache.clear(self.cache)
+
+    def register(self, img_url: str):
+        """
+        Registers the image to the cache.
+        """
+        self.cache[self.keys] = img_url
+
+    @property
+    def cached(self) -> Optional[str]:
+        """
+        Returns the cached image URL if it exists.
+        """
+        return self.cache.get(self.keys)
 
 
 def dedent(message: str) -> str:

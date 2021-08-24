@@ -9,16 +9,34 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum, EnumMeta
+from functools import wraps
 from inspect import ismethod
 import os
 from typing import (
-    Any, Dict, List,
+    Any, Callable, Dict, List,
     Optional, Tuple, Type
 )
 
 import discord
 
 from ..base.items import Item, DB_CLIENT  # pylint: disable=cyclic-import
+
+
+def expire_cache(func: Callable):
+    """
+    Decorator to reset User cache.
+    """
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        """
+        Wrapper function.
+        """
+        # pylint: disable=import-outside-toplevel, cyclic-import
+        from ..commands.basecommand import Commands
+
+        Commands.expire_cache(self.user.id)
+        return func(self, *args, **kwargs)
+    return wrapper
 
 
 class CustomEnumMeta(EnumMeta):
@@ -155,6 +173,7 @@ class Blacklist(Model):
         self.blacklisted_by = mod
         self.reason = reason
 
+    @expire_cache
     def pardon(self):
         """
         Pardons a blacklisted user.
@@ -680,6 +699,10 @@ class Minigame(Model):
             }
         ]))
 
+    @expire_cache
+    def save(self):
+        super().save()
+
     def _get_lb_group(self):
         return {
             "_id": "$played_by",
@@ -839,6 +862,7 @@ class UnlockedModel(Model):
             for key, val in existing.items():
                 setattr(self, key, val)
 
+    @expire_cache
     def reset(self):
         """
         Resets a model for a particular user.
@@ -855,6 +879,11 @@ class UnlockedModel(Model):
             }
         )
 
+    @expire_cache
+    def save(self):
+        super().save()
+
+    @expire_cache
     def update(self, **kwargs):
         """
         Updates an existing unfrozen model.
@@ -1017,6 +1046,7 @@ class Profiles(UnlockedModel):
             }
         ]))
 
+    @expire_cache
     def credit(self, amount: int, bonds: bool = False):
         """
         Shorthand method to add to balance and won_chips.
@@ -1032,6 +1062,7 @@ class Profiles(UnlockedModel):
                 won_chips=self.won_chips + amount
             )
 
+    @expire_cache
     def debit(self, amount: int, bonds: bool = False):
         """
         Shorthand method to subtract from balance and won_chips.

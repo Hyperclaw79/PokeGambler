@@ -24,7 +24,7 @@ from ..base.models import Inventory, Model, Profiles
 from ..base.shop import PremiumShop, Shop
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
-    get_embed, is_admin,
+    ImageCacher, get_embed, is_admin,
     is_dealer, is_owner
 )
 from ..helpers.validators import HexValidator, IntegerValidator
@@ -167,6 +167,39 @@ def alias(alt_names: Union[List[str], str]):
             return func(self, *args, message=message, **kwargs)
         return wrapped
     return decorator
+
+
+def cache_images(func: Callable):
+    '''
+    Cache sent images for a particular user.
+    '''
+    if not func.__dict__.get("image_cache"):
+        func.__dict__["image_cache"] = {}
+
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        user = kwargs.get("selected_user", message.author)
+        if (
+            user.id not in func.__dict__["image_cache"]
+            or func.__dict__["image_cache"][user.id].kwargs != kwargs
+        ):
+            cache = func.__dict__["image_cache"]
+            cache.update({
+                user.id: ImageCacher(
+                    user=user,
+                    **kwargs
+                )
+            })
+            if user.id not in Commands.caches:
+                Commands.caches.update({user.id: []})
+            Commands.caches[user.id].append(
+                cache[user.id]
+            )
+        existing = func.__dict__["image_cache"][user.id].cached
+        if existing:
+            return message.reply(content=existing)
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
 
 
 def check_completion(func: Callable):
@@ -326,6 +359,30 @@ def get_chan(func: Callable):
         else:
             chan = message.channel
         kwargs.update({'chan': chan})
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
+
+
+def get_user(func: Callable):
+    '''
+    Gets the mentioned user.
+    Defaults to the message author.
+    '''
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        if args or kwargs.get("args"):
+            uid = int(
+                args[0] if args
+                else kwargs["args"][0]
+            )
+            user = self.ctx.get_guild(
+                self.ctx.official_server
+            ).get_member(uid)
+        elif kwargs["mentions"]:
+            user = kwargs["mentions"][0]
+        else:
+            user = message.author
+        kwargs.update({'selected_user': user})
         return func(self, *args, message=message, **kwargs)
     return wrapped
 
@@ -497,6 +554,8 @@ class Commands(ABC):
     The Base command class which serves as the starting point for all commands.
     Can also be used to enable or disable entire categories.
     '''
+    caches = {}
+
     def __init__(
         self, ctx: PokeGambler,
         *args, **kwargs
@@ -587,3 +646,12 @@ class Commands(ABC):
                 url=msg.attachments[idx].proxy_url
             )
         return embeds
+
+    @classmethod
+    def expire_cache(cls, user_id: int):
+        '''
+        Expires all the caches for a user.
+        '''
+        if user_id in cls.caches:
+            for cache in cls.caches[user_id]:
+                cache.expire()

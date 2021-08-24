@@ -1,4 +1,5 @@
 aiohttp==3.7.4
+cachetools==4.2.2
 colorama==0.4.4
 git+https://github.com/Rapptz/discord.py.git@1e17b7fceaf7173b1666465e639d1bebaa126683
 python-dotenv==0.12.0
