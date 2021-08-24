@@ -900,9 +900,24 @@ class TradeCommands(Commands):
         message: Message,
         args: List[str]
     ) -> List[Item]:
+        quantity = 0
         try:
-            chest_name = " ".join(args).title().replace('Chest', '').strip()
-            lb_name = " ".join(args).title()
+            named_args = [
+                arg
+                for arg in args
+                if not arg.isdigit()
+            ]
+            quantity_args = [
+                int(arg)
+                for arg in args
+                if arg not in named_args
+            ]
+            if quantity_args:
+                quantity = quantity_args[0]
+            chest_name = " ".join(
+                named_args
+            ).title().replace('Chest', '').strip()
+            lb_name = " ".join(named_args).title()
             if chest_name in (
                 chest.__name__.replace('Chest', '')
                 for chest in Chest.__subclasses__()
@@ -941,7 +956,7 @@ class TradeCommands(Commands):
                     raise ValueError("Item not found in inventory.")
         except (ValueError, ZeroDivisionError):
             openables = []
-        return openables
+        return openables[:quantity] if quantity else openables
 
     async def __open_handle_rewards(
         self, message: Message,
