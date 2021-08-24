@@ -10,6 +10,7 @@ on:
       - wip
     paths-ignore:
       - README.MD
+      - LICENSE.md
       - .gitignore
       - .github/**
       - '!.github/workflows/build.yml'
