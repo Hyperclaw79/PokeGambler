@@ -27,7 +27,6 @@ from abc import ABC
 from datetime import datetime
 from functools import wraps
 import json
-import os
 from typing import (
     Callable, List, Optional,
     TYPE_CHECKING, Union
@@ -59,8 +58,12 @@ load_dotenv()
 
 
 def admin_only(func: Callable):
-    '''
-    Only the admins can access these commands.
+    '''Only the admins can access these commands.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     func.__dict__["admin_only"] = True
 
@@ -110,8 +113,12 @@ def admin_only(func: Callable):
 
 
 def dealer_only(func: Callable):
-    '''
-    Only the dealers can access these commands.
+    '''Only the dealers can access these commands.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     func.__dict__["dealer_only"] = True
 
@@ -136,8 +143,12 @@ def dealer_only(func: Callable):
 
 
 def owner_only(func: Callable):
-    '''
-    Only the owners can access these commands.
+    '''Only the owners can access these commands.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     func.__dict__["owner_only"] = True
 
@@ -164,8 +175,12 @@ def owner_only(func: Callable):
 
 
 def alias(alt_names: Union[List[str], str]):
-    '''
-    Add an alias to a function.
+    '''Add an alias to a function.
+
+    :param alt_names: The alternative names of the function.
+    :type alt_names: Union[List[str], str]
+    :return: The decorated function.
+    :rtype: Callable
     '''
     if isinstance(alt_names, str):
         alt_names = [alt_names]
@@ -187,8 +202,12 @@ def alias(alt_names: Union[List[str], str]):
 
 
 def cache_images(func: Callable):
-    '''
-    Cache sent images for a particular user.
+    '''Cache sent images for a particular user.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     if not func.__dict__.get("image_cache"):
         func.__dict__["image_cache"] = {}
@@ -220,8 +239,12 @@ def cache_images(func: Callable):
 
 
 def check_completion(func: Callable):
-    '''
-    Checks if a command is already in progress for a user.
+    '''Checks if a command is already in progress for a user.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
@@ -251,8 +274,12 @@ def check_completion(func: Callable):
 
 
 def cooldown(secs: int):
-    '''
-    Add a custom cooldown for a command.
+    '''Add a custom cooldown for a command.
+
+    :param secs: The cooldown in seconds.
+    :type secs: int
+    :return: The decorated function.
+    :rtype: Callable
     '''
     def decorator(func: Callable):
         func.__dict__["cooldown"] = secs
@@ -265,8 +292,12 @@ def cooldown(secs: int):
 
 
 def ensure_args(func: Callable):
-    '''
-    Ensure that the command has arguments paased to it.
+    '''Ensure that the command has arguments paased to it.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
@@ -283,8 +314,12 @@ def ensure_args(func: Callable):
 
 
 def ensure_item(func: Callable):
-    '''
-    Make sure that the Item with the given ID exists already.
+    '''Make sure that the Item with the given ID exists already.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
@@ -324,8 +359,12 @@ def ensure_item(func: Callable):
 
 
 def ensure_user(func: Callable):
-    '''
-    Make sure user ID is given in the command.
+    '''Make sure user ID is given in the command.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
@@ -361,9 +400,13 @@ def ensure_user(func: Callable):
 
 
 def get_chan(func: Callable):
-    '''
-    Gets the active channel if there's one present.
+    '''Gets the active channel if there's one present.
     Else returns the message channel.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
@@ -381,9 +424,13 @@ def get_chan(func: Callable):
 
 
 def get_user(func: Callable):
-    '''
-    Gets the mentioned user.
+    '''Gets the mentioned user.
     Defaults to the message author.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
@@ -404,9 +451,16 @@ def get_user(func: Callable):
     return wrapped
 
 
-def model(models: Union[List[Model], Model]):
-    '''
-    Marks a command with list of Models it is accessing.
+def model(models: Union[List[Model], Model]):  # noqa
+    '''Marks a command with list of Models it is accessing.
+
+    :param models: The models to be accessed.
+    :type models: Union[\
+List[:class:`~scripts.base.models.Model`], \
+:class:`~scripts.base.models.Model`\
+]
+    :return: The decorated function.
+    :rtype: Callable
     '''
     if isinstance(models, Model):
         models = [models]
@@ -422,8 +476,13 @@ def model(models: Union[List[Model], Model]):
 
 
 def maintenance(func: Callable):
-    '''
-    Disable a broken/wip function to prevent it from affecting rest of the bot.
+    '''Disable a broken/wip function to prevent it
+    from affecting rest of the bot.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     func.__dict__["disabled"] = True
 
@@ -447,8 +506,12 @@ def maintenance(func: Callable):
 
 
 def needs_ticket(name: str):
-    '''
-    Checks if user has the tickets in inventory.
+    '''Checks if user has the tickets in inventory.
+
+    :param name: The name of the ticket.
+    :type name: str
+    :return: The command which triggered the check.
+    :rtype: Callable
     '''
     def decorator(func: Callable):
         func.__dict__["ticket"] = name
@@ -480,9 +543,13 @@ def needs_ticket(name: str):
 
 
 def no_log(func: Callable):
-    '''
-    Pevents a command from being logged in the DB.
+    '''Pevents a command from being logged in the DB.
     Useful for debug related commands.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
     func.__dict__["no_log"] = True
 
@@ -492,28 +559,21 @@ def no_log(func: Callable):
     return wrapped
 
 
-def no_thumb(func: Callable):
-    '''
-    Mark a command to prevent thumbnail in it's help.
-    Useful for commands with Ascii tables in their docs.
-    '''
-    func.__dict__["no_thumb"] = True
-
-    @wraps(func)
-    def wrapped(self, message, *args, **kwargs):
-        return func(self, *args, message=message, **kwargs)
-    return wrapped
-
-
 def os_only(func: Callable):
+    '''These commands can only run in the official server.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
     '''
-    These commands can only run in the official server.
-    '''
+    func.__dict__["os_only"] = True
+
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
         if all([
             message.guild.id != self.ctx.official_server,
-            not os.getenv('IS_LOCAL')
+            not self.ctx.is_local
         ]):
             return message.channel.send(
                 embed=get_embed(
@@ -528,10 +588,16 @@ def os_only(func: Callable):
 # endregion
 
 
-async def get_profile(message: Message, user: Member):
-    """
-    Retrieves the Profile for a user (creates for new users).
+async def get_profile(message: Message, user: Union[int, str, Member]):
+    """Retrieves the Profile for a user (creates for new users).
     If the user is not found in the guild, returns None.
+
+    :param message: The message that triggered the command.
+    :type message: :class:`discord.Message`
+    :param user: The user to get the Profile for.
+    :type user: Union[int, str, :class:`discord.Member`]
+    :return: The Profile of the user.
+    :rtype: :class:`~scripts.base.models.Profiles`
     """
     try:
         if isinstance(user, (int, str)):
@@ -570,6 +636,9 @@ class Commands(ABC):
     '''
     The Base command class which serves as the starting point for all commands.
     Can also be used to enable or disable entire categories.
+
+    :param ctx: The PokeGambler client.
+    :type ctx: :class:`bot.PokeGambler`
     '''
     caches = {}
 
@@ -597,17 +666,21 @@ class Commands(ABC):
                 setattr(self, f"cmd_{name}", cmd)
 
     @property
-    def enable(self):
-        '''
-        Quickly Enable a Commands Category module.
+    def enable(self) -> bool:
+        '''Quickly Enable a Commands Category module.
+
+        :return: True
+        :rtype: bool
         '''
         self.enabled = True
         return self.enabled
 
     @property
-    def disable(self):
-        '''
-        Quickly Disable a Commands Category module.
+    def disable(self) -> bool:
+        '''Quickly Disable a Commands Category module.
+
+        :return: False
+        :rtype: bool
         '''
         self.enabled = False
         return self.enabled
@@ -618,8 +691,16 @@ class Commands(ABC):
         files: Optional[List[File]] = None,
         content: Optional[str] = None
     ):
-        """
-        Convenience method for conditional pagination.
+        """Convenience method for conditional pagination.
+
+        :param message: The Message which triggered the command.
+        :type message: :class:`discord.Message`
+        :param embeds: The Embeds to paginate.
+        :type embeds: List[:class:`discord.Embed`]
+        :param files: Optional Files to paginate.
+        :type files: Optional[List[:class:`discord.File`]]
+        :param content: Optional content to include in the message.
+        :type content: Optional[str]
         """
         if not embeds and not files:
             if content:
@@ -666,8 +747,10 @@ class Commands(ABC):
 
     @classmethod
     def expire_cache(cls, user_id: int):
-        '''
-        Expires all the caches for a user.
+        '''Expires all the caches for a user.
+
+        :param user_id: The user ID to expire caches for.
+        :type user_id: int
         '''
         if user_id in cls.caches:
             for cache in cls.caches[user_id]:

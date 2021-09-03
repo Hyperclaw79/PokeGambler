@@ -33,9 +33,10 @@ import re
 
 import discord
 
+from ..base.enums import CurrencyExchange
 from ..base.items import Item, Chest, Lootbag, Rewardbox
 from ..base.models import (
-    Blacklist, CurrencyExchange, Exchanges, Inventory, Loots,
+    Blacklist, Exchanges, Inventory, Loots,
     Profiles, Trades
 )
 from ..base.shop import (
@@ -52,8 +53,8 @@ from ..helpers.utils import (
 from ..helpers.validators import MinMaxValidator
 
 from .basecommand import (
-    Commands, alias, check_completion, dealer_only, ensure_args,
-    model, ensure_item, no_thumb, os_only
+    Commands, alias, check_completion, dealer_only,
+    ensure_args, ensure_item, model, os_only
 )
 
 if TYPE_CHECKING:
@@ -78,26 +79,44 @@ class TradeCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Buy item from Shop.
-        $```scss
-        {command_prefix}buy itemid [--quantity]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[itemid: str]
+        :param kwargs: Extra keyword arguments for this command.
+        :type kwargs: Dict[quantity: int]
 
-        @Buys an item from the PokeGambler Shop.
-        You can provide a quantity to buy multiple Tradables.
-        To see the list of purchasable items, check out:
-        ```diff
-        {command_prefix}shop
-        ```@
+        .. meta::
+            :description: Buy an item from the Shop.
 
-        ~To buy a Loot boost with ID boost_lt:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}buy itemid [--quantity value]
+
+        .. rubric:: Description
+
+        Buys an item from the Shop.
+        You can provide a quantity to buy multiple items.
+        To see the list of purchasable items, check the
+        :class:`~scripts.base.shop.Shop`.
+
+        .. rubric:: Examples
+
+        * To buy a Loot boost with ID boost_lt
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}buy boost_lt
-            ```
-        ~To buy 10 items with ID 0000FFFF:
-            ```
+
+        * To buy 10 items with ID 0000FFFF
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}buy 0000FFFF --quantity 10
-            ```~
         """
         itemid = args[0].lower()
         quantity = int(kwargs.get('quantity', 1))
@@ -151,12 +170,22 @@ class TradeCommands(Commands):
         args: Optional[List[str]] = None,
         **kwargs
     ):
-        """Deposit other pokebot credits.
-        $```scss
-        {command_prefix}deposit
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Deposit other currencies to exchange them for Pokechips.@
+        .. meta::
+            :description: Deposit other pokebot credits.
+            :aliases: deposit
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}deposit
+
+        .. rubric:: Description
+
+        Deposit other currencies to exchange them for Pokechips.
         """
         pokebot, quantity = await self.__get_inputs(message)
         if pokebot is None:
@@ -181,21 +210,40 @@ class TradeCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Check the details of a PokeGambler Item.
-        $```scss
-        {command_prefix}details chest_id
-        ```$
-
-        @Check the details, of a PokeGambler item, like:
-            Description, Price, Category
-        @
-
-        ~To check the details of an Item with ID 0000FFFF:
-            ```
-            {command_prefix}details 0000FFFF
-            ```~
         """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[itemid: str]
 
+        .. meta::
+            :description: Check the details of an Item.
+            :aliases: item, detail
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}details itemid
+
+        .. rubric:: Description
+
+        Check the details of a PokeGambler item, like
+
+        * Description
+
+        * Price
+
+        * Category
+
+        .. rubric:: Examples
+
+        * To check the details of an Item with ID 0000FFFF
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}details 0000FFFF
+        """
         item = kwargs["item"]
         await message.reply(embed=item.details)
 
@@ -205,21 +253,40 @@ class TradeCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Check the exchange rates of pokebot credits.
-        $```scss
-        {command_prefix}exchange_rates [currency]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[pokebot: str]
 
-        @Check the exchange rates for different pokebots credits.@
+        .. meta::
+            :description: Check the exchange rates of pokebot credits.
+            :aliases: rates
 
-        ~To check all the exchange rates:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}exchange_rates [currency]
+
+        .. rubric:: Description
+
+        Check the exchange rates for different pokebot credits.
+
+        .. rubric:: Examples
+
+        * To check the exchange rates for all the bots
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}exchange_rates
-            ```
-        To check the exchange rates for Pokétwo:
-            ```
+
+        * To check the exchange rates for PokeTwo
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}rates pokétwo
-            ```~
         """
         enums = CurrencyExchange
         if args:
@@ -247,20 +314,39 @@ class TradeCommands(Commands):
         mentions: Optional[List[Member]] = None,
         **kwargs
     ):
-        """Transfer credits.
-        $```scss
-        {command_prefix}give quantity @mention
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[amount: int]
+        :param mentions: User mentions
+        :type mentions: List[:class:`discord.Member`]
 
-        @`🎲 Dealer Command`
+        .. meta::
+            :description: Transfer credits to other users.
+            :aliases: transfer, pay
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}give amount @mention
+
+        .. rubric:: Description
+
         Transfer some of your own {pokechip_emoji} to another user.
-        If you're being generous, we respect you.
-        But if found abusing it, you will be blacklisted.@
 
-        ~To give user ABCD#1234 500 chips:
-            ```
-            {command_prefix}give @ABCD#1234 500
-            ```~
+        .. warning::
+            If you're being generous, we respect you.
+            But if found abusing it, you will be blacklisted.
+
+        .. rubric:: Examples
+
+        * To give user ABCD#1234 500 chips
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}give 500 @ABCD#1234
         """
         error_tuple = self.__give_santize(message, args, mentions)
         if error_tuple:
@@ -306,17 +392,32 @@ class TradeCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Check IDs of possessed items.
-        $```scss
-        {command_prefix}ids item_name
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[item_name: str]
 
-        @Get a list of IDs of an item you own using its name.@
+        .. meta::
+            :description: Check IDs of your items.
 
-        ~To get the list of IDs for Common Chest:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}ids item_name
+
+        .. rubric:: Description
+
+        Get a list of IDs of an item you own using its name.
+
+        .. rubric:: Examples
+
+        * To get the list of IDs for the Common Chest
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}ids Common Chest
-            ```~
         """
         item_name = " ".join(arg.title() for arg in args)
         ids = Inventory(
@@ -337,12 +438,22 @@ class TradeCommands(Commands):
     @model(Inventory)
     @alias('inv')
     async def cmd_inventory(self, message: Message, **kwargs):
-        """Check personal inventory.
-        $```scss
-        {command_prefix}inventory
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Check your personal inventory for collected Chests, Treasures, etc.@
+        .. meta::
+            :description: Check your inventory.
+            :aliases: inv
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}inventory
+
+        .. rubric:: Description
+
+        Check your inventory for collected Chests, Treasures, etc.
         """
         inv = Inventory(message.author)
         catog_dict, net_worth = inv.get()
@@ -387,7 +498,6 @@ class TradeCommands(Commands):
 
     @model([Loots, Profiles, Chest, Inventory])
     @ensure_args
-    @no_thumb
     async def cmd_open(
         self, message: Message,
         args: Optional[List] = None,
@@ -396,41 +506,73 @@ class TradeCommands(Commands):
 
         # pylint: disable=no-member
 
-        """Opens a PokeGambler treasure chest, Lootbag or Reward Box.
-        $```scss
-        {command_prefix}open itemid/chest name
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[name#Can also be itemid.#: str]
+        :param kwargs: Extra keyword arguments for this command.
+        :type kwargs: Dict[quantity: Optional[int]]
 
-        @Opens a treasure chest, a Lootbag or a Reward Box that you own.
+        .. meta::
+            :description: Open a Treasure Chest, Lootbag or Reward Box.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}open itemid/chest name [--quantity value]
+
+        .. rubric:: Description
+
+        Opens any of these that you own
+
+        * Treasure :class:`~scripts.base.items.Chest`
+
+        * :class:`~scripts.base.items.Lootbag`
+
+        * :class:`~scripts.base.items.Rewardbox`
+
         There are 3 different chests and scale with your tier.
-        Here's a drop table:
-        ```py
-        ╔════╦═════════╦═════════╦════════════╗
-        ║Tier║  Chest  ║Drop Rate║ Pokechips  ║
-        ╠════╬═════════╬═════════╬════════════╣
-        ║  1 ║ Common  ║   66%   ║  34 - 191  ║
-        ║  2 ║  Gold   ║   25%   ║ 192 - 1110 ║
-        ║  3 ║Legendary║    9%   ║1111 - 10000║
-        ╚════╩═════════╩═════════╩════════════╝
-        ```
+        Here's a drop table
+
+        .. code:: py
+
+            ╔════╦═════════╦═════════╦════════════╗
+            ║Tier║  Chest  ║Drop Rate║ Pokechips  ║
+            ╠════╬═════════╬═════════╬════════════╣
+            ║  1 ║ Common  ║   66%   ║  34 - 191  ║
+            ║  2 ║  Gold   ║   25%   ║ 192 - 1110 ║
+            ║  3 ║Legendary║    9%   ║1111 - 10000║
+            ╚════╩═════════╩═════════╩════════════╝
+
         Lootbags are similar to Chests but they will contain items for sure.
         They can either be Normal or Premium.
         Premium Lootbag will contain a guaranteed Premium Item.
         All the items will be of a separate category.
-        Reward Boxes are similar to Lootbags but the items are fixed.@
+        Reward Boxes are similar to Lootbags but the items are fixed.
 
-        ~To open a chest with ID 0000FFFF:
-            ```
-            {command_prefix}open 0000FFFF
-            ```
-        To open a lootbag/reward box with ID 0000AAAA:
-            ```
+        .. rubric:: Examples
+
+        * To open all Common Chests
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}open common chest
+
+        * To open 3 Gold Chests
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}open gold chest --quantity 3
+
+        * To open a lootbag/reward box with ID 0000AAAA
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}open 0000AAAA
-            ```
-        To open all Gold Chests in your inventory:
-            ```
-            {command_prefix}open gold chest
-            ```~
         """
         openables = self.__open_get_openables(message, args)
         if not openables:
@@ -450,17 +592,32 @@ class TradeCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Convert Bonds to Chips.
-        $```scss
-        {command_prefix}redeem_chips amount
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[amount: int]
 
-        @Redeem your pokebonds as x10 pokechips.@
+        .. meta::
+            :description: Convert pokebonds to pokechips.
 
-        ~To redeem 500 chips:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}redeem_chips amount
+
+        .. rubric:: Description
+
+        Redeem your pokebonds as x10 pokechips.
+
+        .. rubric:: Examples
+
+        * To redeem 500 pokechips
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}redeem_chips 500
-            ```~
         """
         if (
             not args
@@ -506,23 +663,47 @@ class TradeCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Sells item from inventory.
-        $```scss
-        {command_prefix}sell itemid/name [--quantity]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[itemid: str]
+        :param kwargs: Extra arguments for this command.
+        :type kwargs: Dict[quantity: Optional[int]]
 
-        @Sells an item from your inventory to the PokeGambler Shop.
-        You can either provide a name or an itemid.
-        If name is provided, you can sell multiples by specifying quantity.@
+        .. meta::
+            :description: Sells item from inventory.
 
-        ~To sell an item with ID 0000FFFF:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}sell itemid/name [--quantity value]
+
+        .. rubric:: Description
+
+        Sells a :class:`~scripts.base.items.Tradable` from your inventory
+        to the PokeGambler Shop. You can either provide a name or an itemid.
+        If name is provided, you can sell multiples by specifying quantity.
+
+        .. note::
+
+            :class:`~scripts.base.items.Tradable` items aren't yet implemented.
+
+        .. rubric:: Examples
+
+        * To sell an item with ID 0000FFFF
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}sell 0000FFFF
-            ```
-        To sell 10 Gears (Tradables):
-            ```
+
+        * To sell 10 Gears (Tradables)
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}sell Gear --quantity 10
-            ```~
         """
         # pylint: disable=no-member
         inventory = Inventory(message.author)
@@ -586,42 +767,60 @@ class TradeCommands(Commands):
         )
 
     @model([Item, Profiles])
-    @no_thumb
     async def cmd_shop(
         self, message: Message,
         args: Optional[List] = None,
         **kwargs
     ):
-        """Access PokeGambler Shop.
-        $```scss
-        {command_prefix}shop [category] [--premium]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[category: Optional[str]]
+        :param kwargs: Extra arguments for this command.
+        :type kwargs: Dict[premium: Optional[bool]]]
 
-        @Used to access the **PokeGambler Shop.**
+        .. meta::
+            :description: Access the PokeGambler Shop.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}shop [category] [--premium]
+
+        .. rubric:: Description
+
+        Used to access the PokeGambler :class:`~scripts.base.shop.Shop`.
         If no arguments are provided, a list of categories will be displayed.
         If a category is provided, list of items will be shown.
-        To access the Premium shop, use the kwarg `--premium` at the end.
-        > You need to own PokeBonds to access this shop.
+        To access the Premium shop, use the kwarg ``--premium`` at the end.
 
-        There are currently 3 shop categories:
-        ```md
-            1. Titles - Special Purchasable Roles
-            2. Boosts - Temporary Boosts to gain an edge
-            3. Tradables - Purchasable assets of trade
-        ```@
+        .. note::
 
-        ~To view the shop categoies:
-            ```
+            You need to own PokeBonds to access the Premium Shop.
+
+        .. rubric:: Examples
+
+        * To view the shop categoies
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}shop
-            ```
-        To view the shop for Titles:
-            ```
+
+        * To view the shop for Titles
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}shop titles
-            ```
-        To view the Premium shop for Gladiators:
-            ```
+
+        * To view the Premium shop for Gladiators
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}shop gladiators --premium
-            ```~
         """
         shop = Shop
         profile = Profiles(message.author)
@@ -681,17 +880,32 @@ class TradeCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Use a consumable ticket.
-        $```scss
-        {command_prefix}use ticket_name
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[ticket_id: str]
 
-        @Use a consumable ticket and trigger it's related command.@
+        .. meta::
+            :description: Use a consumable ticket.
 
-        ~To use the Background Change ticket with ID FFF000:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}use ticket_id
+
+        .. rubric:: Description
+
+        Use a consumable ticket and trigger it's related command.
+
+        .. rubric:: Examples
+
+        * To use the Background Change ticket with ID FFF000
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}use FFF000
-            ```~
         """
         if not args or not re.match(r"[0-9a-fA-F]{6}", args[0]):
             await dm_send(
@@ -749,12 +963,21 @@ class TradeCommands(Commands):
         args: Optional[List[str]] = None,
         **kwargs
     ):
-        """Withdraw other pokebot credits.
-        $```scss
-        {command_prefix}withdraw
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Exchange Pokechips as other pokemon bot credits.@
+        .. meta::
+            :description: Withdraw other pokebot credits.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}withdraw
+
+        .. rubric:: Description
+
+        Exchange Pokechips as other pokemon bot credits.
         """
         pokebot, quantity = await self.__get_inputs(
             message, mode="withdraw"
@@ -922,7 +1145,7 @@ class TradeCommands(Commands):
                 fr"{chest_name}.+Chest",
                 re.IGNORECASE
             )
-            if any (
+            if any(
                 chest_patt.match(chest.__name__)
                 for chest in Chest.__subclasses__()
             ):

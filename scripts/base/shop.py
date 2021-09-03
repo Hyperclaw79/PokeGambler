@@ -47,9 +47,13 @@ if TYPE_CHECKING:
 
 
 class Listing(Queue):
-    """
-    A dynamically flowing Queue with the provision
+    """A dynamically flowing Queue with the provision
     for pinning items from removal.
+
+    :param items: An optional list of items to be added to the queue.
+    :type items: List[ShopItem]
+    :param maxsize: The maximum size of the queue., default is 5.
+    :type maxsize: Optional[int]
     """
     def __init__(
         self, items: Optional[List[ShopItem]] = None,
@@ -97,8 +101,10 @@ class Listing(Queue):
 
     @property
     def name_id_map(self) -> Dict[str, str]:
-        """
-        Returns a mapping between item names and their ids.
+        """Returns a mapping between item names and their ids.
+
+        :return: A dictionary of item names and their ids.
+        :rtype: Dict[str, str]
         """
         return {
             item.name: item.itemid
@@ -106,16 +112,20 @@ class Listing(Queue):
         }
 
     def fetch(self) -> ShopItem:
-        """
-        Pops out an item in FIFO order.
+        """Pops out an item in FIFO order.
+
+        :return: The popped item.
+        :rtype: :class:`ShopItem`
         """
         return super().get_nowait()
 
     def register(
         self, items: Union[ShopItem, List[ShopItem]]
     ):
-        """
-        Adds an item/list of items to the queue.
+        """Adds an item/list of items to the queue.
+
+        :param items: An item or list of items to be added to the queue.
+        :type items: Union[:class:`ShopItem`, List[:class:`ShopItem`]]
         """
         if not items:
             return
@@ -138,8 +148,16 @@ class Listing(Queue):
 
 @dataclass
 class ShopCategory:
-    """
-    This class holds categories of PokeGambler Shop.
+    """The different categories of PokeGambler Shop.
+
+    :param name: The name of the category.
+    :type name: str
+    :param description: The description for the category.
+    :type description: str
+    :param emoji: The emoji for the category.
+    :type emoji: str
+    :param items: A list of items in the category.
+    :type items: :class:`Listing`
     """
     name: str
     description: str
@@ -150,8 +168,10 @@ class ShopCategory:
         return f"『{self.emoji}』 {self.name}"
 
     def copy(self) -> ShopCategory:
-        """
-        Returns a copy of the ShopCategory.
+        """Returns a copy of itself (to prevent mutation).
+
+        :return: A copy of itself.
+        :rtype: :class:`ShopCategory`
         """
         return self.__class__(
             name=self.name,
@@ -163,8 +183,20 @@ class ShopCategory:
 
 @dataclass
 class ShopItem:
-    """
-    Base class for any item visible in the Shop.
+    """Base class for any item visible in the PokeGambler Shop.
+
+    :param itemid: The id of the item.
+    :type itemid: str
+    :param name: The name of the item.
+    :type name: str
+    :param description: The description for the item.
+    :type description: str
+    :param price: The price of the item.
+    :type price: int
+    :param emoji: The emoji for the item.
+    :type emoji: str
+    :param pinned: Whether the item is pinned in the Shop.
+    :type pinned: bool
     """
     itemid: str
     name: str
@@ -197,8 +229,14 @@ class ShopItem:
         quantity: Optional[int] = 1,
         premium: bool = False
     ):
-        """
-        Debits the player the price of the item.
+        """Debits from the player, the price of the item.
+
+        :param user: The user to debit from.
+        :type user: :class:`discord.Member`
+        :param quantity: The quantity of items to debit., default is 1.
+        :type quantity: Optional[int]
+        :param premium: Whether the item is premium.
+        :type premium: bool
         """
         amount = self.price * quantity
         bonds = False
@@ -218,8 +256,14 @@ class BoostItem(ShopItem):
         self,  message: Message,
         quantity: int = 1, **kwargs
     ) -> str:
-        """
-        Applies the relevant temporary boost to the user.
+        """Applies the relevant temporary boost to the user.
+
+        :param message: The message which triggered the boost purchase.
+        :type message: :class:`discord.Message`
+        :param quantity: The number of stacks of boost to buy.
+        :type quantity: int
+        :return: A success/error message.
+        :rtype: str
         """
         user = message.author
         tier = Loots(user).tier
@@ -244,8 +288,12 @@ class BoostItem(ShopItem):
     def get_boosts(
         cls: Type[BoostItem], user_id: str
     ) -> Dict:
-        """
-        Returns a list of all the temporary boosts for the user.
+        """Returns a list of all the temporary boosts for the user.
+
+        :param user_id: The id of the user.
+        :type user_id: str
+        :return: A list of all the temporary boosts for the user.
+        :rtype: Dict
         """
         return {
             boost.itemid: DB_CLIENT["tempboosts"].find_one({
@@ -262,8 +310,10 @@ class BoostItem(ShopItem):
 
     @classmethod
     def default_boosts(cls: Type[BoostItem]) -> Dict:
-        """
-        Returns temporary boosts dictionary.
+        """Returns the default temporary boosts dictionary.
+
+        :return: A dictionary of default temporary boosts.
+        :rtype: Dict
         """
         return {
             item.itemid: {
@@ -331,6 +381,15 @@ class PremiumBoostItem(BoostItem):
         quantity: Optional[int] = 1,
         **kwargs
     ) -> str:
+        """Applies the relevant permanent boost to the user.
+
+        :param message: The message which triggered the boost purchase.
+        :type message: :class:`discord.Message`
+        :param quantity: The number of stacks of boost to buy.
+        :type quantity: int
+        :return: A success/error message.
+        :rtype: str
+        """
         user = message.author
         if self._check_lootlust(
             self._get_tempboosts(user),
@@ -356,14 +415,21 @@ class PremiumBoostItem(BoostItem):
 
 class TradebleItem(ShopItem):
     """
-    This class represents a shop version of [Tradable].
+    This class represents a shop version of \
+        :class:`~scripts.base.items.Tradable`.
     """
     def buy(
         self, message: Message,
         quantity: int, **kwargs
     ) -> str:
-        """
-        Buys the Item and places in user's inventory.
+        """Buys the Item and places in user's inventory.
+
+        :param message: The message that triggered this action.
+        :type message: :class:`discord.Message`
+        :param quantity: The number of items to buy.
+        :type quantity: int
+        :return: A success/error message.
+        :rtype: str
         """
         inventory = Inventory(message.author)
         for _ in range(quantity):
@@ -384,8 +450,13 @@ class Title(ShopItem):
         self, message: Message,
         **kwargs
     ) -> str:
-        """
-        Automatically adds the titled role to the user.
+        """Automatically adds the titled role to the user.
+        Also edits their nickname if possible.
+
+        :param message: The message that triggered this action.
+        :type message: :class:`discord.Message`
+        :return: A success/error message.
+        :rtype: str
         """
         if self.name in (
             role.name.title()
@@ -594,15 +665,21 @@ class Shop:
 
     @classmethod
     def add_category(cls: Type[Shop], category: ShopCategory):
-        """
-        Adds a new category to the Shop.
+        """Adds a new category to the Shop.
+
+        :param category: The new ShopCategory to add.
+        :type category: :class:`ShopCategory`
         """
         cls.categories[category.name] = category
 
     @classmethod
     def from_name(cls: Type[Shop], name: str) -> str:
-        """
-        Returns the itemid of the item with given name.
+        """Returns the itemid of the item with given name.
+
+        :param name: The name of the item.
+        :type name: str
+        :return: The itemid of the item.
+        :rtype: str
         """
         for catog in cls.categories.values():
             if catog.items.name_id_map.get(name) is not None:
@@ -614,8 +691,14 @@ class Shop:
         cls: Type[Shop], itemid: str,
         force_new: bool = False
     ) -> ShopItem:
-        """
-        Returns the item registered in Shop based on itemID.
+        """Returns the item registered in Shop based on itemID.
+
+        :param itemid: The itemid of the item.
+        :type itemid: str
+        :param force_new: If True, a new Item is created.
+        :type force_new: bool
+        :return: The item registered in Shop.
+        :rtype: :class:`ShopItem`
         """
         if itemid in cls.ids_dict:
             return cls.ids_dict[itemid]
@@ -633,7 +716,8 @@ class Shop:
     @classmethod
     def refresh_tradables(cls: Type[Shop]):
         """
-        Similar to Shop.update_category, but exclusive for Tradables.
+        Similar to :func:`update_category`, \
+            but exclusive for :class:`~scripts.base.items.Tradable`.
         """
         item_types = ["Tradables", "Consumables", "Gladiators"]
         for item_type in item_types:
@@ -667,8 +751,12 @@ class Shop:
         cls: Type[Shop], category: str,
         items: List[ShopItem]
     ):
-        """
-        Updates an existing category in the Shop.
+        """Updates an existing category in the Shop.
+
+        :param category: The name of the category.
+        :type category: str
+        :param items: The items to add to the category.
+        :type items: list[:class:`ShopItem`]
         """
         new_items = [
             item
@@ -685,8 +773,16 @@ class Shop:
         cls: Type[Shop], user: Member,
         item: ShopItem, quantity: int = 1
     ) -> str:
-        """
-        Validates if an item is purchasable and affordable by the user.
+        """Validates if an item is purchasable and affordable by the user.
+
+        :param user: The user to check the item for.
+        :type user: :class:`discord.Member`
+        :param item: The item to check.
+        :type item: :class:`ShopItem`
+        :param quantity: The quantity of the item.
+        :type quantity: int
+        :return: The error message if the item is not purchasable.
+        :rtype: str
         """
         if (
             isinstance(item, TradebleItem)

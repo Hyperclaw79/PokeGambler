@@ -58,8 +58,24 @@ DB_CLIENT = MongoClient(
 # region Base Classes
 @dataclass
 class Item(ABC):
-    """
-    Any object which exists in the world of PokeGambler.
+    """Any object which exists in the world of PokeGambler.
+
+    :param description: A description of the item.
+    :type description: str
+    :param category: The category of the item.
+    :type category: str
+    :param asset_url: The URL of the item's asset.
+    :type asset_url: str
+    :param emoji: The emoji of the item.
+    :type emoji: str
+    :param buyable: Whether the item can be bought.
+    :type buyable: bool
+    :param sellable: Whether the item can be sold.
+    :type sellable: bool
+    :param price: The price of the item.
+    :type price: Optional[int]
+    :param premium: Whether the item is premium.
+    :type premium: bool
     """
     description: str
     category: str
@@ -111,8 +127,12 @@ class Item(ABC):
         )
 
     async def get_image(self, sess: ClientSession) -> Image.Image:
-        """
-        Downloads and returns the image of the item.
+        """Downloads and returns the image of the item.
+
+        :param sess: An aiohttp ClientSession object.
+        :type sess: :class:`aiohttp.ClientSession`
+        :return: The image of the item.
+        :rtype: :class:`PIL.Image.Image`
         """
         byio = BytesIO()
         async with sess.get(self.asset_url) as resp:
@@ -141,8 +161,10 @@ class Item(ABC):
         self, modify_all: Optional[bool] = False,
         **kwargs
     ):
-        """
-        Updates an existing item.
+        """Updates an existing item.
+
+        :param modify_all: Modify all copies of the item, defaults to False
+        :type modify_all: Optional[bool]
         """
         if not kwargs:
             return
@@ -158,22 +180,28 @@ class Item(ABC):
 
     @property
     def name(self) -> str:
-        """
-        Returns the name of the Item.
+        """Returns the name of the Item.
+
+        :return: The name of the Item.
+        :rtype: str
         """
         return getattr(self, "_name", str(self))
 
     @name.setter
     def name(self, value: str):
-        """
-        Sets the name of the Item.
+        """Sets the name of the Item.
+
+        :param value: The name of the Item.
+        :type value: str
         """
         self._name = value
 
     @property
     def details(self) -> Embed:
-        """
-        Returns a rich embed containing full details of an item.
+        """Returns a rich embed containing full details of an item.
+
+        :return: Full details of an item.
+        :rtype: :class:`discord.Embed`
         """
         emb = get_embed(
             content=f"『{self.emoji}』 **{self.description}**",
@@ -200,8 +228,14 @@ class Item(ABC):
         cls: Type[Item], itemid: int,
         force_new: bool = False
     ) -> Item:
-        """
-        Returns a item of specified ID or None.
+        """Returns an Item from the Collection base on its itemid.
+
+        :param itemid: The id of the Item.
+        :type itemid: int
+        :param force_new: Force a new Item to be created, defaults to False.
+        :type force_new: bool
+        :return: The existing/newly created Item.
+        :rtype: :class:`Item`
         """
         item = cls.get(itemid)
         if not item:
@@ -213,8 +247,14 @@ class Item(ABC):
         cls: Type[Item], name: str,
         force_new: bool = False
     ) -> Item:
-        """
-        Returns a item of specified name or None.
+        """Returns an Item from the Collection base on its name.
+
+        :param name: The name of the Item.
+        :type name: str
+        :param force_new: Force a new Item to be created, defaults to False.
+        :type force_new: bool
+        :return: The existing/newly created Item.
+        :rtype: :class:`Item`
         """
         item = cls.mongo.find_one({
             "name": {
@@ -228,17 +268,24 @@ class Item(ABC):
 
     @classmethod
     def get(cls: Type[Item], itemid: str) -> Dict:
-        """
-        Get an Item with an ID as a dictionary.
-        Returns None if item not in the DB.
+        """Returns an Item from the Collection base on its itemid.
+
+        :param itemid: The id of the Item.
+        :type itemid: str
+        :return: The dictionary of the Item.
+        :rtype: Dict
         """
         return cls.mongo.find_one({"_id": itemid})
 
     @classmethod
     def get_category(cls: Type[Item], item: Dict) -> Type[Item]:
-        """
-        Resolves category to handle chests differently.
+        """Resolves category to handle chests differently.
         Returns the base Category of the Item.
+
+        :param item: The Item to get the category from.
+        :type item: Dict
+        :return: The base Category of the Item.
+        :rtype: Type[:class:`Item`]
         """
         def catog_crawl(cls, catog_name):
             result = set()
@@ -268,8 +315,10 @@ class Item(ABC):
 
     @classmethod
     def get_unique_items(cls) -> List[Dict]:
-        """
-        Gets all items with a unique name.
+        """Gets all items with a unique name.
+
+        :return: A list of all items with a unique name.
+        :rtype: List[Dict]
         """
         return list(cls.mongo.aggregate([
             {
@@ -291,8 +340,12 @@ class Item(ABC):
         cls: Type[Item],
         limit: Optional[int] = 5
     ) -> List[Dict]:
-        """
-        Returns the latest items from the DB.
+        """Returns the latest items added to the Collection.
+
+        :param limit: The maximum number of items to return, defaults to 5.
+        :type limit: Optional[int]
+        :return: A list of the latest items added to the Collection.
+        :rtype: List[Dict]
         """
         return list(
             cls.mongo.aggregate([
@@ -317,8 +370,10 @@ class Item(ABC):
 
     @classmethod
     def insert_many(cls, items: List[Dict]):
-        """
-        Inserts many items at once.
+        """Inserts many items into the Collection.
+
+        :param items: A list of items to insert.
+        :type items: List[Dict]
         """
         for item in items:
             if "created_on" not in item:
@@ -332,9 +387,17 @@ class Item(ABC):
         limit: Optional[int] = 5,
         premium: Optional[bool] = None
     ) -> List:
-        """
-        Unified Wrapper for the SQL endpoints,
-        which fetches items of specified category.
+        """List items of a certain category.
+
+        :param category: The category of the items to list, defaults to
+            "Tradable".
+        :type category: str
+        :param limit: The maximum number of items to return, defaults to 5.
+        :type limit: Optional[int]
+        :param premium: If True, only return premium items, defaults to None.
+        :type premium: Optional[bool]
+        :return: A list of the items of the given category.
+        :rtype: List
         """
         filter_ = {
             'category': category.title(),
@@ -409,7 +472,7 @@ class Item(ABC):
 @dataclass(eq=False)
 class Treasure(Item):
     """
-    Any non-buyable [Item] is considered a Treasure.
+    Any non-buyable :class:`Item` is considered a Treasure.
     It is unique to the user and cannot be sold either.
     """
     def __init__(self, **kwargs):
@@ -427,7 +490,7 @@ class Treasure(Item):
 @dataclass(eq=False)
 class Tradable(Item):
     """
-    Any buyable and sellable [Item] is a Tradeable.
+    Any buyable and sellable :class:`Item` is a Tradeable.
     It should have a fixed base price.
     """
     def __init__(self, **kwargs):
@@ -444,7 +507,7 @@ class Tradable(Item):
 @dataclass(eq=False)
 class Collectible(Item):
     """
-    Collectibles are sellable variants of [Treasure].
+    Collectibles are sellable variants of :class:`Treasure`.
     They cannot be bought off the market but can be traded among users.
     """
     def __init__(self, **kwargs):
@@ -461,7 +524,7 @@ class Collectible(Item):
 @dataclass(eq=False)
 class Consumable(Tradable):
     """
-    Items buyable from Shop but can't be sold back.
+    :class:`Item` buyable from Shop but can't be sold back.
     """
     def __init__(self, **kwargs):
         super().__init__(
@@ -480,7 +543,17 @@ class Consumable(Tradable):
 @total_ordering
 class Chest(Treasure):
     """
-    Chests are spawnable [Treasure] which contain Pokechips based on tiers.
+    Chests are spawnable :class:`Treasure` which contain \
+        Pokechips based on tiers.
+
+    :param description: A description of the chest.
+    :type description: str
+    :param asset_url: The URL of the chest's asset.
+    :type asset_url: str
+    :param emoji: The emoji of the item.
+    :type emoji: str
+    :param tier: The tier of the chest.
+    :type tier: int
     """
     def __init__(
         self, description: str,
@@ -505,8 +578,10 @@ class Chest(Treasure):
 
     @property
     def chips(self) -> int:
-        """
-        Get a random amount of tier-scaled pokechips.
+        """Get a random amount of tier-scaled pokechips.
+
+        :return: Number of Pokechips.
+        :rtype: int
         """
         scale = int(5.7735 ** (self.tier + 1))
         rand_val = random.randint(scale, scale * 9)
@@ -517,17 +592,23 @@ class Chest(Treasure):
 
     @classmethod
     def get_chest(cls: Type[Chest], tier: int) -> Chest:
-        """
-        Get a specified tier Chest.
+        """Get a specified tier Chest.
+
+        :param tier: The tier of the Chest.
+        :type tier: int
+        :return: A Chest of the specified tier.
+        :rtype: :class:`Chest`
         """
         chests = [CommonChest, GoldChest, LegendaryChest]
         return chests[tier - 1]()
 
     @classmethod
     def get_random_chest(cls: Type[Chest]) -> Chest:
-        """
-        Get a random tier Chest with weight of (90, 35, 12)
+        """Get a random tier Chest with weight of (90, 35, 12)
         for common, gold and legendary resp.
+
+        :return: A Chest of a random tier.
+        :rtype: :class:`Chest`
         """
         chest_class = random.choices(
             cls.__subclasses__(),
@@ -537,11 +618,15 @@ class Chest(Treasure):
         return chest_class()
 
     def get_random_collectible(self) -> Collectible:
-        """
-        Get a random [Collectible] with chance based on chest tier.
-        Common Chest - 0%
-        Gold Chest - 25%
-        Legendary Chest - 50%
+        """Get a random :class:`Collectible` with chance based on chest tier.
+
+        .. note::
+           * Common Chest - 0%
+           * Gold Chest - 25%
+           * Legendary Chest - 50%
+
+        :return: A random collectible.
+        :rtype: :class:`Collectible`
         """
         chance = (self.tier - 1) * 0.25
         proc = random.uniform(0.1, 0.99)
@@ -556,7 +641,7 @@ class Chest(Treasure):
 
 class CommonChest(Chest):
     """
-    Lowest Tier [Chest].
+    Lowest Tier :class:`Chest`.
     Chips scale in 100s.
     """
     def __init__(self, **kwargs):
@@ -578,7 +663,7 @@ class CommonChest(Chest):
 
 class GoldChest(Chest):
     """
-    Mid tier [Chest].
+    Mid tier :class:`Chest`.
     Chips scale in high-hundreds to low-thousands.
     """
     def __init__(self, **kwargs):
@@ -601,9 +686,9 @@ class GoldChest(Chest):
 
 class LegendaryChest(Chest):
     """
-    Highest Tier [Chest].
+    Highest Tier :class:`Chest`.
     Chips scale in the thousands.
-    Legendary Chests have a small chance of containing [Collectible]s.
+    Legendary Chests have a small chance of containing :class:`Collectible`.
     """
     def __init__(self, **kwargs):
         description: str = dedent(
@@ -635,8 +720,10 @@ class Gladiator(Consumable):
         super().__init__(category="Gladiator", **kwargs)
 
     def rename(self, name: str):
-        """
-        Wrapper for Gladiator rename DB call.
+        """Rename a :class:`Gladiator`.
+
+        :param name: The new name of the :class:`Gladiator`.
+        :type name: str
         """
         self.name = name
         self.update(name=name)
@@ -661,10 +748,14 @@ class Lootbag(Treasure):
 
     @property
     def chips(self) -> int:
-        """
-        Return random amount of Pokechips in following ranges:
-            Normal => [100, 499]
-            Premium => [500, 1000]
+        """Return random amount of Pokechips in following ranges:
+
+        .. note::
+           * Normal => [100, 499]
+           * Premium => [500, 1000]
+
+        :return: An amount of Pokechips.
+        :rtype: int
         """
         limits = [500, 1000] if self.premium else [100, 499]
         return random.randint(*limits)
@@ -672,10 +763,15 @@ class Lootbag(Treasure):
     def get_random_items(
         self, categories: Optional[List[str]] = None,
         count: Optional[int] = 3
-    ) -> Item:
-        """
-        Retrieves a random existing item of chosen category.
-        Returns at most 3 items by default.
+    ) -> List[Item]:
+        """Get a random :class:`Item` from a list of categories.
+
+        :param categories: A list of categories to choose from.
+        :type categories: Optional[List[str]]
+        :param count: The amount of items to choose., default is 3.
+        :type count: Optional[int]
+        :return: A list of items.
+        :rtype: List[:class:`Item`]
         """
         pipeline = [
             {
@@ -747,7 +843,7 @@ class Lootbag(Treasure):
 @dataclass(eq=False)
 class Rewardbox(Treasure):
     """
-    [Lootbag] with fixed items and pokechips.
+    :class:`Lootbag` with fixed items and pokechips.
     """
     def __init__(
         self, chips: Optional[int] = None,
@@ -767,8 +863,12 @@ class Rewardbox(Treasure):
 
     @classmethod
     def get_items(cls, boxid: int) -> List[Item]:
-        """
-        Gets the Items stored in a Reward Box.
+        """Get items stored in a :class:`Rewardbox`.
+
+        :param boxid: The itemid of the :class:`Rewardbox`.
+        :type boxid: int
+        :return: A list of stored items.
+        :rtype: List[:class:`Item`]
         """
         return [
             Item.from_id(item, force_new=True)

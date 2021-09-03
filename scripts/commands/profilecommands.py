@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Profile Commands Module
 """
 
-# pylint: disable=unused-argument, too-many-locals
+# pylint: disable=unused-argument
+# pylint: disable=too-many-locals, too-many-lines
 
 from __future__ import annotations
 import random
@@ -76,14 +77,27 @@ class ProfileCommands(Commands):
     @model([Profiles, Inventory])
     @alias('bg')
     async def cmd_background(self, message: Message, **kwargs):
-        """Change Profile Background.
-        $```scss
-        {command_prefix}background
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Change the background in your Profile card.
-        The Background Change ticket can be purchased
-        from the Consumables Shop.@
+        .. meta::
+            :description: Change profile background.
+            :aliases: bg
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}background
+
+        .. rubric:: Description
+
+        Change the background in your Profile card.
+
+        .. note::
+
+            The Background Change ticket can be purchased
+            from the Consumables :class:`~scripts.base.shop.Shop`
         """
         profile = Profiles(message.author)
         inp_msg = await dm_send(
@@ -127,17 +141,22 @@ class ProfileCommands(Commands):
     @model(Profiles)
     @cache_images
     async def cmd_badges(self, message: Message, **kwargs):
-        """Check Badge progress.
-        $```scss
-        {command_prefix}badges
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Check the list of available badges and what all you have unlocked.@
+        .. meta::
+            :description: Check badge progress.
+            :aliases: bdg
 
-        ~To check your rank:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
             {command_prefix}badges
-            ```~
+
+        .. rubric:: Description
+
+        Check the list of available badges and what all you have unlocked.
         """
         profile = await get_profile(message,  message.author)
         badges = profile.get_badges()
@@ -152,17 +171,22 @@ class ProfileCommands(Commands):
     @model(Profiles)
     @cache_images
     async def cmd_balance(self, message: Message, **kwargs):
-        """Check balance pokechips.
-        $```scss
-        {command_prefix}balance
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Quickly check how many {pokechip_emoji} you have.@
+        .. meta::
+            :description: Check balance pokechips.
+            :aliases: bal, chips
 
-        ~To check your balance:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
             {command_prefix}bal
-            ```~
+
+        .. rubric:: Description
+
+        Quickly check how many {pokechip_emoji} you have.
         """
         profile = (
             await get_profile(message,  message.author)
@@ -187,12 +211,21 @@ class ProfileCommands(Commands):
 
     @model([Boosts, BoostItem, Profiles])
     async def cmd_boosts(self, message: Message, **kwargs):
-        """Check active boosts.
-        $```scss
-        {command_prefix}boosts
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Check your active purchased boosts.@
+        .. meta::
+            :description: Check active boosts.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}boosts
+
+        .. rubric:: Description
+
+        Check your active purchased boosts.
         """
         def get_desc(boost):
             prm_bst = perm_boosts[boost['name'].lower().replace(' ', '_')]
@@ -247,19 +280,34 @@ class ProfileCommands(Commands):
     @model([Loots, Profiles, Chest, Inventory])
     @alias('dl')
     async def cmd_daily(self, message: Message, **kwargs):
-        """Daily source of Pokechips.
-        $```scss
-        {command_prefix}daily
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Claim free {pokechip_emoji} and a chest everyday.
+        .. meta::
+            :description: Daily source of pokechips.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}daily
+
+        .. rubric:: Description
+
+        Claim free {pokechip_emoji} and a chest everyday.
         The chips and the chest both scale with Tier.
-        There are 3 tiers:
-            1 - Everyone starts here.
-            2 - Win 10 gamble matches.
-            3 - Win 100 gamble matches.
-        You can maintain a daily streak.
-        Get more (scalable) chips for every 5 day streak.@
+        There are 3 tiers
+
+            * Everyone starts at Tier 1.
+
+            * Win 25 gamble matches to unlock Tier 2.
+
+            * Win 100 gamble matches to unlock Tier 3.
+
+        .. tip::
+
+            You can maintain a daily streak.
+            Get more (scalable) chips for every 5 day streak.
         """
         profile = Profiles(message.author)
         loot_model = Loots(message.author)
@@ -337,14 +385,27 @@ class ProfileCommands(Commands):
     @model([Profiles, Inventory])
     @alias(['embed', 'ec', 'color'])
     async def cmd_embed_color(self, message: Message, **kwargs):
-        """Change Embed Color.
-        $```scss
-        {command_prefix}embed_color
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Change the color of the embeds you get from PokeGambler.
-        The Embed Color Change ticket can be purchased
-        from the Consumables Shop.@
+        .. meta::
+            :description: Change Embed Color.
+            :aliases: embed, ec, color
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}embed_color
+
+        .. rubric:: Description
+
+        Change the color of the embeds you get from PokeGambler.
+
+        .. note::
+
+            The Background Change ticket can be purchased
+            from the Consumables :class:`~scripts.base.shop.Shop`
         """
         profile = Profiles(message.author)
         inp_msg = await dm_send(
@@ -398,27 +459,49 @@ class ProfileCommands(Commands):
 
         # pylint: disable=too-many-locals
 
-        """Check the global leaderboard.
-        $```scss
-        {command_prefix}leaderboard [balance/minigame]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: List of arguments for the command.
+        :type args: List[sort_by: Optional[str]]
 
-        @Check the global PokeGambler leaderboard.
+        .. meta::
+            :description: Check the global leaderboard.
+            :aliases: lb
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}leaderboard ["balance"/minigame]
+
+        .. rubric:: Description
+
+        Check the global PokeGambler leaderboard.
         By default, ranks are sorted according to number of wins.
-        You can also sort it according to balance and any minigame.@
+        You can also sort it according to balance and any minigame.
 
-        ~To check the leaderboard:
-            ```
-            {command_prefix}lb
-            ```
-        To check the leaderboard in terms of riches:
-            ```
-            {command_prefix}lb balance
-            ```
-        To check the leaderboard for QuickFlip:
-            ```
-            {command_prefix}lb flip
-            ```~
+        .. rubric:: Examples
+
+        * To check the leaderboard
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}leaderboard
+
+        * To check the leaderboard in terms of balance
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}leaderboard balance
+
+        * To check the leaderboard for QuickFlip
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}leaderboard flip
         """
         with LineTimer(self.logger, "Get Leaderboards"):
             if args and not args[0].lower().startswith("bal"):
@@ -519,16 +602,30 @@ class ProfileCommands(Commands):
     @model([Loots, Profiles, Chest, Inventory])
     @alias('lt')
     async def cmd_loot(self, message: Message, **kwargs):
-        """Stable source of Pokechips.
-        $```scss
-        {command_prefix}loot
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Search the void for free {pokechip_emoji}.
+        .. meta::
+            :description: Stable source of Pokechips.
+            :aliases: lt
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}loot
+
+        .. rubric:: Description
+
+        Search the void for free {pokechip_emoji}.
         The number of chips is randomly choosen from 5 to 10.
-        `Loot Increase Boost can be purchased from Boosts shop.`
         There is a cooldown of 10 minutes between loots.
-        `Cooldown Reduction Boost can be purchased from Boosts shop.`@
+
+        .. tip::
+
+            Loot Increase and Cooldown Reduction
+            :class:`~scripts.base.models.Boosts` can be purchased from
+            the :class:`~scripts.base.shop.Shop`.
         """
         on_cooldown = self.ctx.loot_cd.get(message.author, None)
         perm_boosts = Boosts(
@@ -575,22 +672,50 @@ class ProfileCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """The profile command.
-        $```scss
-        {command_prefix}profile [id/mention]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for the command.
+        :type args: List[user_id: Optional[int]]
+        :param mentions: User mentions.
+        :type mentions: List[Optional[:class:`discord.Member`]]
 
-        @Check your or someone's PokeGambler profile.
-        To check someone's profile, provide their ID or mention them.@
+        .. meta::
+            :description: Get the profile of a user.
+            :aliases: pr
 
-        ~To check your own profile:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}profile [id/mention]
+
+        .. rubric:: Description
+
+        Check your or someone's PokeGambler profile.
+        To check someone's profile, provide their ID or mention them.
+
+        .. rubric:: Examples
+
+        * To check your own profile
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}profile
-            ```
-        To check Alan's profile:
-            ```
+
+        * To check Alan's profile
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}pr @Alan#1234
-            ```~
+
+        * To check profile of user with ID 12345
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}profile 12345
         """
         user = kwargs["selected_user"]
         profile = await get_profile(message, user)
@@ -625,18 +750,23 @@ class ProfileCommands(Commands):
     @alias("#")
     @cache_images
     async def cmd_rank(self, message: Message, **kwargs):
-        """Check user rank.
-        $```scss
-        {command_prefix}rank
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Creates your PokeGambler Rank card.
-        Rank is decided based on number of wins.@
+        .. meta::
+            :description: Check user rank.
+            :aliases: #
 
-        ~To check your rank:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
             {command_prefix}rank
-            ```~
+
+        .. rubric:: Description
+
+        Creates your PokeGambler Rank card.
+        Rank is decided based on number of wins.
         """
         with LineTimer(self.logger, "Get Profile"):
             profile = await get_profile(
@@ -662,17 +792,21 @@ class ProfileCommands(Commands):
 
     @model([Minigame, Loots, CommandData])
     async def cmd_stats(self, message: Message, **kwargs):
-        """Check match and minigame stats.
-        $```scss
-        {command_prefix}stats
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Check the number of gamble matches & minigames you've played and won.@
+        .. meta::
+            :description: Check match and minigame stats.
 
-        ~To check your rank:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
             {command_prefix}stats
-            ```~
+
+        .. rubric:: Description
+
+        Check the number of gamble matches & minigames you've played and won.
         """
         match_stats = Matches(
             message.author
@@ -708,14 +842,27 @@ class ProfileCommands(Commands):
     @model([Profiles, Votes, Loots, Inventory])
     @alias("v")
     async def cmd_vote(self, message: Message, **kwargs):
-        """Vote for the bot.
-        $```scss
-        {command_prefix}vote
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Vote for the bot on Top.gg.
+        .. meta::
+            :description: Vote for the bot.
+            :aliases: v
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}vote
+
+        .. rubric:: Description
+
+        Vote for the bot on Top.gg.
         Get 100 chips for every vote.
-        Bonus Rewards on every 5 streak.@
+
+        .. tip::
+
+            Bonus rewards on every 5 streak.
         """
         votes = Votes(message.author)
         streak = votes.vote_streak

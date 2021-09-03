@@ -45,7 +45,7 @@ from ..helpers.utils import (
 from ..helpers.validators import MinMaxValidator
 from .basecommand import (
     Commands, alias, check_completion,
-    dealer_only, model, no_thumb
+    dealer_only, model
 )
 
 if TYPE_CHECKING:
@@ -54,8 +54,8 @@ if TYPE_CHECKING:
 
 class GambleCommands(Commands):
     """
-    Gamble Commands are the core commands for PokeGambler.
-    Currently, the only available command is the Gamble command itself.
+    | Gamble Commands are the core commands for PokeGambler.
+    | Currently, the only available command is the Gamble command itself.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -89,30 +89,57 @@ class GambleCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """The core command of the bot - Gamble.
-        $```scss
-        {command_prefix}gamble [50 < fee] [--lower_wins]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments that were passed.
+        :type args: List[fee: Optional[int]]
+        :param kwargs: Any additional keyword arguments.
+        :type kwargs: Dict[lower_wins: Optional[bool]]]
 
-        @`🎲 Dealer Command`
+        .. meta::
+            :description: The core command of the bot - Gamble.
+            :alises: [deal, roll]
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}gamble [50 < fee] [--lower_wins]
+
+        .. rubric:: Description
+
+        ``🎲 Dealer Command``
         Roll random pokemon themed cards for a fee and winner takes it all.
         If a fee is not specified, defaults to 50 {pokechip_emoji}.
-        To make the lower card win, use the kwarg `lower_wins`.
-        *A small transaction fees will be levyed before crediting the winner.
-        This fee scales with number of players, if above 15.*@
+        To make the lower card win, use the kwarg --lower_wins.
 
-        ~To gamble with default settings:
-            ```
+        .. note::
+            A small transaction fees will be levyed before
+            crediting the winner.
+            This fee scales with number of players, if above 15.
+
+        .. rubric:: Examples
+
+        * To gamble with default settings
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}gamble
-            ```
-        To gamble for 1000 {pokechip_emoji}:
-            ```
+
+        * To gamble for 1000 {pokechip_emoji}
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}gamble 1000
-            ```
-        To gamble in lower_wins mode:
-            ```
+
+        * To gamble in lower_wins mode
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}gamble --lower_wins
-            ```~
         """
         kwargs.pop("mentions", [])
         try:
@@ -176,23 +203,44 @@ class GambleCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Head/Tails flip for Pokechips.
-        $```scss
-        {command_prefix}quickflip [50 < amount < 9999]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments that were passed.
+        :type args: List[amount: Optional[int]]
 
-        @A quick way to x2 your pokechips ||(or halve it)|| using a chip flip.
+        .. meta::
+            :description: Head/Tails coinflip for PokeGambler.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}quickflip [50 < amount < 9999]
+
+        .. rubric:: Description
+
+        .. role:: spoiler
+            :class: spoiler
+
+        A quick way to x2 your pokechips :spoiler:`(or halve it)`.
         If no amount is specified, 50 chips will be used by default.
-        Minimum 50 chips and maximum 9999 chips can be used.@
+        Minimum 50 chips and maximum 9999 chips can be used.
 
-        ~To flip for 50 {pokechip_emoji}:
-            ```
+        .. rubric:: Examples
+
+        * To flip for 50 {pokechip_emoji}
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}flip
-            ```
-        To flip for 1000 {pokechip_emoji}:
-            ```
+
+        * To flip for 1000 {pokechip_emoji}
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}flip 1000
-            ```~
         """
         profile = Profiles(message.author)
         amount = await self.__flip_input_handler(
@@ -267,27 +315,50 @@ class GambleCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """List latest gamble matches.
-        $```scss
-        {command_prefix}matches [quantity] [--verbose]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments that were passed.
+        :type args: List[quantity: Optional[int]]
+        :param kwargs: Extra keyword arguments for the command.
+        :type kwargs: Dict[verbose: Optional[bool]]]
 
-        @Lists out the results of latest gamble matches.
+        .. meta::
+            :description: Lists latest gamble matches.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}matches [quantity] [--verbose]
+
+        .. rubric:: Description
+
+        Lists out the results of latest gamble matches.
         If no quantity is given, defaults to 10.
-        If --verbose is used, lists the mode and if joker spawned.@
+        If --verbose is used, lists the mode and if joker spawned.
 
-        ~To list latest matches:
-            ```
+        .. rubric:: Examples
+
+        * To list latest matches
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}matches
-            ```
-        To latest 5 matches:
-            ```
+
+        * To list latest 5 matches
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}matches 5
-            ```
-        To see if Joker spawned in last 5 matches:
-            ```
+
+        * To see if Joker spawned in last 5 matches
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}matches 5 --verbose
-            ```~
         """
         limit = int(args[0]) if args else 10
         matches = Matches.get_matches(limit=limit)
@@ -348,38 +419,56 @@ class GambleCommands(Commands):
 
     @model([Moles, Profiles])
     @alias(["mole", "whack", "moles"])
-    @no_thumb
     @check_completion
     async def cmd_whackamole(self, message: Message, **kwargs):
-        """Find the chip minigame.
-        $```scss
-        {command_prefix}whackamole [--difficulty number]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param kwargs: Extra keyword arguments for this command.
+        :type kwargs: Dict[difficulty: Optional[int]]]
 
-        @Find the hidden chip for a chance to win a jackpot.
-        If no amount is specified, 50 chips will be used by default.
-        Minimum 50 chips and maximum 9999 chips can be used.
-        You can choose difficulty level (default 1) and rewards will scale.
-        ```py
-        ╔═══════╦═══════╦══════╦════════╗
-        ║ Level ║ Board ║ Cost ║ Reward ║
-        ╠═══════╬═══════╬══════╬════════╣
-        ║   1   ║  3x3  ║   50 ║   x3   ║
-        ║   2   ║  4x4  ║  100 ║   x4   ║
-        ║   3   ║  5x5  ║  150 ║   x10  ║
-        ║   4   ║  6x6  ║  200 ║   x50  ║
-        ║   5   ║  7x7  ║  250 ║   x100 ║
-        ╚═══════╩═══════╩══════╩════════╝
-        ```@
+        .. meta::
+            :description: A minigame where you guess chip location.
+            :aliases: mole, whack, moles
 
-        ~To play with the default difficulty (level 1):
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}mole [--difficulty number]
+
+        .. rubric:: Description
+        .. code:: py
+
+            Find the hidden chip for a chance to win a jackpot.
+            If no amount is specified, 50 chips will be used by default.
+            Minimum 50 chips and maximum 9999 chips can be used.
+            You can choose difficulty level (default 1) and rewards will scale.
+
+            ╔═══════╦═══════╦══════╦════════╗
+            ║ Level ║ Board ║ Cost ║ Reward ║
+            ╠═══════╬═══════╬══════╬════════╣
+            ║   1   ║  3x3  ║   50 ║   x3   ║
+            ║   2   ║  4x4  ║  100 ║   x4   ║
+            ║   3   ║  5x5  ║  150 ║   x10  ║
+            ║   4   ║  6x6  ║  200 ║   x50  ║
+            ║   5   ║  7x7  ║  250 ║   x100 ║
+            ╚═══════╩═══════╩══════╩════════╝
+
+        .. rubric:: Examples
+
+        * To play with the default difficulty (level 1)
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}mole
-            ```
-        To play the extreme mode (level 5):
-            ```
+
+        * To play the extreme mode (level 5)
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}mole --difficulty 5
-            ```~
         """
         boards = [
             f"{i + 3}x{i + 3}"
@@ -388,26 +477,27 @@ class GambleCommands(Commands):
         costs = [50, 100, 150, 200, 250]
         multipliers = [3, 4, 10, 50, 100]
         level = kwargs.get("difficulty", kwargs.get("level", 1))
-        choice_view = SelectView(
-            heading="Select the Level",
-            options={
-                (i + 1): f"Board: {boards[i]}\t"
-                f"Cost: {costs[i]}\t"
-                f"Reward Multiplier: x{multipliers[i]}"
-                for i in range(5)
-            },
-            no_response=True,
-            check=lambda x: x.user.id == message.author.id
-        )
-        level_inp = await message.reply(
-            "Which difficulty do you wanna play in?",
-            view=choice_view
-        )
-        await choice_view.dispatch(self)
-        if not choice_view.result:
-            return
-        await level_inp.delete()
-        level = choice_view.result - 1
+        if level == 1:
+            choice_view = SelectView(
+                heading="Select the Level",
+                options={
+                    (i + 1): f"Board: {boards[i]}\t"
+                    f"Cost: {costs[i]}\t"
+                    f"Reward Multiplier: x{multipliers[i]}"
+                    for i in range(5)
+                },
+                no_response=True,
+                check=lambda x: x.user.id == message.author.id
+            )
+            level_inp = await message.reply(
+                "Which difficulty do you wanna play in?",
+                view=choice_view
+            )
+            await choice_view.dispatch(self)
+            if not choice_view.result:
+                return
+            await level_inp.delete()
+            level = choice_view.result - 1
         letters, numbers = self.boardgen.get_valids(level)
         cost = costs[level]
         multiplier = multipliers[level]
@@ -490,7 +580,10 @@ class GambleCommands(Commands):
         )
 
     async def handle_low_bal(self, usr, gamble_channel):
-        """Handle low balance."""
+        """Handle low balance.
+
+        :meta private:
+        """
         low_bal_embed = get_embed(
             "Every user gets 100 chips as a starting bonus.\n"
             "You can buy more or exchange for other bot credits.",

@@ -1,0 +1,10 @@
+.spoiler {
+    background: #333333;
+    border-radius: 0.2em;
+    color: transparent;
+    cursor: pointer;
+}
+.spoiler-show {
+    background: #3333338f;
+    color: inherit;
+}

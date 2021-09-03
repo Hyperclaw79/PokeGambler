@@ -48,7 +48,7 @@ from .basecommand import (
     Commands, admin_only, alias,
     check_completion, ensure_user,
     ensure_item, get_profile,
-    model, no_thumb
+    model
 )
 
 if TYPE_CHECKING:
@@ -60,24 +60,31 @@ load_dotenv()
 class AdminCommands(Commands):
     """
     Commands that deal with the moderation tasks.
-    Only Admins and Owners will have access to these.
+
+    .. note::
+
+        Only Admins and Owners will have access to these.
     """
 
     @admin_only
     async def cmd_announce(self, message: Message, **kwargs):
-        """Send an announcement.
-        $```scss
-        {command_prefix}announce
-        ```$
-
-        @`🛡️ Admin Command`
-        Make PokeGambler send an announcement in the announcement channel.@
-
-        ~To start an announcement:
-            ```
-            {command_prefix}announce
-            ```~
         """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+
+        .. meta::
+            :description: Send an announcement.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}announce
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Make PokeGambler send an announcement in the announcement channel.
+       """
         start_msg = await message.channel.send(
             embed=get_embed(
                 'Enter your announcement message:\n>_'
@@ -105,23 +112,44 @@ class AdminCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Adds chips to user's balance.
-        $```scss
-        {command_prefix}add_chips user_id amount [--purchased]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[user_id: str, amount: int]
+        :param kwargs: Extra keyword arguments.
+        :type kwargs: Dict[purchased: Optional[bool]]
 
-        @`🛡️ Admin Command`
+        .. meta::
+            :description: Add chips to a user's balance.
+            :aliases: chips+
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}add_chips user_id amount [--purchased]
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
         Adds {pokechip_emoji} to a user's account.
-        Use the `--purchased` kwarg if the chips were bought.@
+        Use the --purchased kwarg if the chips were bought.
 
-        ~To give 50 {pokechip_emoji} to user with ID 12345:
-            ```
+        .. rubric:: Examples
+
+        * To give 50 {pokechip_emoji} to user with ID 12345
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}add_chips 12345 50
-            ```
-        To add 500 exchanged {pokechip_emoji} to user 67890:
-            ```
+
+        * To add 500 exchanged {pokechip_emoji} to user 67890
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}add_chips 67890 500 --purchased
-            ```~
         """
         if len(args) < 2:
             await message.channel.send(
@@ -162,23 +190,44 @@ class AdminCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Blacklists a user from using PokeGambler.
-        $```scss
-        {command_prefix}blacklist_user user_id [--reason text]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[user_id: str]
+        :param kwargs: Extra keyword arguments.
+        :type kwargs: Dict[reason: Optional[str]]
 
-        @`🛡️ Admin Command`
+        .. meta::
+            :description: Blacklist a user from using PokeGambler.
+            :aliases: bl
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}blacklist_user user_id [--reason text]
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
         Blacklists a user from using PokeGambler until pardoned.
-        A reason can be provided (recommended) using --reason kwarg.@
+        Use the --reason kwarg to provide a reason for the blacklist.
 
-        ~To blacklist a user with ID 12345:
-            ```
+        .. rubric:: Examples
+
+        * To blacklist user 12345 from using PokeGambler
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}blacklist_user 12345
-            ```
-        ~To blacklist a user with ID 67890 for spamming:
-            ```
-            {command_prefix}blacklist_user 67890 --reason spamming
-            ```~
+
+        * To blacklist user 12345 from using PokeGambler for spamming
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}blacklist_user 12345 --reason Spamming
         """
         user_id = int(args[0])
         user = message.guild.get_member(user_id)
@@ -210,18 +259,35 @@ class AdminCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Get Complete User Profile.
-        $```scss
-        {command_prefix}get_user_profile user_id
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[user_id: str]
 
-        @`🛡️ Admin Command`
-        Get the complete profile of a user, including their loot information.@
+        .. meta::
+            :description: Get the complete profile of a user.
+            :aliases: usr_pr
 
-        ~To get the profile of user with ID 12345:
-            ```
-            {command_prefix}usr_pr 12345
-            ```~
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}get_user_profile user_id
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Get the complete profile of a user, including their
+        loot information.
+
+        .. rubric:: Examples
+
+        * To get the complete profile of user with ID 12345
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}get_user_profile 12345
         """
         user_id = int(args[0])
         profile = await get_profile(message, user_id)
@@ -242,18 +308,35 @@ class AdminCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Pardons a blacklisted user.
-        $```scss
-        {command_prefix}pardon_user user_id
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[user_id: str]
 
-        @`🛡️ Admin Command`
-        Pardons a blacklisted user so that they can use PokeGambler again.@
+        .. meta::
+            :description: Pardons a blacklisted user.
+            :aliases: pardon
 
-        ~To pardon a user with ID 12345:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}pardon_user user_id
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Pardons a blacklisted user so that they can use
+        PokeGambler again.
+
+        .. rubric:: Examples
+
+        * To pardon user with ID 12345
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}pardon 12345
-            ```~
         """
         user_id = int(args[0])
         user = message.guild.get_member(user_id)
@@ -293,18 +376,34 @@ class AdminCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Completely resets a user's profile.
-        $```scss
-        {command_prefix}reset_user user_id
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[user_id: str]
 
-        @`🛡️ Admin Command`
-        Completely resets a user's profile to the starting stage.@
+        .. meta::
+            :description: Completely resets a user's profile.
+            :aliases: rst_usr
 
-        ~To reset user with ID 12345:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}reset_user user_id
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Completely resets a user's profile to the starting stage.
+
+        .. rubric:: Examples
+
+        * To reset user with ID 12345
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}reset_user 12345
-            ```~
         """
         user_id = int(args[0])
         profile = await get_profile(message, user_id)
@@ -314,43 +413,86 @@ class AdminCommands(Commands):
     @admin_only
     @ensure_user
     @model(Profiles)
+    @check_completion
     @alias("upd_usr")
     async def cmd_update_user(
         self, message: Message,
         args: Optional[List] = None,
         **kwargs
     ):
-        """Updates a user's profile.
-        $```scss
-        {command_prefix}update_user user_id --param value
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[user_id: str]
 
-        @`🛡️ Admin Command`
-        Updates a user's profile based on the kwargs.@
+        .. meta::
+            :description: Updates a user's profile.
+            :aliases: upd_usr
 
-        ~To update num_wins of user with ID 12345:
-            ```
-            {command_prefix}update_user 12345 --num_wins 10
-            ```~
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}update_user user_id
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Updates a user's profile.
+
+        .. tip::
+
+            Check :class:`~scripts.base.models.Profiles`
+            for available parameters.
+
+        .. rubric:: Examples
+
+        * To update user with ID 12345
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}update_user 12345
         """
         user_id = int(args[0])
-        kwargs.pop("mentions", [])
         profile = await get_profile(message, user_id)
         if not profile:
             return
         try:
-            if not is_owner(self.ctx, message.author):
-                kwargs.pop('pokebonds', None)
-                if int(kwargs.get('num_wins', "0")) > 1:
-                    await message.channel.send(
-                        embed=get_embed(
-                            "You cannot update more than 1 win at a time.",
-                            embed_type="error",
-                            title="Invalid User"
-                        )
+            choice_view = SelectView(
+                heading="Choose the Field",
+                options={
+                    field: ""
+                    for field in profile.get()
+                    if field != "pokebonds" or is_owner(
+                        self.ctx, message.author
                     )
-                    return
-            profile.update(**kwargs)
+                },
+                no_response=True,
+                check=lambda x: x.user.id == message.author.id
+            )
+            await message.channel.send(
+                content="Which field would you like to edit?",
+                view=choice_view
+            )
+            await choice_view.dispatch(self)
+            if choice_view.result is None:
+                return
+            field = choice_view.result
+            await message.channel.send(
+                content=f"What would you like to set {field} to?",
+                embed=get_embed(
+                    "Enter a value",
+                    title=field,
+                    color=profile.get('embed_color')
+                )
+            )
+            reply = await self.ctx.wait_for(
+                "message",
+                check=lambda msg: user_check(msg, message),
+                timeout=None
+            )
+            profile.update(**{field: reply.content})
         except Exception as excp:  # pylint: disable=broad-except
             await message.channel.send(
                 embed=get_embed(
@@ -378,24 +520,57 @@ class AdminCommands(Commands):
         )
 
     @check_completion
-    @no_thumb
     @admin_only
     @model(Item)
     @alias("item+")
     async def cmd_create_item(self, message: Message, **kwargs):
-        """Self-assign Gambler Role.
-        $```scss
-        {command_prefix}create_item [--premium]
-        ```$
-
-        @`🛡️ Admin Command`
-        Creates a PokeGambler world [Item] and saves it in the database.
-        :information_source: Chests cannot be created using this.
-        **Owner(s) can create Premium items using the --premium kwarg.**
-        *In case of Reward Boxes, the items should be a comma-separated*
-        *list of IDs.*@
         """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param kwargs: The keyword arguments for this command.
+        :type kwargs: Dict[premium: Optional[bool]]]
 
+        .. meta::
+            :description: Creates a PokeGambler world [Item] \
+                and saves it in the database.
+            :aliases: item+
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}create_item [--premium]
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Creates a PokeGambler world Item and saves it in the database.
+
+        .. seealso::
+            :class:`~scripts.base.items.Item`
+
+        .. note::
+
+            * Chests cannot be created using this.
+            * Owner(s) can create Premium items using the --premium kwarg.
+            * In case of Reward Boxes, the items should be a comma-separated \
+                list of IDs.
+
+        .. rubric:: Examples
+
+        * To create a non premium item
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}create_item
+
+        * To create a premium item
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}create_item --premium
+        """
         # pylint: disable=no-member
 
         categories = {}
@@ -511,19 +686,35 @@ class AdminCommands(Commands):
         args: List[str] = None,
         **kwargs
     ):
-        """Deletes an Item from the database.
-        $```scss
-        {command_prefix}delete_item itemid
-        ```$
+        """
+        :param message: The message which triggered the command.
+        :type message: :class:`discord.Message`
+        :param args: A list of arguments to process.
+        :type args: List[itemid: str]
 
-        @`🛡️ Admin Command`
+        .. meta::
+            :description: Deletes an Item from the database.
+            :aliases: item-
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}delete_item itemid
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
         Delete an item from the database.
-        If the item was in anyone's inventory, it will be gone.@
+        If the item was in anyone\'s inventory, it will be gone.
 
-        ~To delete a Golden Cigar with ID 0000FFFF:
-            ```
-            {command_prefix}item- 0000FFFF
-            ```~
+        .. rubric:: Examples
+
+        * To delete a Golden Cigar with ID 0000FFFF
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}delete_item 0000FFFF
         """
         item = kwargs.get("item")
         if item.premium and not is_owner(self.ctx, message.author):
@@ -547,18 +738,34 @@ class AdminCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Adds item to User's inventory.
-        $```scss
-        {command_prefix}distribute_item itemid
-        ```$
+        """
+        :param message: The message which triggered the command.
+        :type message: :class:`discord.Message`
+        :param args: A list of arguments to process.
+        :type args: List[itemid: str]
 
-        @`🛡️ Admin Command`
-        Distribute an item to everyone.@
+        .. meta::
+            :description: Distributes an item to everyone.
+            :aliases: item_all
 
-        ~To distribute a Golden Cigar with ID 0000FFFF:
-            ```
-            {command_prefix}item_all 0000FFFF
-            ```~
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}distribute_item itemid
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Distributes an item to everyone who is not blacklisted.
+
+        .. rubric:: Examples
+
+        * To distribute a Golden Cigar with ID 0000FFFF
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}distribute_item 0000FFFF
         """
         item = kwargs["item"]
         if item.premium and not is_owner(self.ctx, message.author):
@@ -589,18 +796,39 @@ class AdminCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Adds item to User's inventory.
-        $```scss
-        {command_prefix}give_item user_id itemid
-        ```$
+        """
+        :param message: The message which triggered the command.
+        :type message: :class:`discord.Message`
+        :param args: A list of arguments to process.
+        :type args: List[user_id: str, itemid: str]
 
-        @`🛡️ Admin Command`
-        Give the user an item and add it to the inventory.@
+        .. meta::
+            :description: Gives an item to a user.
+            :aliases: usr_itm
 
-        ~To give a user, with ID 12345, a Golden Cigar with ID 0000FFFF:
-            ```
-            {command_prefix}usr_itm 12345 0000FFFF
-            ```~
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}give_item user_id itemid
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Gives an item to a user.
+
+        .. note::
+
+            Creates a new copy of existing item before
+            giving it to the user.
+
+        .. rubric:: Examples
+
+        * To give a user, with ID 12345, a Golden Cigar with ID 0000FFFF
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}give_item 12345 0000FFFF
         """
         if len(args) < 2:
             await message.channel.send(
@@ -657,39 +885,75 @@ class AdminCommands(Commands):
         args: List[str] = None,
         **kwargs
     ):
-        """Updates an existing Item from the database.
-        $```scss
-        {command_prefix}update_item itemid
-        ```$
+        """
+        :param message: The message which triggered the command.
+        :type message: :class:`discord.Message`
+        :param args: A list of arguments to process.
+        :type args: List[itemid: str]
 
-        @`🛡️ Admin Command`
-        Update any attribute of an existing item from the database.@
+        .. meta::
+            :description: Updates an existing Item in the database.
+            :aliases: upd_itm
 
-        ~To make a Golden Cigar with ID 0000FFFF premium:
-            ```
-            {command_prefix}update_item 0000FFFF --premium True
-            ```~
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}update_item itemid
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Updates an existing Item from the database.
+
+        .. tip::
+
+            Check :class:`~scripts.base.items.Item` for available parameters.
+
+        .. rubric:: Examples
+
+        * To update a Golden Cigar with ID 0000FFFF
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}update_item 0000FFFF
         """
         item = kwargs.get("item")
-        updatables = {
-            key.lower(): val
-            for key, val in kwargs.items()
-            if key.lower() in dict(item)
+        options = {
+            key.lower(): ""
+            for key in dict(item)
         }
-        if not updatables:
-            await message.channel.send(
-                embed=get_embed(
-                    "That's not a valid attribute.",
-                    embed_type="warning",
-                    title="Unable to Update."
-                )
-            )
-            return
         if not is_owner(self.ctx, message.author):
-            updatables.pop("premium", None)
-        if not updatables:
+            options.pop("premium")
+        choices_view = SelectView(
+            no_response=True,
+            heading="Choose an attribute",
+            options=options,
+            check=lambda x: x.user.id == message.author.id
+        )
+        await message.channel.send(
+            content="Which attribute do you want to edit?",
+            view=choices_view
+        )
+        await choices_view.dispatch(self)
+        if not choices_view.result:
             return
-        item.update(**updatables, modify_all=True)
+        attribute = choices_view.result
+        await message.channel.send(
+            embed=get_embed(
+                content=f"What do you want to change {attribute} to?",
+                title="Update Item",
+                color=Profiles(message.author).get("embed_color")
+            )
+        )
+        reply = await self.ctx.wait_for(
+            "message",
+            check=lambda msg: user_check(msg, message)
+        )
+        item.update(
+            **{attribute: reply.content},
+            modify_all=True
+        )
         if issubclass(item.__class__, Tradable):
             Shop.refresh_tradables()
             PremiumShop.refresh_tradables()

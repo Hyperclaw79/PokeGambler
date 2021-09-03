@@ -24,13 +24,18 @@ from typing import Tuple, Union
 
 
 class UnicodeProgressBar:
-    """
-    A Progress bar generator using Unicode characters.
+    """A Progress bar generator using Unicode characters.
+
+    :param total: The total length of the progress bar., default is 5.
+    :type total: int
+    :param style: The style of the progress bar., default is "squares".
+    :type style: str
     """
     def __init__(
         self, total: int = 5,
         style: str = "squares"
     ):
+        #:
         charmap = {
             "squares": {
                 "base": '⬛',
@@ -61,9 +66,13 @@ class UnicodeProgressBar:
             unicode_bar = unicode_bar.replace(self.base, char, 1)
             yield unicode_bar
 
-    def get(self, count: int):
-        """
-        Return the progress bar at a specific count.
+    def get(self, count: int) -> str:
+        """Return the progress bar at a specific count.
+
+        :param count: The count of the progress bar.
+        :type count: int
+        :return: The progress bar at the given count.
+        :rtype: str
         """
         unicode_bar = self.empty_bar
         for idx, char in enumerate(self.seq):
@@ -79,8 +88,12 @@ class Unicodex:
     """
     @staticmethod
     def num2emojis(number: Union[str, int]) -> str:
-        """
-        Convert a number into a sequence of dicord emojis.
+        """Convert a number into a sequence of dicord emojis.
+
+        :param number: The number to convert.
+        :type number: Union[str, int]
+        :return: The sequence of emojis.
+        :rtype: str
         """
         uninums = [
             ":zero:", ":one:", ":two:", ":three:", ":four:",
@@ -96,8 +109,14 @@ class Unicodex:
         cls, streak: int,
         mode: str = "daily"
     ) -> Tuple[str, str]:
-        """
-        Format a streak for display.
+        """Format a streak for display.
+
+        :param streak: The streak value.
+        :type streak: int
+        :param mode: The mode of the streak., default is daily.
+        :type mode: str
+        :return: The formatted streak.
+        :rtype: Tuple[str, str]
         """
         emoji = ''
         count = streak % 5

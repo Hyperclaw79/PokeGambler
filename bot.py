@@ -59,8 +59,17 @@ load_dotenv()
 
 
 class PokeGambler(discord.AutoShardedClient):
-    """PokeGambler: A Discord Bot using pokemon themed cards for gambling.
-    Subclass of discord.Client which serves as the base for PokeGambler bot.
+    """
+    PokeGambler: A Discord Bot using pokemon themed cards for gambling.
+    Subclass of :class:`discord.Client` which serves as the base
+    for PokeGambler bot.
+
+    :param error_log_path: Path to the error log file.
+    :type error_log_path: str
+    :param assets_path: Path to the assets folder.
+    :type assets_path: str
+
+    .. _top.gg: https://top.gg/bot/873569713005953064
     """
 
     # pylint: disable=too-many-instance-attributes
@@ -87,10 +96,15 @@ class PokeGambler(discord.AutoShardedClient):
         self.pending_cmds = {}
         self.views = {}
         # Classes
+        #: The :class:`~scripts.helpers.logger.CustomLogger` for PokeGambler.
         self.logger = CustomLogger(
             self.error_log_path
         )
+        #: The :class:`~scripts.base.cardgen.CardGambler` for Gamble matches.
         self.dealer = CardGambler(self.assets_path)
+        #: :class:`topgg.DBLClient` for handling votes and stats.
+        #:
+        #: .. tip:: Check out PokeGambler's `Top.gg`_  page.
         self.topgg = topgg.DBLClient(
             self, os.getenv('TOPGG_TOKEN')
         )
@@ -104,8 +118,15 @@ class PokeGambler(discord.AutoShardedClient):
 
     # pylint: disable=too-many-locals
     async def on_message(self, message: Message):
-        """
-        On_message event from Discord API.
+        """Called when a :class:`discord.Message` is created and sent.
+
+        .. note::
+
+            This requires :attr:`discord.Intents.messages`
+            to be enabled.
+
+        :param message: The message which triggered the event.
+        :type message: :class:`discord.Message`
         """
         # Guild and Channel Checks
         if message.guild is None:
@@ -168,11 +189,43 @@ class PokeGambler(discord.AutoShardedClient):
 # Connectors
 
     def run(self, *args, **kwargs):
+        """A blocking call that abstracts away the event loop
+        initialisation from you.
+
+        If you want more control over the event loop then this
+        function should not be used. Use :meth:`discord.Client.start` coroutine
+        or :meth:`discord.Client.connect` + :meth:`discord.Client.login`.
+
+        Roughly Equivalent to: ::
+
+            try:
+                loop.run_until_complete(start(*args, **kwargs))
+            except KeyboardInterrupt:
+                loop.run_until_complete(close())
+                # cancel all tasks lingering
+            finally:
+                loop.close()
+
+        .. warning::
+
+            This function must be the last function to call due to the fact that it
+            is blocking. That means that registration of events or anything being
+            called after this function call will not execute until it returns.
+        """
+
         super().run(os.getenv('TOKEN'), *args, **kwargs)
 
     async def on_guild_join(self, guild: discord.Guild):
-        """
-        On_guild_join event from Discord API.
+        """Called when a :class:`discord.Guild` is either created
+        by the :class:`PokeGambler` or when :class:`PokeGambler`
+        joins a guild.
+
+        .. note::
+
+            This requires :attr:`discord.Intents.guilds` to be enabled.
+
+        :param guild: The guild which added PokeGambler.
+        :type guild: :class:`discord.Guild`
         """
         if not self.is_prod:
             return
@@ -224,8 +277,26 @@ class PokeGambler(discord.AutoShardedClient):
                 pass
 
     async def on_guild_remove(self, guild: discord.Guild):
-        """
-        On_guild_remove event from Discord API.
+        """Called when a :class:`discord.Guild` is removed
+        from the :class:`PokeGambler`.
+
+        This happens through, but not limited to, these circumstances:
+
+        - The client got banned.
+        - The client got kicked.
+        - The client left the guild.
+        - The client or the guild owner deleted the guild.
+
+        In order for this event to be invoked, :class:`PokeGambler` must have
+        been part of the guild to begin with.
+        (i.e. it is part of :class:`PokeGambler`.guilds)
+
+        .. note::
+
+            This requires :attr:`discord.Intents.guilds` to be enabled.
+
+        :param guild: The guild which was removed from PokeGambler.
+        :type guild: :class:`discord.Guild`
         """
         if not self.is_prod:
             return
@@ -245,8 +316,16 @@ class PokeGambler(discord.AutoShardedClient):
         await jq_log_channel.send(embed=emb)
 
     async def on_ready(self):
-        """
-        On_ready event from Discord API.
+        """Called when the client is done preparing the data received
+        from Discord. Usually after login is successful and the
+        :class:`PokeGambler`.guilds and co. are filled up.
+
+        .. warning::
+
+            This function is not guaranteed to be the first event called.
+            Likewise, this function is **not** guaranteed to only be called
+            once. This library implements reconnection logic and thus will
+            end up calling this event whenever a RESUME request fails.
         """
         if not getattr(self, "owner", False):
             self.owner = self.get_user(self.owner_id)
@@ -268,8 +347,14 @@ class PokeGambler(discord.AutoShardedClient):
         self, module_type: str,
         reload_module: bool = False
     ):
-        """
-        Hot Module Import for Commands.
+        """Hot Module Import for Commands.
+
+        :param module_type: The module type to load.
+        :type module_type: str
+        :param reload_module: Whether the module is preloaded.
+        :type reload_module: bool
+        :return: The loaded module.
+        :rtype: :class:`~scripts.commands.basecommand.Commands`
         """
         if reload_module:
             module = importlib.reload(

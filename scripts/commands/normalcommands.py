@@ -22,13 +22,13 @@ Normal Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
-import re
 from typing import Callable, List, Optional, TYPE_CHECKING
 
 import discord
 
 from ..base.models import CommandData, Profiles, Votes
 from ..base.views import LinkView
+from ..helpers.parsers import CustomRstParser
 from ..helpers.utils import (
     get_commands, get_embed, get_modules,
     dedent, showable_command
@@ -50,26 +50,53 @@ class NormalCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """List all usable commands for the user.
-        $```scss
-        {command_prefix}commands [admin/owner/dealer] [--module name]
-        ```$
+        """
+        :param message: The messag which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[role: Optional[str]]
+        :param kwargs: Extra keyword arguments for this command.
+        :type kwargs: Dict[module: Optional[str]]
 
-        @Lists out all the commands you could use.
-        *Admins and Dealers get access to special hidden commands.@
+        .. meta::
+            :description: Lists all usable commands for the user.
+            :aliases: cmds
 
-        ~To check the commands list:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}commands [role] [--module name]
+
+        .. rubric:: Description
+
+        Lists out all the commands you could use.
+
+        .. note::
+
+            Admins and Dealers get access to special hidden commands
+
+        .. rubric:: Examples
+
+        * To check the commands list
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}commands
-            ```
-        To check the commands specific to admin:
-            ```
+
+        * To check the commands specific to admin
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}commands admin
-            ```
-        To check only profile commands:
-            ```
+
+        * To check only profile commands
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}commands --module profile
-            ```~
         """
         modules = get_modules(self.ctx)
         if kwargs.get("module"):
@@ -116,23 +143,42 @@ class NormalCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """What did you expect? This is just the Help command.
-        $```scss
-        {command_prefix}help [command]
-        ```$
+        """
+        :param message: The messag which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[command: Optional[str]]
 
-        @Prints a help message.
+        .. meta::
+            :description: What did you expect? This is just the Help command.
+            :aliases: ?
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}help [command]
+
+        .. rubric:: Description
+
+        Displays the help embed.
         If a command is specified, it prints a help message for that command.
-        Otherwise, it lists the available commands.@
+        Otherwise, it lists the available commands.
 
-        ~To view help for a specific command, say, `total`:
-            ```
-            {command_prefix}help total
-            ```
-        To view help for all the commands:
-            ```
+        .. rubric:: Examples
+
+        * To view help for a the profile command
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}help profile
+
+        * To view help for all the commands
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}help
-            ```~
         """
         modules = get_modules(self.ctx)
         commands = list(
@@ -148,6 +194,7 @@ class NormalCommands(Commands):
                             self.ctx, getattr(module, attr),
                             message.author
                         ),
+                        module.__class__.__name__ != 'TradeCommands'
                     ]
                 )
             }
@@ -185,12 +232,21 @@ class NormalCommands(Commands):
 
     @model([Profiles, CommandData])
     async def cmd_info(self, message: Message, **kwargs):
-        """Gives info about PokeGambler
-        $```scss
-        {command_prefix}info
-        ```$
+        """
+        :param message: The messag which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Gives new players information about PokeGambler.@
+        .. meta::
+            :description: Gives info about PokeGambler.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}info
+
+        .. rubric:: Description
+
+        Gives new players information about PokeGambler.
         """
         emb1 = self.__info_embed_one()
         emb2 = self.__info_embed_two()
@@ -198,12 +254,21 @@ class NormalCommands(Commands):
         await self.paginate(message, embeds)
 
     async def cmd_invite(self, message: Message, **kwargs):
-        """Invite PokeGambler to other servers
-        $```scss
-        {command_prefix}invite
-        ```$
+        """
+        :param message: The messag which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Get the Invite link for PokeGambler.@
+        .. meta::
+            :description: Invite PokeGambler to other servers.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}invite
+
+        .. rubric:: Description
+
+        Get the Invite link for PokeGambler.
         """
         pg_den = self.ctx.get_guild(self.ctx.official_server)
         inv_emb = get_embed(
@@ -212,9 +277,9 @@ class NormalCommands(Commands):
                 # Want to add me to your own server?
                 [Invite me](By clicking the button below).
                 * Following features are only allowed in {pg_den}:
-                    - Gamble Matches
-                    - Buying Titles
-                    - Cross Trades
+                    * Gamble Matches
+                    * Buying Titles
+                    * Cross Trades
                 ```"""
             ),
             title="Invite Link",
@@ -233,12 +298,21 @@ class NormalCommands(Commands):
 
     @alias('latency')
     async def cmd_ping(self, message: Message, **kwargs):
-        """PokeGambler Latency
-        $```scss
-        {command_prefix}ping
-        ```$
+        """
+        :param message: The messag which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Check the current latency of PokeGambler.@
+        .. meta::
+            :description: PokeGambler Latency
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}ping
+
+        .. rubric:: Description
+
+        Checks the current latency of PokeGambler.
         """
         ping = round(self.ctx.latency * 1000, 2)
         await message.reply(
@@ -254,6 +328,7 @@ class NormalCommands(Commands):
     ):
         got_doc = False
         meta = {}
+        aliases = ""
         if cmd.__doc__:
             if getattr(cmd, "disabled", False):
                 cmd_name = cmd.__name__.replace('cmd_', '').title()
@@ -272,21 +347,18 @@ class NormalCommands(Commands):
                 "{pokechip_emoji}",
                 self.chip_emoji
             )
-            patt = r"\$(?P<Syntax>[^\$]+)\$\s+" + \
-                r"\@(?P<Description>[^\@]+)" + \
-                r"\@(?:\s+\~(?P<Example>[^\~]+)\~)?"
-            meta = re.search(patt, doc_str).groupdict()
+            with CustomRstParser() as rst_parser:
+                rst_parser.parse(doc_str)
+                aliases = rst_parser.meta.aliases
+                meta = {
+                    section.argument: dedent(section.to_string())
+                    for section in rst_parser.sections
+                }
             emb = discord.Embed(
                 title=cmd.__name__.replace("cmd_", "").title(),
                 description='\u200B',
                 color=11068923
             )
-            if "no_thumb" not in dir(cmd):
-                emb.set_thumbnail(
-                    url="https://cdn.discordapp.com/attachments/"
-                    "874623706339618827/874629454251581451/"
-                    "pokegambler_logo.png"
-                )
         else:
             emb = get_embed(
                 "No help message exists for this command.",
@@ -303,11 +375,9 @@ class NormalCommands(Commands):
                 emb.add_field(name=f"**{key}**", value=val, inline=False)
         if all([
             got_doc,
-            "alias" in dir(cmd)
+            aliases
         ]):
-            alt_names = cmd.alias[:]
-            if cmd.__name__.replace("cmd_", "") not in alt_names:
-                alt_names.append(cmd.__name__.replace("cmd_", ""))
+            alt_names = aliases.split(', ')
             alias_str = ', '.join(sorted(alt_names, key=len))
             emb.add_field(
                 name="**Alias**",

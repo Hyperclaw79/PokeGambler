@@ -28,6 +28,9 @@ from PIL import Image
 class CardGambler:
     """
     The Pokecard Generator class.
+
+    :param assets_path: The path to the asset folder.
+    :type assets_path: str
     """
 
     # pylint: disable=too-many-instance-attributes
@@ -50,9 +53,15 @@ class CardGambler:
             os.path.join(self.basecards_path, "pokecards-watermark.png")
         )
 
-    def get_card(self, suit: str, card: str):
-        """
-        Gets the image of a specific card.
+    def get_card(self, suit: str, card: str) -> Image.Image:
+        """Gets the image of a specific card.
+
+        :param suit: The suit of the card.
+        :type suit: str
+        :param card: The card number.
+        :type card: str
+        :return: The image of the card.
+        :rtype: :class:`PIL.Image.Image`
         """
         if ".jpg" not in card:
             card = f"{card.upper()}.jpg"
@@ -66,9 +75,17 @@ class CardGambler:
         cards: List[Image.Image],
         sep: Optional[str] = "auto",
         reverse: Optional[bool] = False
-    ):
-        """
-        Gets a deck generated from list of cards.
+    ) -> Image.Image:
+        """Gets a deck generated from a list of cards.
+
+        :param cards: The list of cards to generate the deck from.
+        :type cards: List[:class:`PIL.Image.Image`]
+        :param sep: The seperation width, defaults to "auto"
+        :type sep: Optional[str]
+        :param reverse: Stack the cards in reverse?, defaults to False
+        :type reverse: Optional[bool]
+        :return: The deck image.
+        :rtype: :class:`PIL.Image.Image`
         """
         width, height = cards[0].size
         if sep == "auto":
@@ -92,25 +109,39 @@ class CardGambler:
     def get_closed_deck(
         self, sep: Optional[int] = 5,
         num_cards: Optional[int] = 12
-    ):
-        """
-        Gets a deck of closed cards.
+    ) -> Image.Image:
+        """Gets a deck of closed cards.
+
+        :param sep: The seperation width, defaults to 5
+        :type sep: Optional[int]
+        :param num_cards: Number of cards, defaults to 12
+        :type num_cards: Optional[int]
+        :return: The closed deck image.
+        :rtype: :class:`PIL.Image.Image`
         """
         cards = [self.closed_card for i in range(num_cards)]
         return self.get_deck(cards, sep=sep, reverse=True)
 
-    def get_random_card(self):
-        """
-        Alias for get_random_cards(num_cards=1).
+    def get_random_card(self) -> Image.Image:
+        """Alias for :func:`get_random_cards` with ``num_cards = 1``.
+
+        :return: Random card.
+        :rtype: :class:`PIL.Image.Image`
         """
         return self.get_random_cards(num_cards=1)[0]
 
     def get_random_cards(
         self, num_cards: Optional[int] = 4,
         joker_chance: Optional[float] = 0.05
-    ):
-        """
-        Gets a list of random cards.
+    ) -> List[Image.Image]:
+        """Gets a list of random cards.
+
+        :param num_cards: Number of cards, defaults to 4
+        :type num_cards: Optional[int]
+        :param joker_chance: Chance of including a Joker, defaults to 0.05
+        :type joker_chance: Optional[float]
+        :return: A list of random cards.
+        :rtype: List[:class:`PIL.Image.Image`]
         """
         cards = []
         joker_drawn = False
@@ -145,9 +176,13 @@ class CardGambler:
     def get_random_deck(
         self, num_cards: Optional[int] = 12,
         **kwargs
-    ):
-        """
-        Gets a deck generated from a list of random cards.
+    ) -> Image.Image:
+        """Gets a deck generated from a list of random cards.
+
+        :param num_cards: Number of cards, defaults to 12
+        :type num_cards: Optional[int]
+        :return: The deck image consisting of random cards.
+        :rtype: :class:`PIL.Image.Image`
         """
         cards = [
             self.get_random_card()[1]

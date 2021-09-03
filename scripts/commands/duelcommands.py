@@ -47,7 +47,7 @@ from ..helpers.validators import (
 )
 from .basecommand import (
     Commands, alias, check_completion,
-    cooldown, model, needs_ticket, no_thumb
+    cooldown, model, needs_ticket
 )
 
 if TYPE_CHECKING:
@@ -118,8 +118,7 @@ class DuelActions:
 
 class DuelCommands(Commands):
     """
-    Gamble Commands are the core commands for PokeGambler.
-    Currently, the only available command is the Gamble command itself.
+    Commands which are related to 1v1 Duel matches.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -128,18 +127,33 @@ class DuelCommands(Commands):
     @alias("action+")
     @model([DuelActionsModel, Profiles])
     @check_completion
-    @no_thumb
     async def cmd_create_action(self, message: Message, **kwargs):
-        """Create a custom Duel Action.
-        $```scss
-        {command_prefix}create_action
-        ```$
+        """
+        :param message: The message that triggered this command.
+        :type message: :class:`discord.Message`
 
-        @Create your own attack action in the Duels.
-        > *Note: Actions created will be added to the global action list.*
-        > *Other will also get this action for their gladiator.*
-        > *Actions are generated using RNG, so it might take a while for yours*
-        > *to show up.*@
+        .. meta::
+            :description: Create a custom Duel Action
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}create_action
+
+        .. rubric:: Description
+
+        Create your own attack actions for the Duels.
+
+        .. note::
+
+            * Actions created will be added to the global action list.
+            * Others will also get this action for their gladiator.
+            * It might take a while for your action to show up.
+
+        .. admonition:: Actions
+
+            * **Normal**: Damage < 150, Costs: 200 Pokechips
+            * **Critical**: Damage > 150, Costs: 300 Pokechips
         """
         levels = ["Normal", "Critical"]
         desc_info = [
@@ -256,24 +270,50 @@ class DuelCommands(Commands):
         mentions: List[Member] = None,
         **kwargs
     ):
-        """Gladiator Battler 1v1.
-        $```scss
-        {command_prefix}duel [chips] @player
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The list of arguments for this command.
+        :type args: List[chips: Optional[int]]
+        :param mentions: User mentions.
+        :type mentions: List[:class:`discord.Member`]
 
-        @Have a 1v1 Gladiator match against any valid player.
+        .. meta::
+            :description: 1v1 Gladiator duels
+            :aliases: fight, gladiator, battle
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}duel [chips] @player
+
+        .. rubric:: Description
+
+        Start a 1v1 Gladiator match against any valid player.
         Cost defaults to 50 {pokechip_emoji} (minimum) if not provided.
-        Both the players must own at least 1 Gladiator & have enough balance.
-        You can purchase Gladiators from the shop.@
+        Both the players must own at least 1 Gladiator
+        & have enough balance.
 
-        ~To battle user ABCD#1234 for 50 chips:
-            ```
+        .. tip::
+
+            You can purchase Gladiators from the
+            :class:`~scripts.base.shop.Shop`.
+
+        .. rubric:: Examples
+
+        * To battle user ABCD#1234 for 50 chips
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}duel @ABCD#1234
-            ```
-        To battle user EFGH#5678 for 50,000 chips:
-            ```
+
+        * To battle user EFGH#5678 for 50,000 chips
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}duel @EFGH#5678 50000
-            ```~
         """
         if not mentions or mentions[0].id == message.author.id:
             await dm_send(
@@ -353,13 +393,31 @@ class DuelCommands(Commands):
     @check_completion
     @model(Inventory)
     async def cmd_gladnick(self, message: Message, **kwargs):
-        """Rename your Gladiator.
-        $```scss
-        {command_prefix}gladnick
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @You can rename your gladiator using a Gladiator Name Change ticket.
-        The ticket can be purchased from the Consumables Shop.@
+        .. meta::
+            :description: Rename your gladiator
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}gladnick
+
+        .. rubric:: Description
+
+        You can rename your gladiator using a
+        **Gladiator Name Change** ticket.
+
+        .. tip::
+
+            You can buy a ticket from the :class:`~scripts.base.shop.Shop`.
+
+        .. seealso::
+
+            :class:`~scripts.base.items.Gladiator`
+
         """
         profile = Profiles(message.author)
         glad = await self.__duel_get_gladiator(

@@ -38,8 +38,11 @@ if TYPE_CHECKING:
 
 
 class BaseView(discord.ui.View):
-    """
-    The overriden Base class for Views.
+    """The overriden Base class for **discord.ui.View**.
+
+    :param timeout: The timeout to wait for a response.,
+        default is 180.0 seconds.
+    :param check: A check function for validating the interaction.
     """
     notify: bool = True
 
@@ -51,8 +54,12 @@ class BaseView(discord.ui.View):
         self.check = check
 
     async def dispatch(self, module: Commands) -> bool:
-        """
-        Overriden method to track all views.
+        """Overriden method to track all views.
+
+        :param module: The module to which the view belongs to.
+        :type module: :class:`~scripts.commands.basecommand.Commands`
+        :return: True if not timed out, False otherwise.
+        :rtype: bool
         """
         module.ctx.views[module.__class__.__name__].append(self)
         timedout = await super().wait()
@@ -61,8 +68,15 @@ class BaseView(discord.ui.View):
 
 
 class SelectComponent(discord.ui.Select):
-    """
-    A Select Component that allows the user to choose an option.
+    """A Select Component that allows the user to choose an option.
+
+    :param heading: The heading of the component.
+    :type heading: str
+    :param options: The options for the Select.
+    :type options: dict
+    :param serializer: The serializer to be used for the options.,
+        defaults to ``str``.
+    :type serializer: Optional[Callable]
     """
     def __init__(
         self, heading: str,
@@ -85,8 +99,10 @@ class SelectComponent(discord.ui.Select):
         self.opts = options
 
     async def callback(self, interaction: discord.Interaction):
-        """
-        On Selecting a choice, execute the required function.
+        """On Selecting a choice, execute the required function.
+
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
         """
         if (
             self.view.check is not None
@@ -119,8 +135,11 @@ class SelectComponent(discord.ui.Select):
 
 
 class SelectView(BaseView):
-    """
-    A Select View that allows the user to choose an option.
+    """A Select View that allows the user to choose an option.
+
+    :param no_response: Whether an Ephemeral response should be sent.,
+        defaults to True.
+    :type no_response: bool
     """
     def __init__(self, no_response=True, **kwargs):
         timeout = kwargs.pop('timeout', 180)
@@ -132,9 +151,13 @@ class SelectView(BaseView):
 
 
 class MultiSelectView(BaseView):
-    """
-    A Multi Select View that requires the user to
+    """A Multi Select View that requires the user to
     choose all Selects before proceeding.
+
+    :param kwarg_list: The keyword arguments for the Selects.
+    :type kwarg_list: List[dict]
+    :param kwargs: Additional keyword arguments for the View.
+    :type kwargs: dict
     """
     def __init__(self, kwarg_list: List[Dict], **kwargs):
         timeout = kwargs.pop('timeout', 180)
@@ -163,8 +186,12 @@ class Confirm(BaseView):
         self, button: discord.ui.Button,
         interaction: discord.Interaction
     ):
-        """
-        When the confirm button is pressed, set the inner value to True.
+        """When the confirm button is pressed, set the inner value to True.
+
+        :param button: The button that was pressed.
+        :type button: :class:`discord.ui.Button`
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
         """
         if (
             self.check is not None
@@ -177,8 +204,14 @@ class Confirm(BaseView):
 
 
 class LinkView(BaseView):
-    """
-    A View that allows the user to visit a link.
+    """A View that allows the user to visit a link.
+
+    :param url: The url to be linked to.
+    :type url: str
+    :param label: The text to be displayed on the button.
+    :type label: str
+    :param emoji: The emoji to be displayed on the button.
+    :type emoji: Optional[str]
     """
     def __init__(
         self, url: str,
@@ -197,9 +230,21 @@ class LinkView(BaseView):
 
 
 class GambleCounter(BaseView):
-    """
-    Tracks and updates the registration list
+    """A view which tracks and updates the registration list
     for a gamble match.
+
+    :param gamble_cmd: The GambleCommands module.
+    :type gamble_cmd: :class:`~scripts.commands.gamblecommands.GambleCommands`
+    :param gamble_thread: The discord thread where the match is taking place.
+    :type gamble_thread: :class:`discord.Thread`
+    :param reg_embed: The discord embed to be used for registration.
+    :type reg_embed: :class:`discord.Embed`
+    :param fee: The fee for the gamble match., defaults to 50.
+    :type fee: Optional[int]
+    :param max_players: The maximum number of players for the match,
+        defaults to 12.
+    :type max_players: Optional[int]
+    :param timeout: The timeout for the registration, defaults to 180.
     """
 
     # pylint: disable=too-many-arguments
@@ -222,9 +267,11 @@ class GambleCounter(BaseView):
         self.max_players = max_players
 
     @property
-    def deadline(self):
-        """
-        Returns the deadline for the registration.
+    def deadline(self) -> int:
+        """Returns the deadline (in seconds) for the registration.
+
+        :return: The deadline for the registration.
+        :rtype: int
         """
         return int(
             30 - (
@@ -233,9 +280,14 @@ class GambleCounter(BaseView):
         )
 
     @property
-    def transaction_fee(self):
-        """
-        Returns the transaction fee for the registration.
+    def transaction_fee(self) -> str:
+        """Calculates the transaction fee for the registration.
+
+        .. note::
+            The Fee scales up by 5% for every extra player more than 12.
+
+        :return: The transaction fee for the registration.
+        :rtype: str
         """
         return str(
             10 + 5 * math.floor(
@@ -248,8 +300,12 @@ class GambleCounter(BaseView):
         self, button: discord.ui.Button,
         interaction: discord.Interaction
     ):
-        """
-        Register a user to the list.
+        """Register a user to the list.
+
+        :param button: The button that was pressed.
+        :type button: :class:`discord.ui.Button`
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
         """
         # pylint: disable=import-outside-toplevel
         from .models import Profiles
@@ -271,9 +327,11 @@ class GambleCounter(BaseView):
             if len(self.registration_list) == self.max_players:
                 self.stop()
 
-    def prep_embed(self):
-        """
-        Returns the embed for the registration list.
+    def prep_embed(self) -> discord.Embed:
+        """Returns the embed for the registration list.
+
+        :return: The embed for the registration list.
+        :rtype: :class:`discord.Embed`
         """
         embed = self.reg_embed.copy()
         embed.description = self.reg_embed.description.replace(

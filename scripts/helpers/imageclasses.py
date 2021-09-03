@@ -21,11 +21,15 @@ This module is a compilation of Image Generation Classes.
 
 # pylint: disable=arguments-differ, too-many-arguments
 
+from __future__ import annotations
 import os
 import random
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import (
+    Dict, Generator, List,
+    Optional, Tuple, TYPE_CHECKING
+)
 
 from PIL import (
     Image, ImageDraw,
@@ -33,10 +37,16 @@ from PIL import (
 )
 from ..base.items import Gladiator
 
+if TYPE_CHECKING:
+    from bot import PokeGambler
+
 
 class AssetGenerator(ABC):
     """
     The Abstract Base Class for Image Generation tasks.
+
+    :param asset_path: The path to the assets folder.
+    :type asset_path: str
     """
     def __init__(self, asset_path: str = "assets"):
         self.asset_path = asset_path
@@ -54,9 +64,17 @@ class AssetGenerator(ABC):
         """
 
     @staticmethod
-    def get_font(font, txt: str, bbox: List) -> ImageFont:
-        """
-        Shrinks the font size until the text fits in bbox.
+    def get_font(font, txt: str, bbox: List[int]) -> ImageFont:
+        """Shrinks the font size until the text fits in bbox.
+
+        :param font: The font to be used.
+        :type font: :class:`PIL.ImageFont.ImageFont`
+        :param txt: The text to be written.
+        :type txt: str
+        :param bbox: The bounding box to be used.
+        :type bbox: List[int]
+        :return: The font object.
+        :rtype: :class:`PIL.ImageFont.ImageFont`
         """
         fontsize = font.size
         while font.getsize(txt)[0] > bbox[0]:
@@ -65,12 +83,22 @@ class AssetGenerator(ABC):
         return font
 
     def imprint_text(
-        self, canvas,
+        self, canvas: ImageDraw.Draw,
         txt: str, start_pos: Tuple,
         bbox: Tuple, fontsize: int = 40
     ):
-        """
-        Pastes Center aligned, font corrected text on the canvas.
+        """Pastes Center aligned, font corrected text on the canvas.
+
+        :param canvas: The canvas to be used.
+        :type canvas: :meth:`PIL.ImageDraw.Draw`
+        :param txt: The text to be written.
+        :type txt: str
+        :param start_pos: The starting position of the text.
+        :type start_pos: Tuple[int, int]
+        :param bbox: The bounding box to be used.
+        :type bbox: Tuple[int, int, int, int]
+        :param fontsize: The font size to be used.
+        :type fontsize: int
         """
         font = ImageFont.truetype(
             os.path.join(self.asset_path, "Exo-ExtraBold.ttf"),
@@ -110,6 +138,14 @@ class BadgeGenerator(AssetGenerator):
     def get(
         self, badges: Optional[List] = None
     ) -> Image.Image:
+        """
+        Returns a strip having the mentioned badges.
+
+        :param badges: The badges to be used.
+        :type badges: List[str]
+        :return: The strip having the mentioned badges.
+        :rtype: :class:`PIL.Image.Image`
+        """
         badgestrip = self.badgestrip.copy()
         if not badges:
             return badgestrip
@@ -157,8 +193,13 @@ class BoardGenerator(AssetGenerator):
     def get(
         self, level: Optional[int] = 0
     ) -> Tuple[str, Image.Image]:
-        """
-        Returns a Board image with a random time replaced with a pokechip.
+        """Returns a Board image with a random tile \
+            replaced with a pokechip.
+
+        :param level: The level of the board., default is 0.
+        :type level: Optional[int]
+        :return: The board image and the board name.
+        :rtype: Tuple[str, :class:`PIL.Image.Image`]
         """
         pos = (
             random.randint(0, level + 2),
@@ -178,8 +219,12 @@ class BoardGenerator(AssetGenerator):
     def get_board(
         self, level: Optional[int] = 0
     ) -> Tuple[str, Image.Image]:
-        """
-        Returns a Wackamole board (name, Image) of given difficulty level.
+        """Returns a Wackamole board of given difficulty level.
+
+        :param level: The level of the board., default is 0.
+        :type level: Optional[int]
+        :return: The board image and the board name.
+        :rtype: Tuple[str, :class:`PIL.Image.Image`]
         """
         return (
             self.board_names[level],
@@ -190,8 +235,13 @@ class BoardGenerator(AssetGenerator):
     def get_valids(
         level: Optional[int] = 0
     ) -> Tuple[Generator, Generator]:
-        """
-        Returns a list of possible tile names for given difficulty level.
+        """Returns a list of possible tile names for \
+            given difficulty level.
+
+        :param level: The level of the board., default is 0.
+        :type level: Optional[int]
+        :return: The row and column values.
+        :rtype: Tuple[Generator, Generator]
         """
         return (
             (
@@ -251,9 +301,13 @@ class GladitorMatchHandler(AssetGenerator):
     def get(
         self, gladiators: List[Gladiator]
     ) -> Tuple[Image.Image, int, int]:
-        """
-        Handles a duel match between Gladiators.
+        """Handles a duel match between Gladiators.
         Returns an image and damages dealt by each gladiator per round.
+
+        :param gladiators: The list of gladiators.
+        :type gladiators: List[:class:`~scripts.base.items.Gladiator`]
+        :return: The image and the damages dealt.
+        :rtype: Tuple[:class:`PIL.Image.Image`, int, int]
         """
         canvas = self.__prepare_arena([
             glad.owner.name
@@ -396,7 +450,19 @@ class LeaderBoardGenerator(AssetGenerator):
         )
 
     # pylint: disable=invalid-overridden-method
-    async def get(self, ctx, data: Dict) -> Image.Image:
+    async def get(
+        self, ctx: PokeGambler,
+        data: Dict
+    ) -> Image.Image:
+        """Returns the leaderboard image.
+
+        :param ctx: The PokeGambler client object.
+        :type ctx: :class:`bot.PokeGambler`
+        :param data: The data to be used to generate the leaderboard.
+        :type data: Dict
+        :return: The leaderboard image.
+        :rtype: :class:`PIL.Image.Image`
+        """
         poslist = [
             (41, 435), (1371, 435),
             (41, 950), (1371, 950)
@@ -411,11 +477,19 @@ class LeaderBoardGenerator(AssetGenerator):
         return leaderboard
 
     async def get_rankcard(
-        self, ctx,
+        self, ctx: PokeGambler,
         data: Dict, heading: bool = False
     ) -> Image.Image:
-        """
-        Generates a Rank Card for a user.
+        """Generates a Rank Card for a user.
+
+        :param ctx: The PokeGambler client object.
+        :type ctx: :class:`bot.PokeGambler`
+        :param data: The data to be used to generate the rank card.
+        :type data: Dict
+        :param heading: Whether or not to include the rank card heading.
+        :type heading: bool
+        :return: The rank card image.
+        :rtype: :class:`PIL.Image.Image`
         """
         pos_dict = {
             "name": {
@@ -517,6 +591,27 @@ class ProfileCardGenerator(AssetGenerator):
         blacklisted: bool = False,
         background: Image.Image = None
     ) -> Image.Image:
+        """Returns the profile card for a user.
+
+        :param name: The user\'s name.
+        :type name: str
+        :param avatar: The user\'s avatar.
+        :type avatar: :class:`PIL.Image.Image`
+        :param balance: The user\'s current balance.
+        :type balance: str
+        :param num_played: The number of matches the user has played.
+        :type num_played: str
+        :param num_won: The number of matches the user has won.
+        :type num_won: str
+        :param badges: The badges the user has earned.
+        :type badges: Optional[List[:class:`PIL.Image.Image`]]
+        :param blacklisted: Whether or not the user is blacklisted.
+        :type blacklisted: bool
+        :param background: The user\'s background image.
+        :type background: :class:`PIL.Image.Image`
+        :return: The profile card
+        :rtype: :class:`PIL.Image.Image`
+        """
 
         # pylint: disable=too-many-locals
 
@@ -624,6 +719,13 @@ class WalletGenerator(AssetGenerator):
         )
 
     def get(self, data: Dict) -> Image.Image:
+        """Returns the balance card for a user.
+
+        :param data: The user's data.
+        :type data: Dict
+        :return: The balance card
+        :rtype: :class:`PIL.Image.Image`
+        """
         wallet = self.wallet.copy()
         canvas = ImageDraw.Draw(wallet)
         params = [

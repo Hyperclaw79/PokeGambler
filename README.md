@@ -1,6 +1,7 @@
 # PokéGambler
 ![Python Version](https://img.shields.io/badge/Python-v3.7%2B-blue)
 [![Build](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build.yml/badge.svg)](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build.yml)
+[![Docs](https://readthedocs.org/projects/pokegambler/badge/?version=latest)](https://pokegambler.readthedocs.io/en/latest/?badge=latest)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/4ae74458ca5941d1884e669a4b3446c0)](https://www.codacy.com/gh/Hyperclaw79/PokeGambler/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Hyperclaw79/PokeGambler&amp;utm_campaign=Badge_Grade)
 [![Discord](https://img.shields.io/discord/361522003355631617?logo=discord)](https://discord.gg/g4TmVyfwj4)
 

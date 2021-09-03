@@ -36,21 +36,28 @@ if TYPE_CHECKING:
 class BidirectionalCycler:
     """
     A bidirectional iterator that can be used to cycle between items.
+
+    :param iterable: The iterable to cycle through.
+    :type iterable: List[Any]
     """
     def __init__(self, iterable: List[Any]):
         self._iterable = iterable
         self._cursor = 0
 
-    def forward(self):
-        """
-        Gets the next element in the iterable.
+    def forward(self) -> Any:
+        """Gets the next element in the iterable.
+
+        :return: The next element in the iterable.
+        :rtype: Any
         """
         self._cursor = (self._cursor + 1) % len(self._iterable)
         return self._iterable[self._cursor]
 
     def backward(self):
-        """
-        Gets the previous element in the iterable.
+        """Gets the previous element in the iterable.
+
+        :return: The previous element in the iterable.
+        :rtype: Any
         """
         self._cursor -= 1
         if self._cursor < 0:
@@ -61,14 +68,13 @@ class BidirectionalCycler:
 class Paginator(BaseView):
     """Custom Pagination for Discord Embeds
 
-    Adds a reaction based pagination to discord Embeds.
+    .. tip:: Adds a :class:`discord.ui.Button` based \
+        pagination to discord Embeds.
 
-    Attributes
-    ----------
-    embeds : list
-        a list of embeds that need to be paginated
-    content: str
-        an optional content for the message
+    :param embeds: The list of embeds to paginate.
+    :type embeds: List[:class:`discord.Embed`]
+    :param content: The content to display in the embed.
+    :type content: Optional[str]
     """
 
     def __init__(
@@ -88,12 +94,10 @@ class Paginator(BaseView):
         """
         Move to the previous embed.
 
-        Parameters
-        ----------
-        button : discord.ui.Button
-            the button that was pressed
-        interaction : discord.Interaction
-            the interaction that was performed
+        :param button: The button that was pressed.
+        :type button: :class:`discord.ui.Button`
+        :param interaction: The interaction that triggered this view.
+        :type interaction: :class:`discord.Interaction`
         """
         await interaction.response.edit_message(
             embed=self.embeds.backward(),
@@ -108,12 +112,10 @@ class Paginator(BaseView):
         """
         Move to the next embed.
 
-        Parameters
-        ----------
-        button : discord.ui.Button
-            the button that was pressed
-        interaction : discord.Interaction
-            the interaction that was performed
+        :param button: The button that was pressed.
+        :type button: :class:`discord.ui.Button`
+        :param interaction: The interaction that triggered this view.
+        :type interaction: :class:`discord.Interaction`
         """
         await interaction.response.edit_message(
             embed=self.embeds.forward(),

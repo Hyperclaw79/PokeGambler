@@ -23,7 +23,7 @@ This module is a compilation of user input validators.
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Dict, Optional, TYPE_CHECKING, Union
 import re
 
 from .utils import dm_send, get_embed
@@ -35,6 +35,13 @@ if TYPE_CHECKING:
 class Validator(ABC):
     """
     Base class for all validators.
+
+    :param message: The message which triggered the validation.
+    :type message: :class:`discord.Message`
+    :param on_error: A dictionary containing error heading and content.
+    :type on_error: Dict
+    :param dm_user: Route the message to user\'s DM?
+    :type dm_user: bool
     """
 
     error_embed_title = ""
@@ -63,8 +70,10 @@ class Validator(ABC):
 
     @property
     def error_embed(self) -> Embed:
-        """
-        Returns an error embed.
+        """Returns an error embed.
+
+        :return: An error embed.
+        :rtype: :class:`discord.Embed`
         """
         return get_embed(
             title=self.error_embed_title,
@@ -78,7 +87,7 @@ class Validator(ABC):
 
     async def __notify(self):
         """
-        Returns the notifier function.
+        Performs the notifier function.
         """
         if not self.dm_user:
             await self.message.channel.send(
@@ -91,8 +100,12 @@ class Validator(ABC):
             )
 
     async def validate(self, value) -> bool:
-        """
-        Validates the given value.
+        """Validates the given value.
+
+        :param value: The value to be validated.
+        :type value: str
+        :return: True if the value is valid, False otherwise.
+        :rtype: bool
         """
         if not self.check(value):
             await self.__notify()
@@ -106,18 +119,23 @@ class IntegerValidator(Validator):
     """
 
     error_embed_title = "Invalid input"
+    #:
     error_embed_desc = "Please enter a valid integer."
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def check(self, value) -> bool:
+    def check(self, value: Union[str, int]) -> bool:
         return str(value).replace(',', '').isdigit()
 
 
 class MaxValidator(IntegerValidator):
-    """
-    Validates a value is less than or equal to the maximum.
+    """Validates a value is less than or equal to the maximum.
+
+    :param max_value: The maximum value to validate against.
+    :type max_value: int
+    :kwargs: Additional keyword arguments to pass to the superclass.
+    :type kwargs: Dict
     """
 
     def __init__(
@@ -130,17 +148,22 @@ class MaxValidator(IntegerValidator):
             self.error_embed_desc = "Value must be less than " + \
                 f"than **{max_value}**."
 
-    def check(self, value) -> bool:
+    def check(self, value: Union[str, int]) -> bool:
         if not super().check(value):
             self.error_embed_title = super().error_embed_title
             self.error_embed_desc = super().error_embed_desc
             return False
-        return int(value.replace(',', '')) <= self.max_value
+        return int(str(value).replace(',', '')) <= self.max_value
 
 
 class MinValidator(IntegerValidator):
     """
     Validates a value is greater than or equal to the minimum.
+
+    :param min_value: The minimum value to validate against.
+    :type min_value: int
+    :kwargs: Additional keyword arguments to pass to the superclass.
+    :type kwargs: Dict
     """
 
     def __init__(
@@ -153,17 +176,25 @@ class MinValidator(IntegerValidator):
             self.error_embed_desc = "Value must be greater than " + \
                 f"than **{min_value}**."
 
-    def check(self, value) -> bool:
+    def check(self, value: Union[str, int]) -> bool:
         if not super().check(value):
             self.error_embed_title = super().error_embed_title
             self.error_embed_desc = super().error_embed_desc
             return False
-        return int(value.replace(',', '')) >= self.min_value
+        return int(str(value).replace(',', '')) >= self.min_value
 
 
 class MinMaxValidator(Validator):
     """
-    Validates a value between a min and max.
+    A combination of :class:`MinValidator` and :class:`MaxValidator`.
+    Used for Range based validations.
+
+    :param min_value: The minimum value to validate against.
+    :type min_value: int
+    :param max_value: The maximum value to validate against.
+    :type max_value: int
+    :kwargs: Additional keyword arguments to pass to the superclass.
+    :type kwargs: Dict
     """
 
     def __init__(
@@ -196,10 +227,15 @@ class MinMaxValidator(Validator):
 
 
 class MaxLengthValidator(Validator):
-    """
-    Validates a string of a certain length.
+    """Validates a string to be of a certain length.
+
+    :param max_length: The maximum permissible length of the string.
+    :type max_length: int
+    :kwargs: Additional keyword arguments to pass to the superclass.
+    :type kwargs: Dict
     """
     error_embed_title = "Invalid Input"
+    #:
     error_embed_desc = "Input value has too many characters."
 
     def __init__(self, max_length: int, **kwargs):
@@ -213,8 +249,10 @@ class MaxLengthValidator(Validator):
 
 
 class RegexValidator(Validator):
-    """
-    Validates a string against a regex.
+    """Validates a string against a regular expression.
+
+    :param pattern: The regular expression to use for validation.
+    :type pattern: str
     """
 
     def __init__(self, pattern: str, **kwargs):
@@ -227,8 +265,9 @@ class RegexValidator(Validator):
 
 class HexValidator(RegexValidator):
     """
-    Validates a hexadecimal value.
+    Validates if a string is a hexadecimal value.
     """
+    #:
     error_embed_title = "Invalid Hexadecimal value"
 
     def __init__(self, **kwargs):
@@ -237,9 +276,11 @@ class HexValidator(RegexValidator):
 
 class ImageUrlValidator(RegexValidator):
     """
-    Validates an image URL.
+    Validates if a strings is an image URL.
     """
+    #:
     error_embed_title = "Invalid image URL"
+    #:
     error_embed_desc = "Only Png and JPG images are supported."
 
     def __init__(self, **kwargs):
@@ -251,8 +292,9 @@ class ImageUrlValidator(RegexValidator):
 
 class UrlValidator(RegexValidator):
     """
-    Validates a URL.
+    Validates if a string is a URL.
     """
+    #:
     error_embed_title = "Invalid URL"
 
     def __init__(self, **kwargs):

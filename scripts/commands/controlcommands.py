@@ -54,8 +54,11 @@ if TYPE_CHECKING:
 
 class ControlCommands(Commands):
     '''
-    Commands that control/interact with other commands.
-    Examples: Togglers, Command Lister, Restart, Channel
+    Commands that help in controlling PokeGambler.
+
+    .. note::
+
+        Only the Owners have access to these commands.
     '''
 
     @owner_only
@@ -66,33 +69,63 @@ class ControlCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Set the active channel for the commands.
-        $```scss
-        {command_prefix}channel [+/add/append] channel_id
-        {command_prefix}channel [-/remove/del/delete] channel_id
-        {command_prefix}channel list
-        {command_prefix}channel reset
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[option: str, channel_id: Optional[int]]
 
-        @`👑 Owner Command`
-        Useful for redirecting echo command.@
+        .. meta::
+            :description: Set the active channel for the commands.
 
-        ~To add channel with ID 1234 to selected channels list:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}channel option [channel_id]
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
+        Useful for redirecting echo command.
+        Supported options
+
+            * +/add/append: Add channel to active list.
+
+            * -/remove/del/delete: Remove channel from active list.
+
+            * list: Display active channels list.
+
+            * reset: Reset active channels list.
+
+        .. rubric:: Examples
+
+        * To add channel with ID 1234
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}channel + 1234
-            ```
-        To remove channel with ID 1234 from selected channels list:
-            ```
+
+        * To remove channel with ID 1234
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}channel - 1234
-            ```
-        To display the selected channels list:
-            ```
+
+        * To display the active channels list
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}channel list
-            ```
-        To reset the selected channels list:
-            ```
+
+        * To reset the active channels list
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}channel reset
-            ```~
         """
         if len(args) >= 2:
             if args and all(dig.isdigit() for dig in args[1]):
@@ -143,27 +176,60 @@ class ControlCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Retrieves the latest command history based on provided kwargs.
-        $```scss
-        {command_prefix}command_history [limit]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The arguments for this command.
+        :type args: List[limit: Optional[int]]
+        :param kwargs: Extra Keyword arguments for this command.
+        :type kwargs: Dict[filter: Optional[str]]
 
-        @`👑 Owner Command`
+        .. meta::
+            :description: Retrieves the latest command history based \
+                on provided kwargs.
+            :aliases: cmd_hist
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}command_history [limit] [--filter param:value]
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
         Retrieves the latest command history based on provided kwargs.
-        Defaults to a limit of 5 commands.@
+        Defaults to a limit of 5 commands.
+        Filter must be comma-separated key value pairs of format key:value.
 
-        ~To retrieve the 10 latest commands:
-            ```
+        .. tip::
+
+            Check :class:`~scripts.base.models.CommandData`
+            for available parameters.
+
+        .. rubric:: Examples
+
+        * To retrieve the 10 latest commands
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}cmd_hist 10
-            ```
-        To retrieve latest commands used by admins:
-            ```
-            {command_prefix}cmd_hist --admin_cmd
-            ```~
+
+        * To retrieve latest commands used by admins
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}cmd_hist --filter admin_cmd:True
         """
         if kwargs:
             kwargs.pop("mentions")
         limit = int(args[0]) if args else 5
+        filter_ = kwargs.get("filter", '')
+        kwargs = {
+            dict(param_str.split(':'))
+            for param_str in filter_.split(',')
+        }
         history = CommandData.history(limit=limit, **kwargs)
         if not history:
             await message.channel.send(
@@ -178,24 +244,43 @@ class ControlCommands(Commands):
     @owner_only
     @no_log
     async def cmd_export_items(self, message: Message, **kwargs):
-        """Items Table Exporter.
-         $```scss
-        {command_prefix}export_items [--pretty level]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param kwargs: Extra Keyword arguments for this command.
+        :type kwargs: Dict[pretty: Optional[int]]]
 
-        @`👑 Owner Command`
+        .. meta::
+            :description: Exports the :class:`~scripts.base.items.Item` \
+                Collection as JSON.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}export_items [--pretty level]
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
         Exports the dynamically created items from the database as JSON.
         The JSON is uploaded as a file in the channel.
-        A --pretty kwarg can be used to provide indentation level.@
+        A --pretty kwarg can be used to provide indentation level.
 
-        ~To export the items as a JSON file:
-            ```
+        .. rubric:: Examples
+
+        * To export the items as a JSON file
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}export_items
-            ```
-        To see a pretty version of items JSON file:
-         ```
+
+        * To see a pretty version of items JSON file
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}export_items --pretty 3
-            ```~
         """
         items = Item.get_unique_items()
         for item in items:
@@ -214,15 +299,26 @@ class ControlCommands(Commands):
     @owner_only
     @no_log
     async def cmd_import_items(self, message: Message, **kwargs):
-        """Items Table Importer.
-         $```scss
-        {command_prefix}import_items
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
 
-        @`👑 Owner Command`
-        Waits for JSON file attachment and loads the data into Items table.
-        Attachment's name should be `items.json`.
-        :warning: Do not import Reward Boxes using this.@
+        .. meta::
+            :description: Imports the items from a JSON file.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}import_items
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
+        Waits for JSON file attachment and loads the data
+        into the Items collection.
+
+        .. warning::
+            Do not import :class:`~scripts.base.items.Rewardbox` using this.
         """
         info_msg = await message.channel.send(
             embed=get_embed(
@@ -248,13 +344,26 @@ class ControlCommands(Commands):
     @owner_only
     @no_log
     async def cmd_latest(self, message: Message, **kwargs):
-        """Returns the latest documents.
-         $```scss
-        {command_prefix}latest [--limit limit]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param kwargs: Extra Keyword arguments for this command.
+        :type kwargs: Dict[limit: Optional[int]]]
 
-        @`👑 Owner Command`
-        Returns the latest entires from a collection.@
+        .. meta::
+            :description: Retrieves the latest documents \
+                from a Collection.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}latest [--limit limit]
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
+        Retrieves the latest documents from a Collection.
+        Defaults to a limit of 5 documents.
         """
         locked, unlocked = self.__get_collections()
         cltn = await self.__get_model_view(
@@ -299,23 +408,42 @@ class ControlCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Purges the tables in the database.
-         $```scss
-        {command_prefix}purge_tables [table_name]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The table name to purge.
+        :type args: List[table: Optional[str]]
 
-        @`👑 Owner Command`
+        .. meta::
+            :description: Purges the tables in the database.
+            :aliases: prg_tbl
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}purge_tables [table_name]
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
         Purges the tables in the database.
-        If no table name is given, purges all the tables.@
+        If no table name is given, purges all the tables.
 
-        ~To purge the profiles table:
-            ```
-            {command_prefix}prg_tbl profiles
-            ```
-        ~To purge all the tables:
-            ```
-            {command_prefix}prg_tbl
-            ```~
+        .. rubric:: Examples
+
+        * To purge the profiles table
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}purge_tables profiles
+
+        * To purge all the tables
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}purge_tables
         """
         locked, unlocked = self.__get_collections()
         if kwargs.get("all", False):
@@ -340,21 +468,36 @@ class ControlCommands(Commands):
     @ensure_args
     async def cmd_reload(
         self, message: Message,
-        args: Optional[List] = None,
+        args: List[str] = None,
         **kwargs
     ):
-        """Hot reload commands.
-        $```scss
-        {command_prefix}reload module_name
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The module name to reload.
+        :type args: List[module: str]
 
-        @`👑 Owner Command`
-        For hot reloading changes in a commands module.@
+        .. meta::
+            :description: Reloads a command module.
 
-        ~To reload changes in normalcommands:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}reload module_name
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
+        Hot reloads a command module without having to restart.
+
+        .. rubric:: Examples
+
+        * To reload the Normalcommands module
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}reload normal
-            ```~
         """
         module = args[0].lower()
         possible_modules = [
@@ -379,21 +522,36 @@ class ControlCommands(Commands):
     @ensure_args
     async def cmd_timeit(
         self, message: Message,
-        args: Optional[List] = None,
+        args: List[str] = None,
         **kwargs
     ):
-        """Executes a command and displays time taken to run it.
-        $```scss
-        {command_prefix}timeit cmd_name
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The command name to time.
+        :type args: List[command: str]
 
-        @`👑 Owner Command`
-        A utility commands that is used for timing other commands.@
+        .. meta::
+            :description: Executes a command and displays time taken to run it.
 
-        ~To time the leaderboard command:
-            ```
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}timeit cmd_name
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
+        A utility commands that is used for timing other commands.
+
+        .. rubric:: Examples
+
+        * To time the leaderboard command
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}timeit lb
-            ```~
         """
         modules = get_modules(self.ctx)
         cmd = args[0].lower()
@@ -424,24 +582,55 @@ class ControlCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Toggle a boolean property of the PokeGambler class.
-        $```scss
-        {command_prefix}toggle property [on/enable/whitelist]
-        {command_prefix}toggle property [off/disable/blacklist]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The property to toggle and to which state.
+        :type args: List[property: str, state: Optional[str]]
 
-        @`👑 Owner Command`
+        .. meta::
+            :description: Toggle a boolean property of the PokeGambler class.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}toggle property [state]
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
         Toggle some of the config options dynamically.
-        Currently, you can toggle: Channel_Mode, Guild_Mode@
+        Currently, the supported properties are:
 
-        ~To enable the autologging:
-            ```
-            {command_prefix}toggle autolog enable
-            ```
-        To operate in Whitelist Guild mode:
-            ```
+            * guildmode
+
+            * channelmode
+
+        The available states are:
+
+            * enable/on/whitelist
+
+            * disable/off/blacklist
+
+        .. warning::
+
+            This command will be deprecated in the future.
+
+        .. rubric:: Examples
+
+        To switch the channel mode
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}toggle channelmode
+
+        To switch the guild mode to whitelist mode
+
+        .. code:: coffee
+            :force:
+
             {command_prefix}toggle guildmode whitelist
-            ```~
         """
         props = {
             "Channel_Mode": "channel_mode",
@@ -518,22 +707,46 @@ class ControlCommands(Commands):
         args: Optional[List] = None,
         **kwargs
     ):
-        """Enable or Disable different command modules.
-        $```scss
-        {command_prefix}toggle_module_state module_name [on/off]
-        ```$
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param args: The command module to toggle and to which state.
+        :type args: List[module: str, state: Optional[str]]
 
-        @`👑 Owner Command`
-        For enabling or disabling a commands module (during maintainence).@
+        .. meta::
+            :description: Enable or Disable different command modules.
+            :aliases: tgl_mod_st
 
-        ~To enable the Controlcommands module:
-            ```
-            {command_prefix}toggle_module_state control enable
-            ```
-        To disable the Normalcommands module:
-            ```
-            {command_prefix}toggle_module_state normal disable
-            ```~
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}toggle_module_state module_name state
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
+        Enable or disable (eg. during maintenance) a command module.
+        The available states are:
+
+            * on/enable
+
+            * off/disable
+
+        .. rubric:: Examples
+
+        To enable the Controlcommands module
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}tgl_mod_st control on
+
+        To disable the Normalcommands module
+
+        .. code:: coffee
+            :force:
+
+            {command_prefix}tgl_mod_st normal off
         """
         if args:
             if len(args) >= 2:

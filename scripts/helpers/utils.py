@@ -28,8 +28,8 @@ import random
 import re
 import time
 from typing import (
-    Callable, Dict, Iterable, List,
-    Optional, TYPE_CHECKING, Union
+    Any, Callable, Dict, Iterable, List,
+    Optional, TYPE_CHECKING, Tuple, Union
 )
 from cachetools import Cache, TTLCache
 
@@ -48,8 +48,14 @@ if TYPE_CHECKING:
 
 
 class LineTimer:
-    """
-    A Context Manager to profile a set of lines of code.
+    """A Context Manager to profile a set of lines of code.
+
+    :param logger: The logger to use.
+    :type logger: CustomLogger
+    :param message: Prefix to add to the profile output.
+    :type message: Optional[str]
+    :param profile_it: Verbose profiling?
+    :type profile_it: Optional[bool]
     """
     def __init__(
         self, logger: CustomLogger,
@@ -90,7 +96,12 @@ class LineTimer:
 
 class ImageCacher:
     """
-    Caches images created in a command for a user.
+    A TTL Cache for images created in a command for a user.
+
+    :param user: The user to cache images for.
+    :type user: :class:`discord.Member`
+    :param kwargs: Additional Keyword Arguments.
+    :type kwargs: Dict[str, Any]
     """
     def __init__(self, user: discord.Member, **kwargs):
         self.cache = TTLCache(maxsize=1, ttl=60)
@@ -98,9 +109,11 @@ class ImageCacher:
         self.kwargs = kwargs
 
     @property
-    def keys(self):
-        """
-        Returns a hashable key for the cache.
+    def keys(self) -> Tuple[str, Tuple[str, Any]]:
+        """Returns a hashable key for the cache.
+
+        :return: Hashable Key
+        :rtype: Tuple[str, Tuple[str, Any]]
         """
         kwgs = tuple({
             key: val
@@ -116,22 +129,30 @@ class ImageCacher:
         Cache.clear(self.cache)
 
     def register(self, img_url: str):
-        """
-        Registers the image to the cache.
+        """Registers the image url to the cache.
+
+        :param img_url: The image url to register.
+        :type img_url: str
         """
         self.cache[self.keys] = img_url
 
     @property
     def cached(self) -> Optional[str]:
-        """
-        Returns the cached image URL if it exists.
+        """Returns the cached image URL if it exists.
+
+        :return: The cached image URL.
+        :rtype: Optional[str]
         """
         return self.cache.get(self.keys)
 
 
 def dedent(message: str) -> str:
-    """
-    Strips whitespaces from the left of every line.
+    """Strips whitespaces from the left of every line.
+
+    :param message: The message to dedent.
+    :type message: str
+    :return: The dedented message.
+    :rtype: str
     """
     return '\n'.join(
         line.lstrip()
@@ -145,9 +166,21 @@ async def dm_send(
     embed: Optional[Embed] = None,
     **kwargs
 ) -> Message:
-    """
-    Attempts to send message to the User's DM.
+    """Attempts to send message to the User's DM.
     In case of fallback, sends in the original channel.
+
+    :param message: The message to send.
+    :type message: :class:`discord.Message`
+    :param user: The user to send the message to.
+    :type user: :class:`discord.Member`
+    :param content: The content of the message.
+    :type content: Optional[str]
+    :param embed: The embed to send.
+    :type embed: Optional[:class:`discord.Embed`]
+    :param kwargs: Additional Keyword Arguments.
+    :type kwargs: Dict[str, Any]
+    :return: The message sent.
+    :rtype: :class:`discord.Message`
     """
     try:
         msg = await user.send(
@@ -165,7 +198,13 @@ async def dm_send(
 
 
 def get_ascii(msg: str) -> str:
-    """ Returns the ascii art for a text. """
+    """Returns the ascii art for a text.
+
+    :param msg: The message to convert to ascii art.
+    :type msg: str
+    :return: The ascii art.
+    :rtype: str
+    """
     artmap = {
         "0": ".█████╗.\n██╔══██╗\n██║..██║\n██║..██║\n╚█████╔╝\n.╚════╝.",
         "1": "..███╗..\n.████║..\n██╔██║..\n╚═╝██║..\n███████╗\n╚══════╝",
@@ -201,8 +240,27 @@ def get_embed(
     color: Optional[int] = None,
     no_icon: bool = False
 ) -> Embed:
-    """
-    Creates a Discord Embed with appropriate color, title and description.
+    """Creates a Discord Embed with appropriate color, \
+        title and description.
+
+    :param content: The content of the embed.
+    :type content: Optional[str]
+    :param embed_type: The type of embed., default is info.
+    :type embed_type: Optional[str]
+    :param title: The title of the embed.
+    :type title: Optional[str]
+    :param footer: The footer of the embed.
+    :type footer: Optional[str]
+    :param image: The image url for the embed.
+    :type image: Optional[str]
+    :param thumbnail: The thumbnail url for the embed.
+    :type thumbnail: Optional[str]
+    :param color: The color of the embed.
+    :type color: Optional[int]
+    :param no_icon: If True, no icon will be shown.
+    :type no_icon: bool
+    :return: The embed
+    :rtype: :class:`discord.Embed`
     """
     embed_params = {
         "info": {
@@ -252,7 +310,21 @@ def get_enum_embed(
     custom_ext: bool = False,
     color: Optional[int] = None
 ) -> Embed:
-    """ Creates a Discord Embed with prettified iterable as description. """
+    """Creates a Discord Embed with prettified iterable as description.
+
+    :param iterable: The iterable to be used as description.
+    :type iterable: Iterable
+    :param embed_type: The type of embed., default is info.
+    :type embed_type: str
+    :param title: The title of the embed.
+    :type title: Optional[str]
+    :param custom_ext: If True, won\'t be wrapped in Markdown codeblock.
+    :type custom_ext: bool
+    :param color: The color of the embed.
+    :type color: Optional[int]
+    :return: The embed
+    :rtype: :class:`discord.Embed`
+    """
     enum_str = '\n'.join(
         f"{i + 1}. {name}"
         for i, name in enumerate(iterable)
@@ -272,7 +344,17 @@ def get_formatted_time(
     show_hours: bool = True,
     show_mins: bool = True
 ) -> str:
-    """ Converts total seconds into a human readable format."""
+    """Converts total seconds into a human readable format.
+
+    :param tot_secs: The total seconds to be converted.
+    :type tot_secs: int
+    :param show_hours: If True, hours will be shown.
+    :type show_hours: bool
+    :param show_mins: If True, minutes will be shown.
+    :type show_mins: bool
+    :return: The formatted time.
+    :rtype: str
+    """
     hours = divmod(tot_secs, 3600)
     minutes = divmod(hours[1], 60)
     seconds = divmod(minutes[1], 1)
@@ -285,8 +367,13 @@ def get_formatted_time(
 
 
 def get_modules(ctx: PokeGambler) -> List[Commands]:
-    """
-    Returns a list of all the commands.
+    """Returns a list of all the
+    :class:`~scripts.commands.basecommand.Commands` Modules.
+
+    :param ctx: The PokeGambler client object.
+    :type ctx: :class:`bot.PokeGambler`
+    :return: A list of all the command modules.
+    :rtype: List[:class:`~scripts.commands.basecommand.Commands`]
     """
     yield from (
         getattr(ctx, comtype)
@@ -299,8 +386,12 @@ def get_modules(ctx: PokeGambler) -> List[Commands]:
 
 
 def get_rand_headers() -> Dict:
-    """
-    Generates a random header for the aiohttp session.
+    """Generates a random header for the aiohttp session.
+
+    .. warning:: Will be deprecated in the future.
+
+    :return: A header with a random User-Agent.
+    :rtype: Dict
     """
     browsers = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -326,8 +417,12 @@ def get_rand_headers() -> Dict:
 
 
 def is_admin(user: Member) -> bool:
-    """
-    Checks if user is a server admin.
+    """Checks if user is an admin in the official server.
+
+    :param user: The user to be checked.
+    :type user: :class:`discord.Member`
+    :return: True if the user is an admin.
+    :rtype: bool
     """
     roles = [
         role.name.lower()
@@ -340,8 +435,12 @@ def is_admin(user: Member) -> bool:
 
 
 def is_dealer(user: Member) -> bool:
-    """
-    Checks if user is a PokeGambler Dealer.
+    """Checks if user is a PokeGambler Dealer.
+
+    :param user: The user to be checked.
+    :type user: :class:`discord.Member`
+    :return: True if the user is a PokeGambler Dealer.
+    :rtype: bool
     """
     roles = [
         role.name.lower()
@@ -354,8 +453,14 @@ def is_dealer(user: Member) -> bool:
 
 
 def is_owner(ctx: PokeGambler, user: Member) -> bool:
-    """
-    Checks if user is bot owner.
+    """Checks if the user is an owner of PokeGambler.
+
+    :param ctx: The PokeGambler client object.
+    :type ctx: :class:`bot.PokeGambler`
+    :param user: The user to be checked.
+    :type user: :class:`discord.Member`
+    :return: True if the user is an owner of PokeGambler.
+    :rtype: bool
     """
     return user.id in (
         ctx.allowed_users,
@@ -367,8 +472,16 @@ def img2file(
     img: Image, fname: str,
     ext: str = "JPEG"
 ) -> File:
-    """
-    Convert a PIL Image into a discord File.
+    """Convert a PIL Image into a discord File.
+
+    :param img: The PIL Image to be converted.
+    :type img: :class:`PIL.Image.Image`
+    :param fname: The filename of the file.
+    :type fname: str
+    :param ext: The extension of the file.
+    :type ext: str
+    :return: The discord File object.
+    :rtype: :class:`discord.File`
     """
     byio = BytesIO()
     img.save(byio, ext)
@@ -377,8 +490,10 @@ def img2file(
 
 
 async def online_now(ctx: PokeGambler):
-    """
-    Notifies on Discord, that PokeGambler is ready.
+    """Notifies on Discord, that PokeGambler is ready.
+
+    :param ctx: The PokeGambler client object.
+    :type ctx: :class:`bot.PokeGambler`
     """
     secret = ctx.discord_webhook_token
     channel = ctx.discord_webhook_channel
@@ -394,8 +509,16 @@ async def online_now(ctx: PokeGambler):
     await ctx.sess.post(url=url, data=body)
 
 
-def parse_command(prefix: str, msg: str) -> dict:
-    """ Parses a message to obtain the command, args and kwargs. """
+def parse_command(prefix: str, msg: str) -> Dict:
+    """Parses a message to obtain the command, args and kwargs.
+
+    :param prefix: The prefix of the command.
+    :type prefix: str
+    :param msg: The message to be parsed.
+    :type msg: str
+    :return: A dictionary with the command, args and kwargs.
+    :rtype: Dict
+    """
     def is_digit(word, check_float=False):
         symbols = ['+', '-']
         if check_float:
@@ -460,10 +583,20 @@ def parse_command(prefix: str, msg: str) -> dict:
 
 def prettify_discord(
     ctx: PokeGambler,
-    iterable: List,
+    iterable: List[str],
     mode: str = "guild"
 ) -> str:
-    """ Prettification for iterables like guilds and channels. """
+    """Prettification for iterables like guilds and channels.
+
+    :param ctx: The PokeGambler client object.
+    :type ctx: :class:`bot.PokeGambler`
+    :param iterable: The iterable to be prettified.
+    :type iterable: List[str]
+    :param mode: Guild or Channel?
+    :type mode: str
+    :return: The prettified string.
+    :rtype: str
+    """
     func = getattr(ctx, f"get_{mode}")
     return '\n\t'.join(
         ', '.join(
@@ -479,8 +612,16 @@ def showable_command(
     ctx: PokeGambler,
     cmd: Callable, user: Member
 ):
-    """
-    Checks if a command is accessible to a user based on roles.
+    """Checks if a command is accessible to a user based on roles.
+
+    :param ctx: The PokeGambler client object.
+    :type ctx: :class:`bot.PokeGambler`
+    :param cmd: The command to be checked.
+    :type cmd: Callable
+    :param user: The user to check the command for.
+    :type user: :class:`discord.Member`
+    :return: True if the command is accessible, False otherwise.
+    :rtype: bool
     """
     def has_access(cmd, user):
         if is_owner(ctx, user):
@@ -506,12 +647,22 @@ def showable_command(
 
 def get_commands(
     ctx: PokeGambler, user: Member, module: Commands,
-    args: Optional[List[str]] = None,
-):
+    roles: Optional[List[str]] = None,
+) -> str:
+    """Get a list of all showable commands for a given Module.
+
+    :param ctx: The PokeGambler client object.
+    :type ctx: :class:`bot.PokeGambler`
+    :param user: The user to check the commands for.
+    :type user: :class:`discord.Member`
+    :param module: The module to get the commands from.
+    :type module: :class:`~scripts.commands.basecommand.Commands`
+    :param roles: The roles to check the commands for.
+    :type roles: Optional[List[str]]
+    :return: A list of all showable commands.
+    :rtype: str
     """
-    Get a list of all showable commands for a given Module.
-    """
-    role = args[0] if args else None
+    role = roles[0] if roles else None
     return '\n'.join(
         sorted(
             [
@@ -549,9 +700,23 @@ async def wait_for(
     check: Optional[Callable] = None,
     timeout: Optional[Union[float, str]] = None
 ) -> Message:
-    """
-    Modified version of discord.Client.wait_for.
+    """Modified version of :meth:`discord.Client.wait_for`.
     Checks the history once upon timeout.
+
+    :param chan: The channel to wait for messages in.
+    :type chan: :class:`discord.TextChannel`
+    :param ctx: The PokeGambler client object.
+    :type ctx: :class:`bot.PokeGambler`
+    :param event: The event to wait for., defaults to message.
+    :type event: str
+    :param init_msg: Checks history after this message.
+    :type init_msg: Optional[:class:`discord.Message`]
+    :param check: Checks the message against this function.
+    :type check: Optional[Callable]
+    :param timeout: The timeout to wait for.
+    :type timeout: Optional[Union[float, str]]
+    :return: The message that was received.
+    :rtype: :class:`discord.Message`
     """
     if not timeout:
         timeout = 5.0

@@ -31,7 +31,7 @@ from inspect import ismethod
 import os
 from typing import (
     Any, Callable, Dict, List,
-    Optional, Tuple, Type
+    Optional, Tuple, Type, Union
 )
 
 import discord
@@ -40,8 +40,9 @@ from ..base.items import Item, DB_CLIENT  # pylint: disable=cyclic-import
 
 
 def expire_cache(func: Callable):
-    """
-    Decorator to reset User cache.
+    """Decorator to reset User cache.
+
+    :param func: Function which requires cache to be cleared.
     """
     @wraps(func)
     def wrapper(self, *args, **kwargs):
@@ -60,6 +61,8 @@ class CustomEnumMeta(EnumMeta):
     """
     Override Enum to allow for case-insensitive enum names.
     Also adds a DEFAULT value to the Enum.
+
+    :meta private:
     """
     def __getitem__(cls, name):
         try:
@@ -82,6 +85,8 @@ class NameSetter(type):
     """
     Metaclass to set the mongo collection for the model.
     Useful for DB actions in Classmethods.
+
+    :meta private:
     """
     def __new__(cls, name, bases, dct):
         new_cl = super().__new__(
@@ -94,8 +99,10 @@ class NameSetter(type):
 
 @dataclass
 class Model(metaclass=NameSetter):
-    """
-    The Base Model Class which has a corresponding table in the Collection.
+    """The Base Model Class which has a corresponding Collection in the DB.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
     """
 
     def __init__(
@@ -134,9 +141,13 @@ class Model(metaclass=NameSetter):
             ]
         })
 
-    def get(self, param=None):
-        """
-        Returns the Model object as a dictionary.
+    def get(self, param=None) -> Any:
+        """Returns the Model object as a dictionary.
+
+        :param param: The attribute to get from the Model.
+        :type param: str
+        :return: The attribute value.
+        :rtype: Any
         """
         if not param:
             return dict(self)
@@ -153,8 +164,12 @@ class Model(metaclass=NameSetter):
         cls: Type[Model],
         limit: Optional[int] = 5
     ) -> List[Dict]:
-        """
-        Returns the latest douments from the DB for a model.
+        """Returns the latest douments from the DB for a model.
+
+        :param limit: The number of documents to return., default 5
+        :type limit: Optional[int]
+        :return: The documents from the DB.
+        :rtype: List[Dict]
         """
         return list(
             cls.mongo.aggregate([
@@ -175,8 +190,14 @@ class Model(metaclass=NameSetter):
 # region Models
 
 class Blacklist(Model):
-    """
-    Wrapper for blacklisted users based DB actions
+    """Wrapper for blacklisted users based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param mod: The ID of the Admin who used the command.
+    :type mod: Optional[str]
+    :param reason: The reason for the blacklist.
+    :type reason: Optional[str]
     """
 
     def __init__(
@@ -238,15 +259,29 @@ class Blacklist(Model):
         cls: Type[Blacklist],
         user_id: str
     ) -> bool:
-        """
-        Wrapper for is_blacklisted DB call.
+        """Checks if a user is blacklisted.
+
+        :param user_id: The ID of the user to check.
+        :type user_id: str
+        :return: True if blacklisted, False otherwise.
+        :rtype: bool
         """
         return cls.mongo.find_one({"user_id": user_id})
 
 
 class CommandData(Model):
-    """
-    Wrapper for command based DB actions
+    """Wrapper for command based DB actions
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param message: The message which triggered the command.
+    :type message: discord.Message
+    :param command: The command which was triggered.
+    :type command: str
+    :param args: The arguments passed to the command.
+    :type args: List[str]
+    :param kwargs: The keyword arguments passed to the command.
+    :type kwargs: Dict[str, Any]
     """
 
     def __init__(
@@ -266,16 +301,22 @@ class CommandData(Model):
         self.kwargs = kwargs
 
     @classmethod
-    def history(cls, limit: Optional[int] = 5, **kwargs):
-        """
-        Returns the list of commands used on PG till now.
+    def history(cls, limit: Optional[int] = 5, **kwargs) -> List[Dict]:
+        """Returns the list of commands used on PG till now.
+
+        :param limit: The number of documents to return., default 5
+        :type limit: Optional[int]
+        :return: The recorded commands from the DB.
+        :rtype: List[Dict]
         """
         return list(cls.mongo.find().limit(limit))
 
     @classmethod
     def most_active_channel(cls) -> Dict:
-        """
-        Returns the most active channel.
+        """Returns the most active channel.
+
+        :return: The most active channel.
+        :rtype: Dict
         """
         return next(
             cls.mongo.aggregate([
@@ -307,8 +348,10 @@ class CommandData(Model):
 
     @classmethod
     def most_used_command(cls) -> Dict:
-        """
-        Returns the most used command.
+        """Returns the most used command.
+
+        :return: The most used command.
+        :rtype: Dict
         """
         return next(
             cls.mongo.aggregate([
@@ -339,8 +382,10 @@ class CommandData(Model):
 
     @classmethod
     def most_active_user(cls) -> Dict:
-        """
-        Returns the most active user.
+        """Returns the most active user.
+
+        :return: The most active user.
+        :rtype: Dict
         """
         return next(
             cls.mongo.aggregate([
@@ -371,8 +416,12 @@ class CommandData(Model):
 
     @classmethod
     def num_user_cmds(cls, user_id: str) -> int:
-        """
-        Returns the number of commands used by a user.
+        """Returns the number of commands used by a user.
+
+        :param user_id: The ID of the user.
+        :type user_id: str
+        :return: The number of commands used by the user.
+        :rtype: int
         """
         return cls.mongo.find({
             "user_id": user_id
@@ -382,6 +431,13 @@ class CommandData(Model):
 class DuelActionsModel(Model):
     """
     Wrapper for duel actions based DB actions
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param action: An action which can be used in a duel.
+    :type action: Optional[str]
+    :param level: The level of the action.
+    :type level: Optional[str]
     """
 
     def __init__(
@@ -401,8 +457,12 @@ class DuelActionsModel(Model):
         cls: Type[DuelActionsModel],
         user_id: Optional[str] = None
     ) -> List[Dict]:
-        """
-        Wrapper for get_actions DB call.
+        """Get Duel Actions from the DB.
+
+        :param user_id: An optional user_id to get the actions for.
+        :type user_id: Optional[str]
+        :return: The list of duel actions.
+        :rtype: List[Dict]
         """
         filter_ = {}
         if user_id:
@@ -414,8 +474,18 @@ class DuelActionsModel(Model):
 
 
 class Exchanges(Model):
-    """
-    Wrapper for currency exchanges based DB actions
+    """Wrapper for currency exchanges based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param admin: The ID of the Admin who performed the exchange.
+    :type admin: str
+    :param pokebot: The ID of the Pokemon themed bot.
+    :type pokebot: str
+    :param chips: The amount of chips exchanged.
+    :type chips: int
+    :param mode: The mode of the exchange., default is Deposit.
+    :type mode: str
     """
 
     def __init__(
@@ -434,8 +504,12 @@ class Exchanges(Model):
         self.mode = mode
 
     def get_daily_exchanges(self, mode: str) -> int:
-        """
-        Wrapper for get_daily_exchanges DB call.
+        """Gets the list of exchanges made by the user today.
+
+        :param mode: The mode of the exchange.
+        :type mode: str
+        :return: The number of chips exchanged.
+        :rtype: int
         """
         pipeline = [
             {
@@ -468,15 +542,21 @@ class Exchanges(Model):
 
     @classmethod
     def exchanges(cls, **kwargs) -> List[Dict]:
-        """
-        Wrapper for getting the completed exchanges.
+        """Find all completed exchanges based on the provided filters.
+
+        :param kwargs: The filters to use in the query.
+        :type kwargs: Dict
+        :return: The list of completed exchanges.
+        :rtype: List[Dict]
         """
         yield from cls.mongo.find(kwargs)
 
 
 class Inventory(Model):
-    """
-    Wrapper for Inventory based DB operations.
+    """Wrapper for Inventory based DB operations.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
     """
 
     # pylint: disable=arguments-differ
@@ -488,16 +568,23 @@ class Inventory(Model):
         self.user_id = str(self.user.id)
 
     def delete(
-        self, item_inp: str,
+        self, item_inp: Union[str, List[str]],
         quantity: int = -1,
         is_name: bool = False
     ) -> int:
-        """
-        Deletes an Item from user's Inventory.
+        """Deletes an Item from user's Inventory.
         Input can either be a name or List of itemids.
         If item name is given, a quantity can be provided.
         If quantity is -1, all items of the name will be removed.
-        Returns number of records deleted.
+
+        :param item_inp: The name or list of item ids to delete.
+        :type item_inp: Union[str, List[str]]
+        :param quantity: The quantity of items to delete., default is -1.
+        :type quantity: int
+        :param is_name: Whether the input is a name or list of item ids.
+        :type is_name: bool
+        :return: The number of items deleted.
+        :rtype: int
         """
         ids = self.from_name(item_inp) if is_name else [item_inp]
         if is_name:
@@ -516,9 +603,13 @@ class Inventory(Model):
         })
         return res.deleted_count
 
-    def from_id(self, itemid: int) -> Item:
-        """
-        Gets an item using ItemID if it exists in user's inventory.
+    def from_id(self, itemid: str) -> Item:
+        """Gets an item using ItemID if it exists in user's inventory.
+
+        :param itemid: The ItemID of the item.
+        :type itemid: str
+        :return: The Item object.
+        :rtype: :class:`~scripts.base.items.Item`
         """
         item = self.mongo.find_one({
             "user_id": self.user_id,
@@ -529,8 +620,12 @@ class Inventory(Model):
         return None
 
     def from_name(self, name: str) -> List[str]:
-        """
-        Returns a list of ItemIDs if they exist in user's Inventory.
+        """Returns a list of ItemIDs if they exist in user's Inventory.
+
+        :param name: The name of the item.
+        :type name: str
+        :return: The list of ItemIDs.
+        :rtype: List[str]
         """
         items = self.mongo.aggregate([
             {
@@ -586,8 +681,18 @@ class Inventory(Model):
     def get(
         self, category: Optional[str] = None
     ) -> Tuple[Dict[str, List], int]:
-        """
-        Returns a list of items in user's Inventory.
+        """Returns a list of items in user's Inventory and the net worth.
+
+        .. note:: These items are not included for calculating the net worth:
+
+            * :class:`~scripts.base.items.Chest`
+            * :class:`~scripts.base.items.Lootbag`
+            * :class:`~scripts.base.items.Rewardbox`
+
+        :param category: The category to filter by.
+        :type category: Optional[str]
+        :return: The list of items and the net worth of the inventory.
+        :rtype: Tuple[Dict[str, List], int]
         """
         pipeline = [
             {
@@ -638,8 +743,10 @@ class Inventory(Model):
         return item_dict, net_worth
 
     def save(self, itemid: str):
-        """
-        Saves an item in a player's inventory.
+        """Saves an item to a player's inventory.
+
+        :param itemid: The ItemID of the item.
+        :type itemid: str
         """
         item = self.from_id(itemid)
         if item:
@@ -661,22 +768,28 @@ class Minigame(Model):
     # pylint: disable=no-self-use
 
     @property
-    def num_plays(self):
-        """
-        Returns number of minigames (of specified type) played.
+    def num_plays(self) -> int:
+        """Returns number of minigames (of specified type) played.
+
+        :return: Number of minigames played.
+        :rtype: int
         """
         return len(self.get_plays())
 
     @property
     def num_wins(self):
-        """
-        Returns number of minigames (of specified type) won.
+        """Returns number of minigames (of specified type) won.
+
+        :return: Number of minigames won.
+        :rtype: int
         """
         return len(self.get_plays(wins=True))
 
-    def get_lb(self):
-        """
-        Returns leaderboard for the specified minigame.
+    def get_lb(self) -> List[Dict]:
+        """Returns leaderboard for the specified minigame.
+
+        :return: The leaderboard for the minigame.
+        :rtype: List[Dict]
         """
         return list(self.mongo.aggregate([
             {
@@ -704,9 +817,13 @@ class Minigame(Model):
             {"$limit": 20}
         ]))
 
-    def get_plays(self, wins: bool = False):
-        """
-        Returns list of minigames (of specified type) played.
+    def get_plays(self, wins: bool = False) -> List[Dict]:
+        """Returns list of minigames (of specified type) played.
+
+        :param wins: Whether to include only wins or all plays.
+        :type wins: bool
+        :return: List of minigames played.
+        :rtype: List[Dict]
         """
         filter_ = {
             "played_by": str(self.user.id)
@@ -746,8 +863,22 @@ class Minigame(Model):
 
 
 class Matches(Model):
-    """
-    Wrapper for matches based DB actions
+    """Wrapper for Gamble matches based DB actions
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param started_by: The ID of the user who started the match.
+    :type started_by: str
+    :param participants: The list of IDs of participants.
+    :type participants: List[str]
+    :param winner: The ID of the winner.
+    :type winner: str
+    :param deal_cost: The fee of the gamble match., deafult is 50.
+    :type deal_cost: int
+    :param lower_wins: Was the lower_wins rule in place?
+    :type lower_wins: bool
+    :param by_joker: Did the match end due to a joker?
+    :type by_joker: bool
     """
 
     def __init__(
@@ -768,9 +899,11 @@ class Matches(Model):
         self.by_joker = by_joker
 
     @property
-    def num_matches(self):
-        """
-        Returns number of gamble matches played.
+    def num_matches(self) -> int:
+        """Returns number of gamble matches played.
+
+        :return: Number of matches played.
+        :rtype: int
         """
         return self.mongo.find({
             "$or": [
@@ -784,17 +917,21 @@ class Matches(Model):
         }).count()
 
     @property
-    def num_wins(self):
-        """
-        Returns number of gamble matches won.
+    def num_wins(self) -> int:
+        """Returns number of gamble matches won.
+
+        :return: Number of matches won.
+        :rtype: int
         """
         return self.mongo.find({
             "winner": str(self.user.id)
         }).count()
 
     def get_stats(self) -> Tuple[int, int]:
-        """
-        Get Match num_matches and num_wins as a Tuple.
+        """Get Match :meth:`num_matches` and :meth:`num_wins` as a Tuple.
+
+        :return: Tuple of num_matches and num_wins.
+        :rtype: Tuple[int, int]
         """
         return (self.num_matches, self.num_wins)
 
@@ -802,9 +939,13 @@ class Matches(Model):
     def get_matches(
         cls: Type[Matches],
         limit: Optional[int] = 10
-    ) -> bool:
-        """
-        Wrapper for get_matches DB call.
+    ) -> List[Dict]:
+        """Get the recently played gamble matches.
+
+        :param limit: The maximum number of matches to return., default 10
+        :type limit: Optional[int]
+        :return: List of recent matches.
+        :rtype: List[Dict]
         """
         pipeline = [
             {"$sort": {"played_at": -1}},
@@ -814,8 +955,14 @@ class Matches(Model):
 
 
 class Nitro(Model):
-    """
-    Wrapper for Nitro Reward records.
+    """Wrapper for Nitro Reward records.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param boosters: The list of IDs of nitro boosters.
+    :type boosters: List[str]
+    :param rewardboxes: The list of IDs of nitro reward boxes.
+    :type rewardboxes: List[str]
     """
     def __init__(
         self, user: discord.Member,
@@ -828,9 +975,10 @@ class Nitro(Model):
         self.rewardboxes = rewardboxes
 
     @classmethod
-    def get_last_rewarded(cls):
-        """
-        Returns the last time the user was given a reward.
+    def get_last_rewarded(cls) -> datetime:
+        """Returns the last time the users were rewarded.
+
+        :return: Last time the users were rewarded.
         """
         pipeline = [
             {"$sort": {"last_rewarded": -1}},
@@ -843,8 +991,20 @@ class Nitro(Model):
 
 
 class Trades(Model):
-    """
-    Wrapper for trades based DB actions
+    """Wrapper for trades based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param traded_to: The ID of the user with whom the trade happened.
+    :type traded_to: str
+    :param given_chips: The number of pokechips given to user.
+    :type given_chips: int
+    :param taken_chips: The number of pokechips taken from user.
+    :type taken_chips: int
+    :param given_items: The list of items given to user.
+    :type given_items: List[str]
+    :param taken_items: The list of items taken from user.
+    :type taken_items: List[str]
     """
 
     def __init__(
@@ -852,8 +1012,8 @@ class Trades(Model):
         traded_to: Optional[str] = None,
         given_chips: int = None,
         taken_chips: int = None,
-        given_items: List[int] = None,
-        taken_items: List[int] = None
+        given_items: List[str] = None,
+        taken_items: List[str] = None
     ):
         super().__init__(user)
         self.traded_at = datetime.now()
@@ -866,8 +1026,10 @@ class Trades(Model):
 
 
 class UnlockedModel(Model):
-    """
-    The Base Unlocked Model class which can be modified after creation.
+    """The Base Unlocked Model class which can be modified after creation.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
     """
 
     def __init__(self, user: discord.Member):
@@ -922,7 +1084,10 @@ class UnlockedModel(Model):
             setattr(self, key, val)
 
     def _default(self):
-        pass
+        """
+        The default values to be used for init.
+        """
+        raise NotImplementedError
 
 # endregion
 
@@ -930,9 +1095,12 @@ class UnlockedModel(Model):
 # region Unlocked Models
 
 class Boosts(UnlockedModel):
+    """Wrapper for Permanent Boosts based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
     """
-    Wrapper for Boosts based DB actions.
-    """
+
     def _default(self):
         self.user_id: str = str(self.user.id)
         self.lucky_looter: int = 0
@@ -943,7 +1111,7 @@ class Boosts(UnlockedModel):
     @classmethod
     def reset_all(cls: Type[Boosts]):
         """
-        Resets all Unlocked Models.
+        Resets the Boosts collection.
         """
         cls.mongo.update_many(
             {"user_id": {"$exists": True}},
@@ -957,8 +1125,10 @@ class Boosts(UnlockedModel):
 
 
 class Loots(UnlockedModel):
-    """
-    Wrapper for Loots based DB actions.
+    """Wrapper for Loots based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
     """
     def _default(self):
         self.user_id: str = str(self.user.id)
@@ -972,7 +1142,7 @@ class Loots(UnlockedModel):
     @classmethod
     def reset_all(cls: Type[Loots]):
         """
-        Resets all the Loots.
+        Resets the Loots collection.
         """
         cls.mongo.update_many(
             {"user_id": {"$exists": True}},
@@ -988,8 +1158,10 @@ class Loots(UnlockedModel):
 
 
 class Profiles(UnlockedModel):
-    """
-    Wrapper for Profiles based DB actions.
+    """Wrapper for Profiles based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
     """
 
     # pylint: disable=access-member-before-definition
@@ -1030,8 +1202,10 @@ class Profiles(UnlockedModel):
 
     @property
     def full_info(self) -> Dict:
-        """
-        Wrapper for Get Full Profile DB call.
+        """Get the full/consolidated info for the user.
+
+        :return: The full info for the user.
+        :rtype: Dict
         """
         for collection in [Loots, Boosts]:
             if not collection(self.user).get():
@@ -1068,8 +1242,12 @@ class Profiles(UnlockedModel):
 
     @expire_cache
     def credit(self, amount: int, bonds: bool = False):
-        """
-        Shorthand method to add to balance and won_chips.
+        """Shorthand method to credit user\'s balance and won_chips.
+
+        :param amount: The amount to credit to the balance.
+        :type amount: int
+        :param bonds: Currency type is Pokebonds?
+        :type bonds: bool
         """
         if bonds:
             self.update(
@@ -1084,8 +1262,12 @@ class Profiles(UnlockedModel):
 
     @expire_cache
     def debit(self, amount: int, bonds: bool = False):
-        """
-        Shorthand method to subtract from balance and won_chips.
+        """Shorthand method to debit user\'s balance and won_chips.
+
+        :param amount: The amount to debit from the balance.
+        :type amount: int
+        :param bonds: Currency type is Pokebonds?
+        :type bonds: bool
         """
         if bonds:
             self.update(
@@ -1099,8 +1281,10 @@ class Profiles(UnlockedModel):
             )
 
     def get_badges(self) -> List[str]:
-        """
-        Computes the Badges unlocked by the user.
+        """Computes the Badges unlocked by the user.
+
+        :return: The list of badges unlocked by the user.
+        :rtype: List[str]
         """
         definitions = {
             "champion": ("num_wins", 1),
@@ -1129,8 +1313,10 @@ class Profiles(UnlockedModel):
         return badges
 
     def get_rank(self) -> int:
-        """
-        Wrapper for get_rank DB call.
+        """Get the user\'s rank in the leaderboard.
+
+        :return: The user\'s rank in the leaderboard.
+        :rtype: int
         """
         res = self.mongo.aggregate([
             {
@@ -1179,8 +1365,12 @@ class Profiles(UnlockedModel):
         cls: Type[Profiles],
         ids_only: bool = False
     ) -> List[Dict]:
-        """
-        Wrapper for the DB query to get all whitelist profiles.
+        """DB query to get all whitelisted profiles.
+
+        :param ids_only: Return only the user IDs?
+        :type ids_only: bool
+        :return: The list of whitelisted profiles.
+        :rtype: List[Dict]
         """
         pipeline = [
             {
@@ -1214,8 +1404,12 @@ class Profiles(UnlockedModel):
         cls: Type[Profiles],
         sort_by: List[str]
     ) -> List[Dict]:
-        """
-        Wrapper for get_leaderboard DB call.
+        """Get the global leaderboard of PokeGambler.
+
+        :param sort_by: The fields to sort the leaderboard by.
+        :type sort_by: List[str]
+        :return: The leaderboard.
+        :rtype: List[Dict]
         """
         res = cls.mongo.aggregate([
             {
@@ -1270,7 +1464,12 @@ class Profiles(UnlockedModel):
 
 class Votes(UnlockedModel):
     """
-    Wrapper for Votes based DB actions.
+    .. _Votes: https://top.gg/bot/873569713005953064/vote
+
+    Wrapper for `Votes`_ based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
     """
 
     def _default(self):
@@ -1284,8 +1483,10 @@ class Votes(UnlockedModel):
 
     @classmethod
     def most_active_voter(cls: Type[Votes]) -> Dict:
-        """
-        Wrapper for the DB query to get the most active voter.
+        """Get the most active voter.
+
+        :return: The most active voter.
+        :rtype: Dict
         """
         res = cls.mongo.aggregate([
             {
@@ -1304,7 +1505,7 @@ class Votes(UnlockedModel):
     @classmethod
     def reset_all(cls: Type[Votes]):
         """
-        Resets all the Votes.
+        Resets the Votes collection.
         """
         cls.mongo.update_many(
             {"user_id": {"$exists": True}},
@@ -1324,8 +1525,20 @@ class Votes(UnlockedModel):
 # region Minigames
 
 class Duels(Minigame):
-    """
-    Wrapper for duels based DB actions
+    """Wrapper for duels based DB actions
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param gladiator: The gladiator used by the user.
+    :type gladiator: Optional[str]
+    :param opponent: The ID of the opponent for the Duel.
+    :type opponent: Optional[str]
+    :param opponent_gladiator: The gladiator of the opponent.
+    :type opponent_gladiator: Optional[str]
+    :param won: The ID of the winner of the Duel.
+    :type won: Optional[str]
+    :param cost: The cost of the Duel., default is 50.
+    :type cost: Optional[int]
     """
 
     def __init__(
@@ -1345,9 +1558,13 @@ class Duels(Minigame):
         self.cost = cost
         self.won = won
 
-    def get_plays(self, wins: bool = False):
-        """
-        Returns list of minigames (of specified type) played.
+    def get_plays(self, wins: bool = False) -> List[Dict]:
+        """Returns list of duels played/won by the user.
+
+        :param wins: Whether to get the list of wins or plays.
+        :type wins: bool
+        :return: The list of plays.
+        :rtype: List[Dict]
         """
         filter_ = {
             "played_by": str(self.user.id)
@@ -1374,8 +1591,14 @@ class Duels(Minigame):
 
 
 class Flips(Minigame):
-    """
-    Wrapper for flips based DB actions
+    """Wrapper for Quickflips based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param cost: The cost of the flip.
+    :type cost: int
+    :param won: Did the user win the flip?
+    :type won: bool
     """
 
     def __init__(
@@ -1390,8 +1613,16 @@ class Flips(Minigame):
 
 
 class Moles(Minigame):
-    """
-    Wrapper for moles based DB actions
+    """Wrapper for Whackamole based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param cost: The cost of the mole.
+    :type cost: int
+    :param level: The level of the mole.
+    :type level: int
+    :param won: Did the user win the mole?
+    :type won: bool
     """
 
     def __init__(

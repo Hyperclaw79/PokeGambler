@@ -32,9 +32,11 @@ init()  # Initialize Colorama
 
 
 class CustomLogger:
-    '''
-    A simple Logger which has the main purpose of colorifying outputs.
+    '''A simple Logger which has the main purpose of colorizing outputs.
     Barebones implementation without importing from the Logging module.
+
+    :param error_log_path: Path to the error log file.
+    :type error_log_path: str
     '''
     def __init__(self, error_log_path: str):
         formats = [
@@ -57,9 +59,14 @@ class CustomLogger:
         timestamp: bool = True,
         **kwargs
     ):
-        '''
-        Wraps the text and prints it to Stdout.
-        In case of an error (red), logs it to error.log
+        '''Wraps the text and prints it to Stdout.
+        In case of an error (red), logs it to
+        :class:`CustomLogger`.error_log_path
+
+        :param text: The text to print.
+        :type text: str
+        :param timestamp: If true, prints the timestamp before the text.
+        :type timestamp: bool
         '''
         if kwargs and kwargs.get("color") == "red":
             func_name = kwargs.get("wrapped_func")
@@ -77,10 +84,16 @@ class CustomLogger:
         self, text: str, *args,
         color: Optional[str] = None,
         **kwargs
-    ):
-        '''
-        Wraps the text based on the color and returns it.
+    ) -> str:
+        '''Wraps the text based on the color and returns it.
         Can handle a list of colors as well.
+
+        :param text: The text to wrap.
+        :type text: str
+        :param color: The color to wrap the text in.
+        :type color: Optional[str]
+        :returns: The wrapped text.
+        :rtype: str
         '''
         if color and isinstance(color, list):
             for fmt in color:
