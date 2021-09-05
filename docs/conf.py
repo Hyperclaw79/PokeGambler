@@ -29,6 +29,7 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
+    'sphinxext.opengraph',
     "sphinx_rtd_dark_mode",
     'sphinx_search.extension',
     'sphinx_tabs.tabs'
@@ -93,6 +94,9 @@ nitpick_ignore_regex = [
     ('py:class', r'[a-zA-Z_-]+'),
     ('py:class', r'[^:]?:\s[a-zA-Z_-]+'),
 ]
+
+ogp_image = 'https://pokegambler.readthedocs.io/en/latest/_images/logochip.png'
+
 python_use_unqualified_type_names = True
 
 # -- Options for HTML output -------------------------------------------------
