@@ -336,7 +336,7 @@ class SlashHandler:
         try:
             await self.http.request(route)
             if cmd['name'] in self.registered.names:
-                self.registered.remove(command)
+                self.registered.remove(cmd['name'])
             self.ctx.logger.pprint(
                 f"Unregistered command: {cmd['name']}",
                 color='yellow'
@@ -434,6 +434,8 @@ class SlashHandler:
         :type kwargs: Dict
         """
         cmd_name = command.__name__.replace('cmd_', '')
+        if self.ctx.is_local:
+            cmd_name += '_'
         if cmd_name in self.registered.names and self.__params_matched(
             command, cmd_name
         ):
@@ -492,6 +494,8 @@ class SlashHandler:
         """
         for command in commands:
             cmd_name = command.__name__.replace('cmd_', '')
+            if self.ctx.is_local:
+                cmd_name += '_'
             cmd_obj = self.registered[cmd_name]
             perms = [{
                 'id': user.id,
@@ -572,8 +576,7 @@ class SlashHandler:
             )
             return False
 
-    @staticmethod
-    def __prep_payload(command: Callable) -> Dict:
+    def __prep_payload(self, command: Callable) -> Dict:
         """Prepare payload for slash command registration.
 
         :param command: Command to register.
@@ -611,18 +614,23 @@ class SlashHandler:
         if len(desc) <= 100:
             description = desc
         options = sorted(options, key=lambda x: -x['required'])
+        cmd_name = command.__name__.replace("cmd_", "")
+        if self.ctx.is_local:
+            cmd_name += "_"
         return {
-            "name": command.__name__.replace("cmd_", "").lower(),
+            "name": cmd_name,
             "description": description,
             "type": 1,
             "options": options
         }
 
     async def __sync_commands(self, current_commands, **kwargs):
-        await self.registered.refresh()
-        await self.registered.refresh(guild_id=self.ctx.official_server)
+        if not self.ctx.is_local:
+            await self.registered.refresh()
+        await self.registered.refresh(**kwargs)
+        pad = '' if not self.ctx.is_local else '_'
         cmds = [
-            cmd.__name__.replace('cmd_', '')
+            cmd.__name__.replace('cmd_', '') + pad
             for cmd in current_commands
         ]
         for command in self.registered:

@@ -186,6 +186,8 @@ class PokeGambler(discord.AutoShardedClient):
         """
         if interaction.data.get('type', 0) != 1:
             return
+        if not interaction.guild or self.__bl_wl_check(interaction):
+            return
         method, kwargs = await self.slasher.parse_response(interaction)
         if not (method and kwargs):
             return
