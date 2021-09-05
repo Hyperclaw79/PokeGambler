@@ -503,7 +503,7 @@ class SlashHandler:
         :type command_id: int
         """
         route_kwargs = {
-            "method": "POST",
+            "method": "PUT",
             "endpoint": f"{command_id}/permissions"
         }
         if self.ctx.is_prod:
@@ -515,7 +515,9 @@ class SlashHandler:
                 "type": 2,
                 "permission": True
             }
-            for uid in self.ctx.allowed_users
+            for uid in set(
+                self.ctx.allowed_users + [self.ctx.owner.id]
+            )
         ]
         if hasattr(command, "admin_only"):
             perms.append({
