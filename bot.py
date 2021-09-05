@@ -50,7 +50,7 @@ from scripts.helpers.slash import SlashHandler
 # pylint: disable=cyclic-import
 from scripts.helpers.utils import (
     dm_send, get_ascii, get_commands,
-    get_formatted_time, get_modules,
+    get_formatted_time, get_modules, is_admin, is_dealer,
     prettify_discord, get_embed, parse_command,
     get_rand_headers, is_owner, online_now
 )
@@ -321,6 +321,51 @@ class PokeGambler(discord.AutoShardedClient):
         )
         await jq_log_channel.send(embed=emb)
 
+    async def on_member_update(
+        self, before: discord.Member,
+        after: discord.Member
+    ):
+        """Called when a :class:`discord.Member` is updated.
+
+        This event is called whenever a member's status,
+        roles, or other attributes are updated.
+        We will use this to sync Slash command permissions
+        for new admins, dealers, etc.
+
+        .. note::
+
+            This requires :attr:`discord.Intents.guilds` to be enabled.
+
+        :param before: The member before the update.
+        :type before: :class:`discord.Member`
+        :param after: The member after the update.
+        :type after: :class:`discord.Member`
+        """
+        if not self.is_prod or after.guild.id != self.official_server:
+            return
+        commands = []
+        allow = True
+        if any([
+            not is_dealer(before) and is_dealer(after),
+            is_dealer(before) and not is_dealer(after)
+        ]):
+            for module in get_modules(self):
+                commands.extend(
+                    self.__get_commands(module, role="dealer")
+                )
+            allow = is_dealer(after)
+        elif any([
+            not is_admin(before) and is_admin(after),
+            is_admin(before) and not is_admin(after)
+        ]):
+            for module in get_modules(self):
+                commands.extend(
+                    self.__get_commands(module, role="admin")
+                )
+            allow = is_admin(after)
+        if commands:
+            await self.slasher.sync_permissions(commands, after, allow)
+
     async def on_ready(self):
         """Called when the client is done preparing the data received
         from Discord. Usually after login is successful and the
@@ -343,6 +388,10 @@ class PokeGambler(discord.AutoShardedClient):
         PremiumShop.refresh_tradables()
         await self.topgg.post_guild_count()
         if self.is_prod or self.is_local:
+            self.logger.pprint(
+                "Syncing up the slash commands now.",
+                color='blue'
+            )
             kwargs = {}
             if self.is_local:
                 kwargs["guild_id"] = self.whitelist_guilds[0]
@@ -438,6 +487,18 @@ class PokeGambler(discord.AutoShardedClient):
                 await task
         except Exception:  # pylint: disable=broad-except
             await self.__handle_error()
+
+    @staticmethod
+    def __get_commands(module, role="owner"):
+        commands = []
+        for attr in dir(module):
+            if attr.startswith("cmd_") and attr not in getattr(
+                module, "alias", []
+            ):
+                method = getattr(module, attr)
+                if hasattr(method, f"{role}_only"):
+                    commands.append(method)
+        return commands
 
     def __get_method(self, message: Message):
         cleaned_content = message.clean_content

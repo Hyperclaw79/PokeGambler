@@ -28,7 +28,6 @@ from typing import (
     Dict, List, Tuple, Union
 )
 
-import asyncio
 import discord
 from discord.http import Route
 
@@ -308,11 +307,10 @@ class SlashHandler:
         await self.__sync_commands(current_commands, **kwargs)
         for command in current_commands:
             await self.register_command(command, **kwargs)
-            await asyncio.sleep(1.0)
-        self.ctx.logger.pprint(
-            f"Succesfully synced {len(self.registered)} slash commands.",
-            color='green'
-        )
+        msg = f"Succesfully synced {len(self.registered)} slash commands."
+        if not self.update_counter:
+            msg = 'No commands require sync.'
+        self.ctx.logger.pprint(msg, color='green')
 
     async def delete_command(
         self, command: Union[SlashCommand, str],
@@ -479,6 +477,35 @@ class SlashHandler:
             )
             return {}
 
+    async def sync_permissions(
+        self, commands: List[Callable],
+        user: discord.Member, allow: bool = True
+    ):
+        """Sync permissions for a list of commands for a user.
+
+        :param commands: List of commands to sync permissions for.
+        :type commands: List[Callable]
+        :param user: User to sync permissions for.
+        :type user: :class:`discord.Member`
+        :param allow: Whether to allow or deny the user for the commands.
+        :type allow: bool
+        """
+        for command in commands:
+            cmd_name = command.__name__.replace('cmd_', '')
+            cmd_obj = self.registered[cmd_name]
+            perms = [{
+                'id': user.id,
+                'type': 1,
+                'permission': allow
+            }]
+            success = await self.__update_permissions(cmd_obj.id, perms)
+            if success:
+                self.ctx.logger.pprint(
+                    f"{user.mention} is now {'allowed' if allow else 'denied'} "
+                    f"to use {cmd_name}",
+                    color='blue'
+                )
+
     def __params_matched(self, command, cmd_name):
         params = {}
         with CustomRstParser() as rst_parser:
@@ -502,13 +529,6 @@ class SlashHandler:
         :param command_id: Command ID to add permissions to.
         :type command_id: int
         """
-        route_kwargs = {
-            "method": "PUT",
-            "endpoint": f"{command_id}/permissions"
-        }
-        if self.ctx.is_prod:
-            route_kwargs["guild_id"] = self.ctx.official_server
-        route = self.get_route(**route_kwargs)
         perms = [
             {
                 "id": uid,
@@ -531,13 +551,25 @@ class SlashHandler:
                 "type": 1,
                 "permission": True
             })
+        await self.__update_permissions(command_id, perms)
+
+    async def __update_permissions(self, command_id, perms):
+        route_kwargs = {
+            "method": "PUT",
+            "endpoint": f"{command_id}/permissions"
+        }
+        if self.ctx.is_prod:
+            route_kwargs["guild_id"] = self.ctx.official_server
+        route = self.get_route(**route_kwargs)
         payload = {"permissions": perms}
         try:
             await self.http.request(route, json=payload)
+            return True
         except discord.HTTPException as excp:
             self.ctx.logger.pprint(
                 excp, color='red'
             )
+            return False
 
     @staticmethod
     def __prep_payload(command: Callable) -> Dict:
@@ -586,7 +618,8 @@ class SlashHandler:
         }
 
     async def __sync_commands(self, current_commands, **kwargs):
-        await self.registered.refresh(**kwargs)
+        await self.registered.refresh()
+        await self.registered.refresh(guild_id=self.ctx.official_server)
         cmds = [
             cmd.__name__.replace('cmd_', '')
             for cmd in current_commands
