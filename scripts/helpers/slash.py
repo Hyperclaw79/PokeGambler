@@ -500,8 +500,9 @@ class SlashHandler:
             }]
             success = await self.__update_permissions(cmd_obj.id, perms)
             if success:
+                state = 'allowed' if allow else 'denied'
                 self.ctx.logger.pprint(
-                    f"{user.mention} is now {'allowed' if allow else 'denied'} "
+                    f"{user.mention} is now {state} "
                     f"to use {cmd_name}",
                     color='blue'
                 )
