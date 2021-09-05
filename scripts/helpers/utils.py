@@ -389,6 +389,7 @@ def get_modules(ctx: PokeGambler) -> List[Commands]:
         getattr(ctx, comtype)
         for comtype in dir(ctx)
         if all([
+            not comtype.startswith("_"),
             comtype.endswith('commands'),
             comtype != "load_commands"
         ])
