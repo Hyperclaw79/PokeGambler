@@ -47,12 +47,12 @@ autodoc_typehints = "description"
 autosummary_generate = True
 
 coverage_ignore_classes = [
-    'CustomEnumMeta',
     'NameSetter',
     'PremiumShop'
 ]
 coverage_ignore_pyobjects = [
-    r'scripts\.helpers\.validators\..+\.check'
+    r'scripts\.helpers\.validators\..+\.check',
+    r'scripts\.base\.enums\..+'
 ]
 coverage_show_missing_items = True
 coverage_write_headline = True

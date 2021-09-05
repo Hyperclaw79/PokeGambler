@@ -33,7 +33,7 @@ from typing import Callable
 
 import aiohttp
 import discord
-from discord import Message
+from discord import Message, Interaction
 from discord.ext import tasks
 from dotenv import load_dotenv
 import topgg
@@ -46,6 +46,7 @@ from scripts.base.models import (
 from scripts.base.items import Item
 from scripts.base.shop import PremiumShop, Shop
 from scripts.helpers.logger import CustomLogger
+from scripts.helpers.slash import SlashHandler
 # pylint: disable=cyclic-import
 from scripts.helpers.utils import (
     dm_send, get_ascii, get_commands,
@@ -79,7 +80,7 @@ class PokeGambler(discord.AutoShardedClient):
         # pylint: disable=assigning-non-slot
         intents.presences = False
         super().__init__(intents=intents)
-        self.version = "v1.1.0"
+        self.version = "v1.2.0"
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
         self.__update_configs()
@@ -108,6 +109,9 @@ class PokeGambler(discord.AutoShardedClient):
         self.topgg = topgg.DBLClient(
             self, os.getenv('TOPGG_TOKEN')
         )
+        #: The :class:`~scripts.helpers.slash.SlashHandler` for handling
+        #:  slash commands.
+        self.slasher = SlashHandler(self)
         # Commands
         for module in os.listdir("scripts/commands"):
             if module.endswith("commands.py"):
@@ -169,22 +173,23 @@ class PokeGambler(discord.AutoShardedClient):
             }
             if message.mentions:
                 kwargs["mentions"] = message.mentions
-            try:
-                if "no_log" not in dir(method) or not os.getenv('IS_LOCAL'):
-                    cmd_data = CommandData(
-                        message.author, message,
-                        cmd.replace("cmd_", ""),
-                        hasattr(method, "admin_only"),
-                        args, option_dict
-                    )
-                    cmd_data.save()
-                task = method(**kwargs)
-                # Decorators can return None
-                if task:
-                    cmd_name = method.__name__.replace("cmd_", "")
-                    await task
-            except Exception:  # pylint: disable=broad-except
-                await self.__handle_error()
+            await self.__exec_command(method, kwargs)
+
+    async def on_interaction(self, interaction: Interaction):
+        """
+        | Called when an interaction happened.
+        | This currently happens due to slash command invocations \
+            or components being used.
+
+        :param interaction: The interaction data.
+        :type interaction: :class:`discord.Interaction`
+        """
+        if interaction.data.get('type', 0) != 1:
+            return
+        method, kwargs = await self.slasher.parse_response(interaction)
+        if not (method and kwargs):
+            return
+        await self.__exec_command(method, kwargs)
 
 # Connectors
 
@@ -208,9 +213,10 @@ class PokeGambler(discord.AutoShardedClient):
 
         .. warning::
 
-            This function must be the last function to call due to the fact that it
-            is blocking. That means that registration of events or anything being
-            called after this function call will not execute until it returns.
+            This function must be the last function to call due to the fact
+            that it is blocking. That means that registration of events or
+            anything being called after this function call will not execute
+            until it returns.
         """
 
         super().run(os.getenv('TOKEN'), *args, **kwargs)
@@ -333,13 +339,18 @@ class PokeGambler(discord.AutoShardedClient):
         self.sess = aiohttp.ClientSession(loop=self.loop, headers=headers)
         self.__pprinter()
         self.ready = True
-        game = discord.Game(
-            f"with the strings of fate. | Check: {self.prefix}info"
-        )
-        await online_now(self)
         Shop.refresh_tradables()
         PremiumShop.refresh_tradables()
         await self.topgg.post_guild_count()
+        if self.is_prod or self.is_local:
+            kwargs = {}
+            if self.is_local:
+                kwargs["guild_id"] = self.whitelist_guilds[0]
+            await self.slasher.add_slash_commands(**kwargs)
+        await online_now(self)
+        game = discord.Game(
+            f"with the strings of fate. | Check: {self.prefix}info"
+        )
         await self.change_presence(activity=game)
         self.__reward_nitro_boosters.start()
 
@@ -404,6 +415,29 @@ class PokeGambler(discord.AutoShardedClient):
             all(whiteguild_checks)
         ]
         return any(return_checks)
+
+    async def __exec_command(self, method, kwargs):
+        try:
+            message = kwargs["message"]
+            opts = {
+                key: val
+                for key, val in kwargs.items()
+                if key not in ("message", "mentions", "args")
+            }
+            cmd_name = method.__name__.replace("cmd_", "")
+            if "no_log" not in dir(method) or not self.is_local:
+                cmd_data = CommandData(
+                    message.author, message,
+                    cmd_name, hasattr(method, "admin_only"),
+                    kwargs["args"], opts
+                )
+                cmd_data.save()
+            task = method(**kwargs)
+            # Decorators can return None
+            if task:
+                await task
+        except Exception:  # pylint: disable=broad-except
+            await self.__handle_error()
 
     def __get_method(self, message: Message):
         cleaned_content = message.clean_content
@@ -655,6 +689,7 @@ class PokeGambler(discord.AutoShardedClient):
         self.prefix = os.getenv('COMMAND_PREFIX', '->')
         self.cooldown_time = int(os.getenv('COOLDOWN_TIME', "5"))
         self.is_prod = os.getenv('IS_PROD', "False") == "True"
+        self.is_local = os.getenv('IS_LOCAL', "False") == "True"
         for cfg_id in (
             "discord_webhook_token",
             "discord_webhook_channel"

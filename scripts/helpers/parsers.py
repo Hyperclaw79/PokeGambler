@@ -20,7 +20,9 @@ RestructuredText and Parameter parsers
 """
 
 import re
-from typing import Optional
+from typing import Any, Dict, List, Optional
+
+from ..base.enums import OptionTypes
 
 
 class Options(dict):
@@ -135,15 +137,74 @@ class Param:
         self.name = name
         self.description = description
         self.type = None
-
-    def parse_kwargs(self):
-        """
-        .. warning::
-            Yet to be Implemented.
-        """
-        raise NotImplementedError(
-            "Required for automatic slash command creation."
+        self._parse_pattern = re.compile(
+            r'[ld]i[sc]t\[(.+)\]',
+            re.IGNORECASE
         )
+        self._vals_pattern = re.compile(
+            r'(?P<name>[^#]+)(?:#(?P<description>.+)#)?:\s'
+            r'(?P<type>[a-zA-Z_\[\]]+)'
+            r'(?:\s=\s(?P<default>[^\]]+))?'
+        )
+        self._optional_pattern = re.compile(
+            r'Optional\[(.+)\]'
+        )
+
+    @property
+    def variables(self) -> List[str]:
+        """All the parsed variable names.
+
+        :return: Returns a list of variable names
+        :rtype: List[str]
+        """
+        for var in self.__get_var_strings():
+            yield self._vals_pattern.search(
+                var
+            ).groupdict()['name']
+
+    def parse(self) -> List[Dict[str, Any]]:
+        """Resolves the parameter type into attributes
+        using regular expressions.
+
+        :return: The resolved parameters.
+        :rtype: List[Dict[str, Any]]
+        """
+        if self.name == 'mentions':
+            return [{
+                'name': 'user-mentions',
+                'type': OptionTypes.MENTION.value,
+                'description': 'Users to mention',
+                'required': 'Optional' not in str(self.type)
+            }]
+        if self.name not in ('args', 'kwargs'):
+            return []
+        parsed_list = []
+        variables = self.__get_var_strings()
+        for var in variables:
+            parsed = self._vals_pattern.search(var).groupdict()
+            parsed['required'] = 'Optional' not in parsed['type']
+            parsed['type'] = OptionTypes[
+                self._optional_pattern.sub(r'\1', parsed['type'])
+            ].value
+            parsed['description'] = parsed.get(
+                'description'
+            ) or 'Please enter a value.'
+            if parsed.get('default') is not None:
+                if parsed['type'] == 4:
+                    parsed['default'] = int(parsed['default'])
+                elif parsed['type'] == 10:
+                    parsed['default'] = float(parsed['default'])
+                elif parsed['type'] == 5:
+                    parsed['default'] = parsed['default'] == 'True'
+                parsed['description'] += f" Default is {parsed['default']}."
+            parsed_list.append(parsed)
+        return parsed_list
+
+    def __get_var_strings(self):
+        match_ = self._parse_pattern.search(self.type)
+        if match_ is None:
+            raise ValueError('Invalid Parameter.')
+        yield from match_.group(1).split(', ')
 
 
 class CustomRstParser:

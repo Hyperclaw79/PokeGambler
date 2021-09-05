@@ -25,7 +25,6 @@ This module contains a compilation of data models.
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum, EnumMeta
 from functools import wraps
 from inspect import ismethod
 import os
@@ -55,30 +54,6 @@ def expire_cache(func: Callable):
         Commands.expire_cache(self.user.id)
         return func(self, *args, **kwargs)
     return wrapper
-
-
-class CustomEnumMeta(EnumMeta):
-    """
-    Override Enum to allow for case-insensitive enum names.
-    Also adds a DEFAULT value to the Enum.
-
-    :meta private:
-    """
-    def __getitem__(cls, name):
-        try:
-            return super().__getitem__(name.upper())
-        except (TypeError, KeyError):
-            return cls.DEFAULT
-
-
-class CurrencyExchange(Enum, metaclass=CustomEnumMeta):
-    """
-    Holds exchange values for different pokebot currencies.
-    """
-    POKÉTWO = 10
-    POKETWO = 10
-    DEFAULT = 1
-    # Add support for more pokebots if required.
 
 
 class NameSetter(type):

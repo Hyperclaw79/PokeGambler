@@ -182,12 +182,22 @@ async def dm_send(
     :return: The message sent.
     :rtype: :class:`discord.Message`
     """
+    # pylint: disable=import-outside-toplevel, cyclic-import
+    from ..helpers.slash import CustomInteraction
+
     try:
-        msg = await user.send(
-            content=content,
-            embed=embed,
-            **kwargs
-        )
+        if isinstance(message, CustomInteraction):
+            msg = await message.reply(
+                content=content,
+                embed=embed,
+                **kwargs
+            )
+        else:
+            msg = await user.send(
+                content=content,
+                embed=embed,
+                **kwargs
+            )
     except discord.Forbidden:
         msg = await message.reply(
             content=f"{content if content else ''}",
