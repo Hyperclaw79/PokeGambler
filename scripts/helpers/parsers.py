@@ -252,18 +252,17 @@ class CustomRstParser:
             re.compile(r'\s{4}[^\*\d]+')
         ]
         self._tab_space = 8
-        #: Meta :class:`~scripts.helpers.parsers.Directive`
+        #: Meta :class:`Directive`
         #:
         #: .. tip::
         #:
         #:     There's usually only one Meta directive per docstring.
         self.meta = None
-        #: All the parsed :class:`~scripts.helpers.parsers.Directive`.
+        #: All the parsed :class:`Directive`.
         self.directives = []
-        #: All the parsed :class:`~scripts.helpers.parsers.Param`.
+        #: All the parsed :class:`Param`.
         self.params = {}
-        #: Rubric sections containing child
-        #:  :class:`~scripts.helpers.parsers.Directive`.
+        #: Rubric sections containing child :class:`Directive`.
         self.sections = []
         #: Additional lines before Params.
         self.info = ""

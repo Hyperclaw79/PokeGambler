@@ -416,7 +416,7 @@ class PremiumBoostItem(BoostItem):
 class TradebleItem(ShopItem):
     """
     This class represents a shop version of \
-        :class:`~scripts.base.items.Tradable`.
+        :class:`~.items.Tradable`.
     """
     def buy(
         self, message: Message,
@@ -717,7 +717,7 @@ class Shop:
     def refresh_tradables(cls: Type[Shop]):
         """
         Similar to :func:`update_category`, \
-            but exclusive for :class:`~scripts.base.items.Tradable`.
+            but exclusive for :class:`~.items.Tradable`.
         """
         item_types = ["Tradables", "Consumables", "Gladiators"]
         for item_type in item_types:

@@ -584,7 +584,7 @@ class Inventory(Model):
         :param itemid: The ItemID of the item.
         :type itemid: str
         :return: The Item object.
-        :rtype: :class:`~scripts.base.items.Item`
+        :rtype: :class:`~.items.Item`
         """
         item = self.mongo.find_one({
             "user_id": self.user_id,
@@ -660,9 +660,9 @@ class Inventory(Model):
 
         .. note:: These items are not included for calculating the net worth:
 
-            * :class:`~scripts.base.items.Chest`
-            * :class:`~scripts.base.items.Lootbag`
-            * :class:`~scripts.base.items.Rewardbox`
+            * :class:`~.items.Chest`
+            * :class:`~.items.Lootbag`
+            * :class:`~.items.Rewardbox`
 
         :param category: The category to filter by.
         :type category: Optional[str]
