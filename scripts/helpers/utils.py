@@ -183,7 +183,7 @@ async def dm_send(
     :rtype: :class:`discord.Message`
     """
     # pylint: disable=import-outside-toplevel, cyclic-import
-    from ..helpers.slash import CustomInteraction
+    from ..base.handlers import CustomInteraction
 
     try:
         if isinstance(message, CustomInteraction):

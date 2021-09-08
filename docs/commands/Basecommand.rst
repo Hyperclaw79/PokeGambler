@@ -28,6 +28,8 @@ Decorators
 
 .. autodecorator:: scripts.commands.basecommand.check_completion
 
+.. autodecorator:: scripts.commands.basecommand.ctx_command
+
 .. autodecorator:: scripts.commands.basecommand.ensure_args
 
 .. autodecorator:: scripts.commands.basecommand.ensure_item

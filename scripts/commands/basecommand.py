@@ -291,6 +291,22 @@ def cooldown(secs: int):
     return decorator
 
 
+def ctx_command(func: Callable):
+    '''Marks a command as a context menu command.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
+    '''
+    func.__dict__["ctx_command"] = True
+
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
+
+
 def ensure_args(func: Callable):
     '''Ensure that the command has arguments paased to it.
 

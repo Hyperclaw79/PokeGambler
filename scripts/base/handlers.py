@@ -16,26 +16,54 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ----------------------------------------------------------------------------
 
-Module which extends Discord.py to allow for custom slash commands.
+Module which extends Discord.py to allow for custom application commands.
 """
 
-# pylint: disable=too-many-instance-attributes
-
 from __future__ import annotations
-from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING, Any, Callable,
-    Dict, List, Tuple, Union
+    Dict, List, Optional, Tuple, Type, Union
 )
 
 import discord
 from discord.http import Route
+
+from .components import AppCommand, ContextMenu, SlashCommand
 
 from ..helpers.parsers import CustomRstParser
 from ..helpers.utils import get_modules
 
 if TYPE_CHECKING:
     from bot import PokeGambler
+
+
+class OverriddenChannel:
+    """
+    A modified version of :class:`discord.TextChannel` which
+    overrides :meth:`discord.TextChannel.send` to
+    suppress stray deferred ephemeral messages.
+
+    :param parent: The original interaction class.
+    :type parent: :class:`discord.Interaction`
+    """
+    def __init__(self, parent: discord.Interaction):
+        self.parent = parent
+        self.channel = parent.channel
+
+    def __getattr__(self, item: str) -> Any:
+        return self.__dict__.get(
+            item, getattr(self.channel, item)
+        )
+
+    async def send(self, *args, **kwargs):
+        """
+        :meth:`discord.TextChannel.send` like behavior for
+        :class:`discord.TextChannel`.
+        """
+        msg = await self.channel.send(*args, **kwargs)
+        # Hack to silence the stray deferred ephemeral message.
+        await self.parent.followup.send(content='\u200B')
+        return msg
 
 
 class CustomInteraction:
@@ -49,6 +77,7 @@ class CustomInteraction:
     def __init__(self, interaction: discord.Interaction):
         self.interaction = interaction
         self.author = interaction.user
+        self.channel = OverriddenChannel(interaction)
 
     def __getattr__(self, item: str) -> Any:
         return self.__dict__.get(
@@ -63,187 +92,79 @@ class CustomInteraction:
         return msg
 
 
-class SlashCommandOptions(dict):
-    """
-    A class to hold slash command options.
-    """
-    def __init__(self, **kwargs):
-        super().__init__(kwargs)
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-    def __getattr__(self, item: str) -> Any:
-        return super().get(item)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        setattr(self, key, value)
-        super().__setitem__(key, value)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert the options to a dictionary.
-        """
-        return {
-            key: value
-            for key, value in self.__dict__.items()
-            if not key.startswith('_')
-        }
-
-
-@dataclass(repr=True)
-class SlashCommand:
-    """
-    The model equivalent to a discord Slash Command.
-    Has the structure of command input object from discord's api.
-    """
-    #: | The type of the command.
-    #: | Always 1 because this is a slash command.
-    type: int = 1
-    # pylint: disable=invalid-name
-    #: Unique id of the command
-    id: str = None
-    # pylint: enable=invalid-name
-    #: Unique id of the application to which the command belongs.
-    application_id: str = None
-    #: Guild id of the command, if not global
-    guild_id: str = None
-    #: Command name, must be between 1 and 32 characters.
-    #:
-    #: .. warning::
-    #:
-    #:     The cmd\_ prefix must be removed before assigning.
-    name: str = None
-    #: A description with a length between 1 and 100 characters.
-    description: str = None
-    #: The parameters for the command, max 25
-    options: List[SlashCommandOptions] = field(
-        default_factory=list
-    )
-    #: Whether the command is enabled by default for everyone
-    default_permission: bool = True
-    version: int = None
-
-    def __post_init__(self):
-        """
-        Convert Options to a List of :class:`SlashCommandOptions`
-        """
-        for idx, opt in enumerate(self.options):
-            required = opt.get('required', False)
-            opt.update({
-                'required': required
-            })
-            self.options[idx] = SlashCommandOptions(**opt)
-        self.options = sorted(
-            self.options,
-            key=lambda opt: -opt.required
-        )
-
-    @property
-    def parameters(self) -> Dict[str, Tuple[int, bool]]:
-        """
-        The parameters of the command.
-
-        :return: The function parameters, along with type and required.
-        :rtype:
-        """
-        return {
-            opt.name: (opt.type, opt.required or False)
-            for opt in self.options
-            if opt.name is not None
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> SlashCommand:
-        """Populate the SlashCommand from a dictionary.
-
-        :param data: The dictionary to populate the SlashCommand from.
-        :type data: Dict
-        :return: The SlashCommand instance.
-        :rtype: :class:`SlashCommand`
-        """
-        return cls(**data)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Return the SlashCommand as a dictionary.
-
-        :return: A dictionary representation of the SlashCommand.
-        :rtype: Dict[str, Any]
-        """
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "options": [
-                opts.to_dict()
-                for opts in self.options
-            ],
-            "default_permission": self.default_permission,
-        }
-
-
 class CommandListing(list):
-    """An extending hybrid list to hold instances of :class:`SlashCommand`.
+    """An extending hybrid list to hold instances of
+    :class:`~.components.AppCommand`.
     Supports accessing a command by name.
 
-    .. _HTTPClient: https://github.com/Rapptz/discord.py/\
-        blob/master/discord/http.py#L159
-
-    :param session: The session object.
-    :type session: `HTTPClient`_
+    :param handler: The command handler object.
+    :type session: Union[SlashHandler, ContextHandler]
     """
 
-    def __init__(self, handler: SlashHandler):
-        super().__init__()
+    def __init__(self, handler: Union[SlashHandler, ContextHandler]):
+        list.__init__(self)
         self.handler = handler
 
-    def __iter__(self) -> List[SlashCommand]:
+    def __iter__(self) -> List[AppCommand]:
         for item in super().__iter__():
-            if isinstance(item, SlashCommand):
+            if isinstance(item, AppCommand):
                 yield item
 
-    def __getitem__(self, item: str) -> SlashCommand:
+    def __getitem__(self, item: str) -> AppCommand:
         for command in self:
             if command.name == item:
                 return command
         return None
 
-    def __setitem__(self, key: str, value: SlashCommand) -> None:
+    def __setitem__(self, key: str, value: AppCommand) -> None:
         if isinstance(value, dict):
-            value = SlashCommand.from_dict(**value)
+            value = AppCommand.from_dict(**value)
         super().__setitem__(key, value)
 
-    def __contains__(self, item: Union[SlashCommand, Dict]) -> bool:
+    def __contains__(self, item: Union[AppCommand, Dict]) -> bool:
         if isinstance(item, dict):
-            item = SlashCommand.from_dict(**item)
+            item = self.Component.from_dict(**item)
         return any(
             command.id == item.id
             for command in self
         )
 
-    def append(self, command: Union[SlashCommand, Dict]):
-        """Transform/Ensure that the command is a :class:`SlashCommand`
-        and append it to the list.
+    # pylint: disable=invalid-name
+    @property
+    def Component(self) -> Type[AppCommand]:
+        """Returns the component class of the handler.
+
+        :return: The component class of the handler.
+        :rtype: Type[AppCommand]
+        """
+        return self.handler.component_class
+
+    def append(self, command: Union[AppCommand, Dict]):
+        """Transform/Ensure that the command is a
+        :class:`~.components.AppCommand` and append it to the list.
 
         :param command: The command to add to the list.
-        :type command: Union[:class:`SlashCommand`, Dict]
+        :type command: Union[:class:`~.components.AppCommand`, Dict]
         """
         if isinstance(command, dict):
-            command = SlashCommand(**command)
+            command = self.Component(**command)
         super().append(command)
 
-    def remove(self, command: Union[str, Dict, SlashCommand]):
+    def remove(self, command: Union[str, Dict, AppCommand]):
         """
         | Remove a command from the list.
         | Supports lookups by name and ID.
 
         :param command: The command to remove from the list.
-        :type command: Union[str, Dict, :class:`SlashCommand`]
+        :type command: Union[str, Dict, :class:`~.components.AppCommand`]
         """
         for index, item in enumerate(self):
             if any([
                 isinstance(command, str) and item.name == command,
                 isinstance(command, dict) and item.id == command['id'],
-                isinstance(command, SlashCommand) and item.id == command.id,
+                isinstance(
+                    command, AppCommand
+                ) and item.id == command.id,
             ]):
                 del self[index]
                 return
@@ -263,7 +184,10 @@ class CommandListing(list):
         route = self.handler.get_route('GET', **kwargs)
         commands = await self.handler.http.request(route)
         for command in commands:
-            self.append(SlashCommand.from_dict(command))
+            if command['type'] >= self.Component.type:
+                self.append(
+                    self.handler.component_class.from_dict(command)
+                )
 
 
 class SlashHandler:
@@ -274,6 +198,7 @@ class SlashHandler:
     def __init__(self, ctx: PokeGambler):
         self.ctx = ctx
         self.http = ctx.http
+        self.component_class = SlashCommand
         self.registered = CommandListing(self)
         self.official_roles = {}
         self.update_counter = 0
@@ -313,13 +238,13 @@ class SlashHandler:
         self.ctx.logger.pprint(msg, color='green')
 
     async def delete_command(
-        self, command: Union[SlashCommand, str],
+        self, command: Union[SlashCommand, Dict],
         **kwargs
     ):
         """Deletes a Slash command to the guild/globally.
 
         :param command: The Command object/dictionary to delete.
-        :type command: Union[:class:`SlashCommand`, Dict]
+        :type command: Union[:class:`~.components.SlashCommand`, Dict]
         :param kwargs: Keyword arguments to pass to the route.
         :type kwargs: Dict[str, Any]
         """
@@ -346,13 +271,13 @@ class SlashHandler:
                 excp, color='red'
             )
 
-    async def get_command(self, command: str) -> SlashCommand:
+    async def get_command(self, command: str) -> AppCommand:
         """Gets the Command Object from its name.
 
         :param command: The command name
         :type command: str
         :return: The corresponding Slash Command object.
-        :rtype: :class:`SlashCommand`
+        :rtype: :class:`~.components.SlashCommand`
         """
         for cmd in self.registered:
             if cmd.name == command:
@@ -386,7 +311,7 @@ class SlashHandler:
 
         :param interaction: Interaction to parse.
         :type interaction: :class:`discord.Interaction`
-        :return: Parsed command method and response.
+        :return: Parsed command method and additional details.
         :rtype: Tuple[Callable, Dict[str, Any]]
         """
         await interaction.response.defer()
@@ -399,6 +324,8 @@ class SlashHandler:
         }
         method = None
         cmd = f'cmd_{data["name"]}'
+        if self.ctx.is_local:
+            cmd = cmd.rstrip('_')
         for com in get_modules(self.ctx):
             if com.enabled:
                 method = getattr(com, cmd, None)
@@ -636,3 +563,152 @@ class SlashHandler:
         for command in self.registered:
             if command.name not in cmds:
                 await self.delete_command(command, **kwargs)
+
+
+class ContextHandler:
+    """Class which handles context menus.
+
+    .. warning::
+
+        Currently does not support autosync.
+
+    :param ctx: The pokegambler client.
+    :type ctx: :class:`bot.PokeGambler`
+    """
+    def __init__(self, ctx: PokeGambler):
+        self.ctx = ctx
+        self.http = ctx.http
+        self.component_class = ContextMenu
+        self.registered = CommandListing(self)
+        self.update_counter = 0
+
+    async def delete_command(
+        self, command: Union[ContextMenu, Dict],
+        **kwargs
+    ):
+        """Deletes a Context Menu command.
+
+        :param command: The Command object/dictionary to delete.
+        :type command: Union[:class:`~.components.ContextMenu`, Dict]
+        :param kwargs: Keyword arguments to pass to the route.
+        :type kwargs: Dict[str, Any]
+        """
+        if isinstance(command, ContextMenu):
+            cmd = command.to_dict()
+        route_kwargs = {
+            "method": "DELETE",
+            "endpoint": cmd['id']
+        }
+        kwargs.update(route_kwargs)
+        route = self.get_route(**kwargs)
+        try:
+            await self.http.request(route)
+            if cmd['name'] in self.registered.names:
+                self.registered.remove(cmd['name'])
+            self.ctx.logger.pprint(
+                f"Unregistered command: {cmd['name']}",
+                color='yellow'
+            )
+        except discord.HTTPException as excp:
+            self.ctx.logger.pprint(
+                excp, color='red'
+            )
+
+    async def execute(
+        self, interaction: discord.Interaction
+    ) -> Callable:
+        """Parse the data into :class:`.components.ContextMenu`
+        and executes its callback.
+
+        :param interaction: Interaction to parse.
+        :type interaction: :class:`discord.Interaction`
+        :return: Parsed command method.
+        :rtype: Callable
+        """
+        await interaction.response.defer()
+        interaction = CustomInteraction(interaction)
+        command = self.registered[interaction.data['name']]
+        await command.callback(message=interaction)
+
+    def get_route(self, method="POST", **kwargs):
+        """Get the route for the query.
+
+        :param method: HTTP Method to use.
+        :type method: str
+        """
+        path = f"/applications/{self.ctx.user.id}/commands"
+        if kwargs.get("endpoint"):
+            path += f"/{kwargs['endpoint']}"
+        return Route(
+            method=method,
+            path=path
+        )
+
+    async def register_command(
+        self, callback: Callable,
+        type_: Optional[int] = 2
+    ) -> ContextMenu:
+        """
+        Register a context menu command.
+
+        :param callback: The callback which gets executed upon interaction.
+        :type callback: Callable
+        :param type_: The type of the context menu command.
+        :type type_: Optional[int]
+        :return: The registered context menu command.
+        :rtype: :class:`~.components.ContextMenu`
+        """
+        if not self.registered:
+            await self.registered.refresh()
+        cmd_name = callback.__name__.title().replace('Cmd_', '')
+        if cmd_name in self.registered.names:
+            if not self.registered[cmd_name].callback:
+                self.registered[cmd_name].callback = callback
+            return {}
+        session = self.http
+        payload = {
+            "name": cmd_name,
+            "type": type_
+        }
+        route = Route(
+            'POST',
+            f"/applications/{self.ctx.user.id}/commands",
+            json=payload
+        )
+        self.ctx.logger.pprint(
+            f"Registering the command: {payload['name']}",
+            color='blue'
+        )
+        try:
+            resp = await session.request(route, json=payload)
+            self.update_counter += 1
+            self.registered.append(
+                ContextMenu.from_dict(
+                    {**resp, "callback": callback}
+                )
+            )
+            self.ctx.logger.pprint(
+                f"Succesfully registered: {payload['name']}",
+                color='green'
+            )
+            return self.registered[-1]
+        except discord.HTTPException as excp:
+            self.ctx.logger.pprint(
+                excp, color='red'
+            )
+            return None
+
+    async def register_all(self):
+        """
+        Registers all the decorated Context Menu commands.
+        """
+        for module in get_modules(self.ctx):
+            for cmd in dir(module):
+                if cmd.startswith('cmd_') and hasattr(
+                    getattr(module, cmd), 'ctx_command'
+                ):
+                    await self.register_command(getattr(module, cmd))
+        msg = f"Registered {len(self.registered)} commands."
+        if not self.update_counter:
+            msg = "No new context menu commands found."
+        self.ctx.logger.pprint(msg, color='green')

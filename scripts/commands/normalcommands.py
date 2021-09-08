@@ -33,7 +33,7 @@ from ..helpers.utils import (
     get_commands, get_embed, get_modules,
     dedent, showable_command
 )
-from .basecommand import alias, Commands, model
+from .basecommand import alias, Commands, ctx_command, model
 
 if TYPE_CHECKING:
     from discord import Message
@@ -44,6 +44,7 @@ class NormalCommands(Commands):
     Public/Normal commands for PokeGambler.
     """
 
+    @ctx_command
     @alias("cmds")
     async def cmd_commands(
         self, message: Message,
@@ -253,6 +254,7 @@ class NormalCommands(Commands):
         embeds = [emb1, emb2]
         await self.paginate(message, embeds)
 
+    @ctx_command
     async def cmd_invite(self, message: Message, **kwargs):
         """
         :param message: The messag which triggered this command.
@@ -296,6 +298,7 @@ class NormalCommands(Commands):
             view=invite_view
         )
 
+    @ctx_command
     @alias('latency')
     async def cmd_ping(self, message: Message, **kwargs):
         """

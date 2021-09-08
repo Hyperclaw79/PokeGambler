@@ -45,8 +45,9 @@ from scripts.base.models import (
 )
 from scripts.base.items import Item
 from scripts.base.shop import PremiumShop, Shop
+from scripts.base.handlers import ContextHandler, SlashHandler
+
 from scripts.helpers.logger import CustomLogger
-from scripts.helpers.slash import SlashHandler
 # pylint: disable=cyclic-import
 from scripts.helpers.utils import (
     dm_send, get_ascii, get_commands,
@@ -109,9 +110,12 @@ class PokeGambler(discord.AutoShardedClient):
         self.topgg = topgg.DBLClient(
             self, os.getenv('TOPGG_TOKEN')
         )
-        #: The :class:`~scripts.helpers.slash.SlashHandler` for handling
+        #: The :class:`~scripts.base.handlers.SlashHandler` for handling
         #:  slash commands.
         self.slasher = SlashHandler(self)
+        #: The :class:`~scripts.base.handlers.ContextHandler` for handling
+        #:  context commands.
+        self.ctx_cmds = ContextHandler(self)
         # Commands
         for module in os.listdir("scripts/commands"):
             if module.endswith("commands.py"):
@@ -184,14 +188,17 @@ class PokeGambler(discord.AutoShardedClient):
         :param interaction: The interaction data.
         :type interaction: :class:`discord.Interaction`
         """
-        if interaction.data.get('type', 0) != 1:
+        if not 1 <= interaction.data.get('type', 0) <= 2:
             return
         if not interaction.guild or self.__bl_wl_check(interaction):
             return
-        method, kwargs = await self.slasher.parse_response(interaction)
-        if not (method and kwargs):
-            return
-        await self.__exec_command(method, kwargs)
+        if interaction.data.get('type') == 1:
+            method, kwargs = await self.slasher.parse_response(interaction)
+            if not (method and kwargs):
+                return
+            await self.__exec_command(method, kwargs)
+        elif interaction.data.get('type') in (2, 3):
+            await self.ctx_cmds.execute(interaction)
 
 # Connectors
 
@@ -398,6 +405,11 @@ class PokeGambler(discord.AutoShardedClient):
             if self.is_local:
                 kwargs["guild_id"] = self.whitelist_guilds[0]
             await self.slasher.add_slash_commands(**kwargs)
+            self.logger.pprint(
+                "Registering the context menu commands now.",
+                color='blue'
+            )
+            await self.ctx_cmds.register_all()
         await online_now(self)
         game = discord.Game(
             f"with the strings of fate. | Check: {self.prefix}info"
