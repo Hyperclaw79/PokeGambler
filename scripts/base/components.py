@@ -25,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import (
     Any, Callable, Dict,
-    List, Tuple
+    List, Set, Tuple
 )
 
 import discord
@@ -102,6 +102,19 @@ class AppCommand:
         self.options = sorted(
             self.options,
             key=lambda opt: -opt.required
+        )
+
+    @classmethod
+    def types(cls) -> Set[int]:
+        """
+        Return the command types of parent and children commands.
+
+        :return: The command types of parent and children commands.
+        :rtype: Set[int]
+        """
+        return (cls.type,) + tuple(
+            cmd.type
+            for cmd in cls.__subclasses__()
         )
 
     @classmethod

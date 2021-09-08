@@ -404,6 +404,8 @@ class PokeGambler(discord.AutoShardedClient):
             kwargs = {}
             if self.is_local:
                 kwargs["guild_id"] = self.whitelist_guilds[0]
+            elif self.is_prod:
+                kwargs["guild_id"] = self.official_server
             await self.slasher.add_slash_commands(**kwargs)
             self.logger.pprint(
                 "Registering the context menu commands now.",

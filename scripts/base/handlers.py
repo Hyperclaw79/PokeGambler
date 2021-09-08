@@ -184,7 +184,7 @@ class CommandListing(list):
         route = self.handler.get_route('GET', **kwargs)
         commands = await self.handler.http.request(route)
         for command in commands:
-            if command['type'] >= self.Component.type:
+            if command['type'] in self.Component.types():
                 self.append(
                     self.handler.component_class.from_dict(command)
                 )
