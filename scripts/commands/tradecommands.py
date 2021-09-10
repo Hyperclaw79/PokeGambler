@@ -1142,7 +1142,7 @@ class TradeCommands(Commands):
             ).title().replace('Chest', '').strip()
             lb_name = " ".join(named_args).title()
             chest_patt = re.compile(
-                fr"{chest_name}.+Chest",
+                fr"{chest_name}.*Chest",
                 re.IGNORECASE
             )
             if any(
@@ -1151,7 +1151,7 @@ class TradeCommands(Commands):
             ):
                 chests = Inventory(
                     message.author
-                ).from_name(f"{chest_name}.+Chest$")
+                ).from_name(fr"{chest_name}.*Chest")
                 if not chests:
                     raise ValueError(f"No {chest_name} Chests in Inventory.")
                 openables = [
