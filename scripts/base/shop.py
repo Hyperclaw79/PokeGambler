@@ -708,6 +708,8 @@ class Shop:
         ):
             return None
         item = Item.from_id(itemid, force_new=force_new)
+        if not item:
+            return None
         # pylint: disable=no-member
         if cls._premium_cond(item.premium):
             return None
