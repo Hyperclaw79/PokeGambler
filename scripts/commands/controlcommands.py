@@ -226,11 +226,12 @@ class ControlCommands(Commands):
             kwargs.pop("mentions")
         limit = int(args[0]) if args else 5
         filter_ = kwargs.get("filter", '')
-        kwargs = {
-            dict(param_str.split(':'))
+        cmd_kwargs = {
+            param_str.strip().split(':')[0]: param_str.strip().split(':')[1]
             for param_str in filter_.split(',')
+            if param_str
         }
-        history = CommandData.history(limit=limit, **kwargs)
+        history = CommandData.history(limit=limit, **cmd_kwargs)
         if not history:
             await message.channel.send(
                 embed=get_embed(
