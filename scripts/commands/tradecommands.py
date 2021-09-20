@@ -205,7 +205,7 @@ class TradeCommands(Commands):
     @model(Item)
     @ensure_item
     @alias(['item', 'detail'])
-    async def cmd_details(
+    async def cmd_details(  # pylint: disable=no-self-use
         self, message: Message,
         args: Optional[List] = None,
         **kwargs
@@ -248,7 +248,7 @@ class TradeCommands(Commands):
         await message.reply(embed=item.details)
 
     @alias("rates")
-    async def cmd_exchange_rates(
+    async def cmd_exchange_rates(  # pylint: disable=no-self-use
         self, message: Message,
         args: Optional[List] = None,
         **kwargs
@@ -1447,7 +1447,8 @@ class TradeCommands(Commands):
         )
         return pokebot, quantity
 
-    async def __get_thread(self, message, pokebot, req_msg):
+    @staticmethod
+    async def __get_thread(message, pokebot, req_msg):
         tname = f"Transaction for {message.author.id}"
         thread = await req_msg.channel.create_thread(
             name=tname,

@@ -210,6 +210,7 @@ class ProfileCommands(Commands):
         )
 
     @model([Boosts, BoostItem, Profiles])
+    # pylint: disable=no-self-use
     async def cmd_boosts(self, message: Message, **kwargs):
         """
         :param message: The message which triggered this command.
@@ -791,6 +792,7 @@ class ProfileCommands(Commands):
             )
 
     @model([Minigame, Loots, CommandData])
+    # pylint: disable=no-self-use
     async def cmd_stats(self, message: Message, **kwargs):
         """
         :param message: The message which triggered this command.
@@ -919,7 +921,8 @@ class ProfileCommands(Commands):
             to_send["view"] = vote_button
         await message.reply(**to_send)
 
-    async def __background_get_url(self, message, reply):
+    @staticmethod
+    async def __background_get_url(message, reply):
         if len(reply.attachments) > 0:
             if reply.attachments[0].content_type not in (
                 "image/png", "image/jpeg"

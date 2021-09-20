@@ -254,7 +254,7 @@ class AdminCommands(Commands):
     @ensure_user
     @model(Profiles)
     @alias("usr_pr")
-    async def cmd_get_user_profile(
+    async def cmd_get_user_profile(  # pylint: disable=no-self-use
         self, message: Message,
         args: Optional[List] = None,
         **kwargs
@@ -371,7 +371,7 @@ class AdminCommands(Commands):
     @ensure_user
     @model(Profiles)
     @alias("rst_usr")
-    async def cmd_reset_user(
+    async def cmd_reset_user(  # pylint: disable=no-self-use
         self, message: Message,
         args: Optional[List] = None,
         **kwargs

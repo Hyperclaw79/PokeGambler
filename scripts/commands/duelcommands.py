@@ -700,8 +700,9 @@ class DuelCommands(Commands):
             return False
         return True
 
+    @staticmethod
     async def __duel_start(
-        self, message: Message,
+        message: Message,
         gladhandler: GladitorMatchHandler,
         glads: List[Gladiator]
     ) -> Message:

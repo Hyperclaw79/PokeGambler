@@ -579,7 +579,8 @@ class GambleCommands(Commands):
             view=multi_select_view
         )
 
-    async def handle_low_bal(self, usr, gamble_channel):
+    @staticmethod
+    async def handle_low_bal(usr, gamble_channel):
         """Handle low balance.
 
         :meta private:
@@ -687,7 +688,7 @@ class GambleCommands(Commands):
         rules = ', '.join(
             self.rules[key]
             for key in kwargs
-            if key in self.rules.keys()
+            if key in self.rules
         ) or 'None'
         desc = (
             f"**Entry Fee**: {fee} {self.chip_emoji} "

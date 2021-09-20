@@ -244,6 +244,7 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
+    # pylint: disable=no-self-use
     async def cmd_export_items(self, message: Message, **kwargs):
         """
         :param message: The message which triggered this command.
@@ -848,8 +849,9 @@ class ControlCommands(Commands):
         locked.extend(Minigame.__subclasses__())
         return locked, unlocked
 
+    @staticmethod
     async def __get_model_view(
-        self, message: Message,
+        message: Message,
         models: List[Union[Type[Item], Type[Model]]],
         content: str = None
     ) -> Union[Union[Type[Item], Type[Model]]]:
