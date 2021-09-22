@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Module which extends Discord.py to allow for custom application commands.
 """
 
+# pylint: disable=no-member
+
 from __future__ import annotations
 from typing import (
     TYPE_CHECKING, Any, Callable,
@@ -90,6 +92,22 @@ class CustomInteraction:
         """
         msg = await self.interaction.followup.send(*args, **kwargs)
         return msg
+
+    async def add_reaction(self, reaction: str):
+        """
+        :meth:`discord.Message.add_reaction` like behavior for Interactions.
+        :param reaction: The reaction to add.
+        :type reaction: :class:`str`
+        """
+        # pylint: disable=import-outside-toplevel
+        from ..base.views import EmojiButton
+
+        emoji_btn = EmojiButton(reaction)
+        await self.interaction.followup.send(
+            content='\u200B',
+            view=emoji_btn,
+            ephemeral=True
+        )
 
 
 class CommandListing(list):

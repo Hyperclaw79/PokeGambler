@@ -21,6 +21,7 @@ Compilation of Discord UI Views
 
 # pylint: disable=unused-argument, no-member
 # pylint: disable=too-few-public-methods
+# pylint: disable=attribute-defined-outside-init
 
 from __future__ import annotations
 from datetime import datetime
@@ -224,6 +225,22 @@ class LinkView(BaseView):
             discord.ui.Button(
                 label=label,
                 url=url,
+                emoji=emoji
+            )
+        )
+
+
+class EmojiButton(BaseView):
+    """A read-only View with an emoji Button.
+
+    :param emoji: The emoji to be displayed.
+    :type emoji: str
+    """
+    def __init__(self, emoji: str, **kwargs):
+        super().__init__(**kwargs)
+        self.add_item(
+            discord.ui.Button(
+                label='',
                 emoji=emoji
             )
         )
