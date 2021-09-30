@@ -37,6 +37,7 @@ from typing import (
     Tuple, Type, TYPE_CHECKING
 )
 
+import certifi
 from dotenv import load_dotenv
 from PIL import Image
 from pymongo import MongoClient
@@ -51,7 +52,8 @@ if TYPE_CHECKING:
 load_dotenv()
 
 DB_CLIENT = MongoClient(
-    os.getenv("MONGO_CLUSTER_STRING")
+    os.getenv("MONGO_CLUSTER_STRING"),
+    tlsCAfile=certifi.where()
 ).pokegambler
 
 
