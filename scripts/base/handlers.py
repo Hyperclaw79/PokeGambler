@@ -351,7 +351,7 @@ class SlashHandler:
                     break
         with CustomRstParser() as rst_parser:
             rst_parser.parse(method.__doc__)
-            args = rst_parser.params.get('args', [])
+            args = rst_parser.params.get('args', None)
         if 'resolved' in data:
             mentions = [
                 interaction.guild.get_member(int(uid))
@@ -361,7 +361,7 @@ class SlashHandler:
         for opt in data.get('options', {}):
             if opt['name'] == 'user-mentions':
                 continue
-            if opt['name'] in args.variables:
+            if args and opt['name'] in args.variables:
                 kwargs['args'].append(opt['value'])
                 continue
             kwargs[opt['name']] = opt['value']
