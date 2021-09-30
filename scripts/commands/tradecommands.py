@@ -50,7 +50,7 @@ from ..helpers.utils import (
     get_embed, get_formatted_time, get_modules,
     is_admin, is_owner
 )
-from ..helpers.validators import MinMaxValidator
+from ..helpers.validators import HexValidator, MinMaxValidator, MinValidator
 
 from .basecommand import (
     Commands, alias, check_completion, dealer_only,
@@ -619,15 +619,19 @@ class TradeCommands(Commands):
 
             {command_prefix}redeem_chips 500
         """
-        if (
-            not args
-            or not args[0].isdigit()
-            or int(args[0]) < 10
-            or int(args[0]) % 10  # Must be a multiple of 10, 0 -> False
-        ):
+        valid = await MinValidator(
+            min_value=10, message=message,
+            on_null={
+                "title": "Invalid Amount",
+                "description": "You need to specify number of chips to redeem."
+            }
+        ).validate(args[0] if args else None)
+        if not valid:
+            return
+        if int(args[0]) % 10 != 0:
             await message.reply(
                 embed=get_embed(
-                    "You need to enter the number of chips to redeem.",
+                    "The number of chips must be a multiple of 10.",
                     embed_type="error",
                     title="Invalid Amount"
                 )
@@ -907,15 +911,18 @@ class TradeCommands(Commands):
 
             {command_prefix}use FFF000
         """
-        if not args or not re.match(r"[0-9a-fA-F]{6}", args[0]):
-            await dm_send(
-                message, message.author,
-                embed=get_embed(
-                    "You need to enter a valid ticket ID.",
-                    embed_type="error",
-                    title="Invalid Ticket ID"
-                )
-            )
+        valid = await HexValidator(
+            message=message,
+            on_error={
+                'title': "Invalid Ticket ID",
+                'description': "You need to enter a valid ticket ID."
+            },
+            on_null={
+                'title': "No Ticket ID specified",
+                'description': "You need to enter a ticket ID."
+            }
+        ).validate(args[0] if args else None)
+        if not valid:
             return
         ticket = Inventory(message.author).from_id(args[0])
         # pylint: disable=no-member
@@ -1071,15 +1078,12 @@ class TradeCommands(Commands):
                 "No user mentioned.",
                 "Please mention whom you want to give it to."
             )
-        elif not args or (
-            args and (
-                not args[0].isdigit()
-                or int(args[0]) <= 0
-            )
-        ):
+        elif not args or not MinValidator(
+            min_value=10, message=message
+        ).check(args[0]):
             error_tuple = (
                 "Invalid amount.",
-                "Please provide a valid amount."
+                "Please provide a valid amount. (Min 10 chips)"
             )
         elif message.author.id == mentions[0].id:
             error_tuple = (

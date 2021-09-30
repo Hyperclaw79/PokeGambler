@@ -23,7 +23,7 @@ This module is a compilation of user input validators.
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict, Optional, TYPE_CHECKING, Union
 import re
 
 from .utils import dm_send, get_embed
@@ -47,19 +47,29 @@ class Validator(ABC):
     error_embed_title = ""
     error_embed_desc = ""
     error_embed_kwargs = {}
+    null_embed_title = "No Value specified."
+    null_embed_desc = "You need to provide a value."
+    null_embed_kwargs = {}
 
     def __init__(
         self, message: Message,
         on_error: Optional[Dict[str, str]] = None,
+        on_null: Optional[Dict[str, str]] = None,
         dm_user: bool = False
     ):
         self.message = message
         on_error = on_error or {}
+        on_null = on_null or {}
         if on_error.get("title"):
             self.error_embed_title = on_error.pop("title")
         if on_error.get("description"):
             self.error_embed_desc = on_error.pop("description")
+        if on_null.get("title"):
+            self.null_embed_title = on_null.pop("title")
+        if on_null.get("description"):
+            self.null_embed_desc = on_null.pop("description")
         self.error_embed_kwargs.update(on_error)
+        self.null_embed_kwargs.update(on_null)
         self.dm_user = dm_user
 
     @abstractmethod
@@ -85,21 +95,39 @@ class Validator(ABC):
             **self.error_embed_kwargs
         )
 
-    async def __notify(self):
+    @property
+    def null_embed(self) -> Embed:
+        """Returns a null embed.
+
+        :return: A null embed.
+        :rtype: :class:`discord.Embed`
+        """
+        return get_embed(
+            title=self.null_embed_title,
+            embed_type="error",
+            content=(
+                self.null_embed_desc
+                + "\nPlease retry the command."
+            ),
+            **self.null_embed_kwargs
+        )
+
+    async def __notify(self, is_null: bool = False):
         """
         Performs the notifier function.
         """
+        embed = self.null_embed if is_null else self.error_embed
         if not self.dm_user:
             await self.message.channel.send(
-                embed=self.error_embed
+                embed=embed
             )
         else:
             await dm_send(
                 self.message, self.message.author,
-                embed=self.error_embed
+                embed=embed
             )
 
-    async def validate(self, value) -> bool:
+    async def validate(self, value: Any) -> bool:
         """Validates the given value.
 
         :param value: The value to be validated.
@@ -107,6 +135,9 @@ class Validator(ABC):
         :return: True if the value is valid, False otherwise.
         :rtype: bool
         """
+        if value is None:
+            await self.__notify(is_null=True)
+            return False
         if not self.check(value):
             await self.__notify()
             return False
@@ -271,7 +302,7 @@ class HexValidator(RegexValidator):
     error_embed_title = "Invalid Hexadecimal value"
 
     def __init__(self, **kwargs):
-        super().__init__(r'#?[0-9a-fA-F]*', **kwargs)
+        super().__init__(r'#?[0-9a-fA-F]{6}', **kwargs)
 
 
 class ImageUrlValidator(RegexValidator):
