@@ -425,7 +425,7 @@ class GambleCommands(Commands):
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
         :param kwargs: Extra keyword arguments for this command.
-        :type kwargs: Dict[difficulty: Optional[int]]]
+        :type kwargs: Dict[difficulty: Optional[int]]
 
         .. meta::
             :description: A minigame where you guess chip location.
@@ -477,7 +477,10 @@ class GambleCommands(Commands):
         costs = [50, 100, 150, 200, 250]
         multipliers = [3, 4, 10, 50, 100]
         level = kwargs.get("difficulty", kwargs.get("level", 1))
-        if level == 1:
+        if level == 1 and all(
+            word not in kwargs
+            for word in ('difficulty', 'level')
+        ):
             choice_view = SelectView(
                 heading="Select the Level",
                 options={
@@ -497,7 +500,8 @@ class GambleCommands(Commands):
             if not choice_view.result:
                 return
             await level_inp.delete()
-            level = choice_view.result - 1
+            level = choice_view.result
+        level -= 1
         letters, numbers = self.boardgen.get_valids(level)
         cost = costs[level]
         multiplier = multipliers[level]
