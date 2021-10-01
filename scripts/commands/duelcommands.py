@@ -666,8 +666,8 @@ class DuelCommands(Commands):
         other.debit(amount)
         Duels(
             players[0], glads[0].name,
-            str(players[1].id), glads[1].name, str(winner.user.id),
-            amount
+            players[1], glads[1].name,
+            str(winner.user.id), amount
         ).save()
         await thread.edit(
             archived=True,

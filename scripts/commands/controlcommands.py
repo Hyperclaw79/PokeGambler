@@ -789,8 +789,8 @@ class ControlCommands(Commands):
     def __cmd_hist_parse(self, cmd):
         user = self.ctx.get_user(int(cmd["user_id"]))
         is_admin = cmd["admin_cmd"]
-        channel = self.ctx.get_channel(int(cmd["channel"]))
-        guild = self.ctx.get_guild(int(cmd["guild"]))
+        channel = cmd["channel"]["name"]
+        guild = cmd["guild"]["name"]
         timestamp = cmd["used_at"].strftime("%Y-%m-%d %H:%M:%S")
         emb = discord.Embed(
             title="Command History",

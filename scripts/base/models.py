@@ -56,6 +56,36 @@ def expire_cache(func: Callable):
     return wrapper
 
 
+def to_dict(
+    dc_obj: Union[
+        discord.User, discord.Guild,
+        discord.TextChannel
+    ]
+) -> Dict[str, Any]:
+    """Convert a Discord object into a Dictionary.
+
+    .. note::
+        Currently only supports User, Guild, and TextChannel.
+
+    :param dc_obj: Discord object to be converted.
+    :type dc_obj: Union[discord.User, discord.Guild, discord.TextChannel]
+    :return: Dictionary of Discord object.
+    :rtype: Dict[str, Any]
+    """
+    fields = [
+        'name', 'id', 'created_at'
+    ]
+    if isinstance(dc_obj, discord.Guild):
+        fields.extend(['owner', 'large'])
+    obj_dict = {
+        attr: getattr(dc_obj, attr, None)
+        for attr in fields
+    }
+    if isinstance(dc_obj, discord.Guild):
+        obj_dict['owner'] = to_dict(obj_dict['owner'])
+    return obj_dict
+
+
 class NameSetter(type):
     """
     Metaclass to set the mongo collection for the model.
@@ -69,6 +99,7 @@ class NameSetter(type):
         )
         new_cl.model_name = new_cl.__name__.lower()
         new_cl.mongo = DB_CLIENT[new_cl.model_name]
+        new_cl.no_uinfo = dct.get('no_uinfo', False)
         return new_cl
 
 
@@ -91,11 +122,13 @@ class Model(metaclass=NameSetter):
             # Patch for Full_Info being executed before Profile creation.
             if attr in getattr(self, "excludes", []):
                 continue
+            if attr == 'user' and self.no_uinfo:
+                continue
             if all([
                 not attr.startswith("_"),
                 attr not in [
-                    "user", "model_name",
-                    "mongo", "excludes"
+                    "model_name", "mongo",
+                    "excludes", "no_uinfo"
                 ],
                 not ismethod(getattr(self, attr)),
                 not isinstance(
@@ -103,7 +136,12 @@ class Model(metaclass=NameSetter):
                     (property, staticmethod, classmethod)
                 )
             ]):
-                yield (attr, getattr(self, attr))
+                res = getattr(self, attr)
+                if attr == 'user':
+                    attr = 'user_info'
+                    res = to_dict(res)
+                    res.pop('id')
+                yield (attr, res)
 
     def drop(self):
         """
@@ -169,21 +207,21 @@ class Blacklist(Model):
 
     :param user: The user to map the collection to.
     :type user: :class:`discord.Member`
-    :param mod: The ID of the Admin who used the command.
-    :type mod: Optional[str]
+    :param mod: The Admin who used the command.
+    :type mod: Optional[:class:`discord.Member`]
     :param reason: The reason for the blacklist.
     :type reason: Optional[str]
     """
 
     def __init__(
         self, user: discord.Member,
-        mod: Optional[str] = "",
+        mod: Optional[discord.Member] = None,
         reason: Optional[str] = ""
     ):
         super().__init__(user)
         self.user_id = str(user.id)
         self.blacklisted_at = datetime.now()
-        self.blacklisted_by = mod
+        self.blacklisted_by = to_dict(mod) if mod else None
         self.reason = reason
 
     @expire_cache
@@ -251,6 +289,8 @@ class CommandData(Model):
     :type user: :class:`discord.Member`
     :param message: The message which triggered the command.
     :type message: discord.Message
+    :param is_interaction: Whether the command is an interaction.
+    :type is_interaction: bool
     :param command: The command which was triggered.
     :type command: str
     :param args: The arguments passed to the command.
@@ -262,6 +302,7 @@ class CommandData(Model):
     def __init__(
         self, user: discord.Member,
         message: discord.Message,
+        is_interaction: bool,
         command: str, admin_cmd: bool,
         args: List, kwargs: Dict
     ):
@@ -269,8 +310,9 @@ class CommandData(Model):
         self.user_id = str(user.id)
         self.admin_cmd = admin_cmd
         self.used_at = datetime.now()
-        self.channel = str(message.channel.id)
-        self.guild = str(message.guild.id)
+        self.is_interaction = is_interaction
+        self.channel = to_dict(message.channel)
+        self.guild = to_dict(message.guild)
         self.command = command
         self.args = args
         self.kwargs = kwargs
@@ -306,7 +348,8 @@ class CommandData(Model):
                     }
                 }, {
                     '$group': {
-                        '_id': '$channel',
+                        '_id': '$channel.id',
+                        'name': {'$last': '$channel.name'},
                         'num_cmds': {'$sum': 1},
                         'guild': {'$first': '$guild'}
                     }
@@ -453,27 +496,27 @@ class Exchanges(Model):
 
     :param user: The user to map the collection to.
     :type user: :class:`discord.Member`
-    :param admin: The ID of the Admin who performed the exchange.
-    :type admin: str
-    :param pokebot: The ID of the Pokemon themed bot.
-    :type pokebot: str
+    :param admin: The Admin who performed the exchange.
+    :type admin: Optional[:class:`discord.Member`]
+    :param pokebot: The Pokemon themed bot.
+    :type pokebot: Optional[:class:`discord.Member`]
     :param chips: The amount of chips exchanged.
-    :type chips: int
+    :type chips: Optional[int]
     :param mode: The mode of the exchange., default is Deposit.
-    :type mode: str
+    :type mode: Optional[str]
     """
 
     def __init__(
         self, user: discord.Member,
-        admin: str = None,
-        pokebot: str = None,
-        chips: int = None,
-        mode: str = "Deposit",
+        admin: Optional[discord.Member] = None,
+        pokebot: Optional[discord.Member] = None,
+        chips: Optional[int] = None,
+        mode: Optional[str] = None
     ):
         super().__init__(user)
         self.exchanged_at = datetime.now()
         self.user_id = str(user.id)
-        self.admin = str(admin)
+        self.admin = admin
         self.pokebot = pokebot
         self.chips = chips
         self.mode = mode
@@ -730,6 +773,7 @@ class Inventory(Model):
             itemid = new_item.itemid
         self.mongo.insert_one({
             "user_id": self.user_id,
+            "user": to_dict(self.user),
             "itemid": itemid,
             "obtained_on": datetime.now()
         })
@@ -842,12 +886,12 @@ class Matches(Model):
 
     :param user: The user to map the collection to.
     :type user: :class:`discord.Member`
-    :param started_by: The ID of the user who started the match.
-    :type started_by: str
-    :param participants: The list of IDs of participants.
-    :type participants: List[str]
-    :param winner: The ID of the winner.
-    :type winner: str
+    :param started_by: The user who started the match.
+    :type started_by: Optional[:class:`discord.Member`]
+    :param participants: The list of participants.
+    :type participants: Optional[List[:class:`discord.Member`]]
+    :param winner: The user who won.
+    :type winner: :class:`discord.Member`
     :param deal_cost: The fee of the gamble match., deafult is 50.
     :type deal_cost: int
     :param lower_wins: Was the lower_wins rule in place?
@@ -856,18 +900,24 @@ class Matches(Model):
     :type by_joker: bool
     """
 
+    no_uinfo = True
+
     def __init__(
         self, user: discord.Member,
-        started_by: str = "",
-        participants: List[str] = None,
-        winner: str = "", deal_cost: int = 50,
+        started_by: Optional[discord.Member] = None,
+        participants: Optional[List[discord.Member]] = None,
+        winner: Optional[discord.Member] = None,
+        deal_cost: int = 50,
         lower_wins: bool = False,
         by_joker: bool = False
     ):
         super().__init__(user)
         self.played_at = datetime.now()
         self.started_by = started_by
-        self.participants = participants
+        self.participants = [
+            to_dict(user)
+            for user in participants
+        ] if participants else None
         self.winner = winner
         self.deal_cost = deal_cost
         self.lower_wins = lower_wins
@@ -886,7 +936,7 @@ class Matches(Model):
                     "played_by": str(self.user.id)
                 },
                 {
-                    "participants": str(self.user.id)
+                    "participants.id": self.user.id
                 }
             ]
         }).count()
@@ -899,7 +949,7 @@ class Matches(Model):
         :rtype: int
         """
         return self.mongo.find({
-            "winner": str(self.user.id)
+            "winner.id": self.user.id
         }).count()
 
     def get_stats(self) -> Tuple[int, int]:
@@ -934,19 +984,25 @@ class Nitro(Model):
 
     :param user: The user to map the collection to.
     :type user: :class:`discord.Member`
-    :param boosters: The list of IDs of nitro boosters.
-    :type boosters: List[str]
+    :param boosters: The list of the nitro boosters.
+    :type boosters: List[:class:`discord.Member`]
     :param rewardboxes: The list of IDs of nitro reward boxes.
     :type rewardboxes: List[str]
     """
+
+    no_uinfo = True
+
     def __init__(
         self, user: discord.Member,
-        boosters: List[str] = None,
+        boosters: List[discord.Member] = None,
         rewardboxes: List[str] = None
     ):
         super().__init__(user)
         self.last_rewarded = datetime.now()
-        self.boosters = boosters
+        self.boosters = [
+            to_dict(user)
+            for user in boosters
+        ] if boosters else None
         self.rewardboxes = rewardboxes
 
     @classmethod
@@ -970,8 +1026,8 @@ class Trades(Model):
 
     :param user: The user to map the collection to.
     :type user: :class:`discord.Member`
-    :param traded_to: The ID of the user with whom the trade happened.
-    :type traded_to: str
+    :param traded_to: The user with whom the trade happened.
+    :type traded_to: :class:`discord.Member`
     :param given_chips: The number of pokechips given to user.
     :type given_chips: int
     :param taken_chips: The number of pokechips taken from user.
@@ -984,7 +1040,7 @@ class Trades(Model):
 
     def __init__(
         self, user: discord.Member,
-        traded_to: Optional[str] = None,
+        traded_to: Optional[discord.Member] = None,
         given_chips: int = None,
         taken_chips: int = None,
         given_items: List[str] = None,
@@ -993,7 +1049,7 @@ class Trades(Model):
         super().__init__(user)
         self.traded_at = datetime.now()
         self.traded_by = str(user.id)
-        self.traded_to = str(traded_to)
+        self.traded_to = traded_to
         self.given_chips = given_chips
         self.taken_chips = taken_chips
         self.given_items = given_items
@@ -1210,7 +1266,9 @@ class Profiles(UnlockedModel):
             {
                 "$unset": [
                     "_id", "loots._id", "boosts._id",
-                    "loots.user_id", "boosts.user_id"
+                    "loots.user_id", "boosts.user_id",
+                    "user_info", "loots.user_info",
+                    "boosts.user_info"
                 ]
             }
         ]))
@@ -1506,8 +1564,8 @@ class Duels(Minigame):
     :type user: :class:`discord.Member`
     :param gladiator: The gladiator used by the user.
     :type gladiator: Optional[str]
-    :param opponent: The ID of the opponent for the Duel.
-    :type opponent: Optional[str]
+    :param opponent: The opponent for the Duel.
+    :type opponent: Optional[:class:`discord.Member`]
     :param opponent_gladiator: The gladiator of the opponent.
     :type opponent_gladiator: Optional[str]
     :param won: The ID of the winner of the Duel.
@@ -1519,7 +1577,7 @@ class Duels(Minigame):
     def __init__(
         self, user: discord.Member,
         gladiator: Optional[str] = None,
-        opponent: Optional[str] = None,
+        opponent: Optional[discord.Member] = None,
         opponent_gladiator: Optional[str] = None,
         won: Optional[str] = None,
         cost: int = 50
@@ -1528,7 +1586,7 @@ class Duels(Minigame):
         self.played_at = datetime.now()
         self.played_by = str(user.id)
         self.gladiator = gladiator
-        self.opponent = opponent
+        self.opponent = to_dict(opponent)
         self.opponent_gladiator = opponent_gladiator
         self.cost = cost
         self.won = won

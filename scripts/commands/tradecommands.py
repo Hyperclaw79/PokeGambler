@@ -1504,8 +1504,8 @@ class TradeCommands(Commands):
             )(chips)
             Profiles(admin).credit(int(chips * 0.1))
             Exchanges(
-                message.author, str(admin.id),
-                str(pokebot.id), chips, mode.title()
+                message.author, admin,
+                pokebot, chips, mode.title()
             ).save()
             await dm_send(
                 message, admin,

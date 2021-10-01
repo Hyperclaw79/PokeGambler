@@ -492,12 +492,13 @@ class NormalCommands(Commands):
         )
         return stats.encode('utf-8').decode('utf-8')
 
-    def __info_most_active_channel(self):
+    @staticmethod
+    def __info_most_active_channel():
         top_channel = CommandData.most_active_channel()
         if top_channel is None:
             return None
-        channel = self.ctx.get_channel(int(top_channel['_id']))
-        guild = self.ctx.get_guild(int(top_channel['guild']))
+        channel = top_channel['name']
+        guild = top_channel['guild']['name']
         return f"{channel} ({guild})"
 
     def __info_most_active_user(self, mode: str = "command"):

@@ -244,8 +244,7 @@ class AdminCommands(Commands):
             )
             return
         await Blacklist(
-            user,
-            str(message.author.id),
+            user, message.author,
             reason=kwargs.get("reason")
         ).save()
         await message.add_reaction("👍")
@@ -361,10 +360,7 @@ class AdminCommands(Commands):
                 )
             )
             return
-        Blacklist(
-            user,
-            str(message.author.id)
-        ).pardon()
+        Blacklist(user, message.author).pardon()
         await message.add_reaction("👍")
 
     @admin_only

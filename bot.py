@@ -196,7 +196,7 @@ class PokeGambler(discord.AutoShardedClient):
             method, kwargs = await self.slasher.parse_response(interaction)
             if not (method and kwargs):
                 return
-            await self.__exec_command(method, kwargs)
+            await self.__exec_command(method, kwargs, is_interaction=True)
         elif interaction.data.get('type') in (2, 3):
             await self.ctx_cmds.execute(interaction)
 
@@ -481,7 +481,7 @@ class PokeGambler(discord.AutoShardedClient):
         ]
         return any(return_checks)
 
-    async def __exec_command(self, method, kwargs):
+    async def __exec_command(self, method, kwargs, is_interaction=False):
         try:
             message = kwargs["message"]
             opts = {
@@ -492,7 +492,7 @@ class PokeGambler(discord.AutoShardedClient):
             cmd_name = method.__name__.replace("cmd_", "")
             if "no_log" not in dir(method) or not self.is_local:
                 cmd_data = CommandData(
-                    message.author, message,
+                    message.author, message, is_interaction,
                     cmd_name, hasattr(method, "admin_only"),
                     kwargs["args"], opts
                 )
@@ -657,7 +657,7 @@ class PokeGambler(discord.AutoShardedClient):
                         color=profile.get('embed_color')
                     )
                 )
-                rewarded.append(booster.id)
+                rewarded.append(booster)
                 rewardboxes.append(nitro_box.itemid)
             Nitro(owner, rewarded, rewardboxes).save()
 

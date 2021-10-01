@@ -181,9 +181,9 @@ class GambleCommands(Commands):
             )
             Matches(
                 message.author,
-                started_by=str(message.author.id),
-                participants=list(profiles),
-                winner=str(winner.id),
+                started_by=message.author,
+                participants=profiles,
+                winner=self.ctx.get_user(int(winner)),
                 lower_wins=lower_wins,
                 deal_cost=fee,
                 by_joker=is_joker
@@ -364,17 +364,15 @@ class GambleCommands(Commands):
         matches = Matches.get_matches(limit=limit)
         embeds = []
         for match in matches:
-            started_by = message.guild.get_member(
-                int(match["started_by"])
-            )
+            started_by = match["started_by"]["name"]
             played_at = match["played_at"]
             pot = match["deal_cost"] * len(match['participants'])
             parts = "\n".join(
-                str(message.guild.get_member(int(plyr)))
+                plyr["name"]
                 for plyr in match["participants"]
             )
             parts = f"```py\n{parts}\n```"
-            winner = message.guild.get_member(int(match["winner"]))
+            winner = match["winner"]
             emb = get_embed(
                 f"Match started by: **{started_by}**\n"
                 f"Played on: **{played_at}**\n"
@@ -386,9 +384,10 @@ class GambleCommands(Commands):
                 value=parts,
                 inline=True
             )
+            winner_name = winner['name'] if winner else 'Not in Server'
             emb.add_field(
                 name="Winner",
-                value=f"**```{winner if winner else 'Not in Server'}```**",
+                value=f"**```{winner_name}```**",
                 inline=True
             )
             emb.add_field(
@@ -412,6 +411,7 @@ class GambleCommands(Commands):
                     value="\u200B",
                     inline=True
                 )
+            winner = self.ctx.get_user(winner['id'])
             if winner:
                 emb.set_image(url=winner.avatar.with_size(256))
             embeds.append(emb)
@@ -627,7 +627,7 @@ class GambleCommands(Commands):
     def __gamble_charge_player(self, dealed_deck, fee):
         profiles = {}
         for player, _ in dealed_deck.items():
-            profiles[str(player.id)] = profile = Profiles(player)
+            profiles[player] = profile = Profiles(player)
             data = profile.get()
             bal = data["balance"]
             num_matches = data["num_matches"]
@@ -685,10 +685,17 @@ class GambleCommands(Commands):
         await message.channel.set_permissions(
             gamblers, send_messages=False
         )
-        gamble_thread = await message.channel.create_thread(
-            name="gamble-here",
-            message=message
-        )
+        try:  # Interaction Messages can't be used for creating threads.
+            gamble_thread = await message.channel.create_thread(
+                name="gamble-here",
+                message=message
+            )
+        except discord.HTTPException:
+            msg = await message.channel.send("Starting Gamble....")
+            gamble_thread = await message.channel.create_thread(
+                name="gamble-here",
+                message=msg
+            )
         rules = ', '.join(
             self.rules[key]
             for key in kwargs
@@ -787,7 +794,7 @@ class GambleCommands(Commands):
         self, gamble_channel, dealed_deck,
         winner, fee, profiles
     ):
-        profile = profiles[str(winner.id)]
+        profile = profiles[winner]
         data = profile.get()
         bal = data["balance"]
         num_wins = data["num_wins"]
