@@ -22,7 +22,10 @@ Module which contains different discord application command components.
 # pylint: disable=too-many-instance-attributes
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import (
+    dataclass, field,
+    fields, make_dataclass
+)
 from typing import (
     Any, Callable, Dict,
     List, Set, Tuple
@@ -126,6 +129,28 @@ class AppCommand:
         :return: The AppCommand instance.
         :rtype: :class:`AppCommand`
         """
+        new_fields = [
+            (key, type(val), field(default=None))
+            for key, val in data.items()
+            if key not in (param.name for param in fields(cls))
+        ]
+        if new_fields:
+            old_fields = [
+                (
+                    field_.name, field_.type, field(
+                        default=field_.default,
+                        default_factory=field_.default_factory
+                    )
+                )
+                for field_ in fields(cls)
+            ]
+            new_cls = make_dataclass(
+                cls.__name__,
+                fields=old_fields+new_fields,
+                bases=(cls,)
+            )
+            new_cls.__subclasses__ = cls.__subclasses__
+            return new_cls(**data)
         return cls(**data)
 
     def to_dict(self) -> Dict[str, Any]:
