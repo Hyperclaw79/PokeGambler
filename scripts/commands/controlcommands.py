@@ -502,11 +502,7 @@ class ControlCommands(Commands):
             {command_prefix}reload normal
         """
         module = args[0].lower()
-        possible_modules = [
-            cmd.replace("commands", "")
-            for cmd in dir(self.ctx)
-            if cmd.endswith("commands") and cmd != "load_commands"
-        ]
+        possible_modules = self.__possible_modules
         if module not in possible_modules:
             embed = get_enum_embed(
                 possible_modules,
@@ -769,11 +765,7 @@ class ControlCommands(Commands):
                 title="Possible toggle states"
             )
             await message.channel.send(embed=embed)
-        possible_modules = [
-            cmd.replace("commands", "")
-            for cmd in dir(self.ctx)
-            if cmd.endswith("commands") and cmd != "load_commands"
-        ]
+        possible_modules = self.__possible_modules
         if module not in possible_modules:
             embed = get_enum_embed(
                 possible_modules,
@@ -785,6 +777,18 @@ class ControlCommands(Commands):
             await message.channel.send(
                 embed=get_embed(f"Successfully switched {module} to {state}.")
             )
+
+    @property
+    def __possible_modules(self):
+        return [
+            cmd.replace("commands", "")
+            for cmd in dir(self.ctx)
+            if all([
+                not cmd.startswith("_"),
+                cmd.endswith("commands"),
+                cmd != "load_commands"
+            ])
+        ]
 
     def __cmd_hist_parse(self, cmd):
         user = self.ctx.get_user(int(cmd["user_id"]))
@@ -854,7 +858,7 @@ class ControlCommands(Commands):
         message: Message,
         models: List[Union[Type[Item], Type[Model]]],
         content: str = None
-    ) -> Union[Union[Type[Item], Type[Model]]]:
+    ) -> Union[Type[Item], Type[Model]]:
         choices_view = SelectView(
             heading="Select a Collection",
             options={
