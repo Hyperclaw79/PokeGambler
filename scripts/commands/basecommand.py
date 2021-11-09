@@ -575,6 +575,22 @@ def no_log(func: Callable):
     return wrapped
 
 
+def no_slash(func: Callable):
+    '''Prevents a command from being triggered by a slash.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
+    '''
+    func.__dict__["no_slash"] = True
+
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
+
+
 def os_only(func: Callable):
     '''These commands can only run in the official server.
 
