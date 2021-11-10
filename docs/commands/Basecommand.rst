@@ -44,6 +44,8 @@ Decorators
 
 .. autodecorator:: scripts.commands.basecommand.no_log
 
+.. autodecorator:: scripts.commands.basecommand.no_slash
+
 .. rubric:: Decorators with arguments
 .. autodecorator:: scripts.commands.basecommand.alias
 

@@ -135,7 +135,7 @@ def setup(app):
             lines[idx] = arg_info_patt.sub(
                 '',
                 line.replace(
-                    "{command_prefix}", command_prefix
+                    "{command_prefix}", command_prefix.replace("'", "")
                 ).replace(
                     "{pokechip_emoji}", "Pokechips"
                 )
