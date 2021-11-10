@@ -26,7 +26,7 @@ from __future__ import annotations
 import random
 from datetime import datetime, timedelta
 from io import BytesIO
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING, Tuple, Union
 
 from PIL import Image
 import discord
@@ -44,7 +44,7 @@ from ..helpers.imageclasses import (
     BadgeGenerator, LeaderBoardGenerator,
     ProfileCardGenerator, WalletGenerator
 )
-from ..helpers.unicodex import Unicodex
+from ..helpers.unicodex import UnicodeProgressBar, Unicodex
 from ..helpers.utils import (
     LineTimer, dm_send, get_embed, get_formatted_time,
     get_modules, img2file, wait_for
@@ -52,7 +52,7 @@ from ..helpers.utils import (
 from ..helpers.validators import HexValidator, ImageUrlValidator
 
 from .basecommand import (
-    Commands, alias, check_completion, cache_images, get_user,
+    Commands, alias, check_completion, cache_images, cooldown, get_user,
     model, get_profile, needs_ticket
 )
 
@@ -278,6 +278,106 @@ class ProfileCommands(Commands):
             )
         await message.reply(embed=emb)
 
+    @alias(['timers', 'cd', 'cds', 'tm', 'tms'])
+    @cooldown(120)
+    @model([Profiles, Loots, Votes, Boosts, BoostItem])
+    async def cmd_cooldowns(self, message: Message, **kwargs):
+        """
+
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+
+        .. meta::
+            :description: Check the timers for loot, vote and daily.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            {command_prefix}timers
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
+        Check the time remaining before you can use the command again for:
+
+            - Loot
+            - Daily
+            - Vote
+        """
+        def rand_style():
+            return random.choice(['squares', 'circles'])
+
+        def _clean_cmd(cmd):
+            return cmd.__name__.replace('cmd_', '').title()
+
+        def _get_cmd_cd(cmd, timestamp):
+            return cmd.__dict__['cooldown'] - (
+                datetime.now() - timestamp
+            ).total_seconds()
+
+        def _format_cmd_cd(cmd, timestamp):
+            time_remaining = _get_cmd_cd(cmd, timestamp)
+            if time_remaining <= 0:
+                return "**now**."
+            cmd_pb = UnicodeProgressBar(style=rand_style()).get(
+                int(
+                    (
+                        (
+                            cmd.__dict__['cooldown'] - time_remaining
+                        ) / cmd.__dict__['cooldown']
+                    ) * 5
+                )
+            )
+            return f"in {get_formatted_time(time_remaining)}\n`{cmd_pb}`"
+
+        def _get_message(key, elapsed, total, show_hours=True):
+            message = "**now**."
+            if elapsed < total:
+                prog_bar = UnicodeProgressBar(style=rand_style()).get(
+                    int(
+                        (elapsed / total) * 5
+                    )
+                )
+                ts_fmt = get_formatted_time(
+                    total - elapsed, show_hours=show_hours
+                )
+                message = f"in {ts_fmt}.\n`{prog_bar}`"
+            return f"You can use {key.title()} again {message}"
+        emb_data = {}
+        loot_elapsed, loot_total = self._get_loot_cooldown(
+            message, Boosts(message.author),
+            BoostItem.get_boosts(str(message.author.id))
+        )
+        emb_data['Loot'] = _get_message(
+            'loot', loot_elapsed, loot_total,
+            show_hours=False
+        )
+        (
+            daily_elapsed, daily_base_cd, *_
+        ) = self._get_daily_cooldown(
+            Loots(message.author)
+        )
+        emb_data['Daily'] = _get_message('daily', daily_elapsed, daily_base_cd)
+        _, vote_elapsed, vote_total = self._get_vote_cooldown(
+            Votes(message.author)
+        )
+        emb_data['Vote'] = _get_message('vote', vote_elapsed, vote_total)
+        emb_data.update({
+            _clean_cmd(cmd): f"You can use **{_clean_cmd(cmd)}** again "
+            f"{_format_cmd_cd(cmd, user_obj[message.author])}"
+            for cmd, user_obj in self.ctx.cooldown_cmds.items()
+            if message.author in user_obj and _get_cmd_cd(
+                cmd, user_obj[message.author]
+            ) > 0
+        })
+        emb = get_embed(
+            title='Your cooldowns',
+            color=Profiles(message.author).get('embed_color')
+        )
+        for key, value in emb_data.items():
+            emb.add_field(name=key, value=value, inline=False)
+        await dm_send(message, message.author, embed=emb)
+
     @model([Loots, Profiles, Chest, Inventory])
     @alias('dl')
     async def cmd_daily(self, message: Message, **kwargs):
@@ -319,21 +419,11 @@ class ProfileCommands(Commands):
         earned = loot_info["earned"]
         tier = loot_info["tier"]
         daily_streak = loot_info["daily_streak"]
-        last_claim = loot_info["daily_claimed_on"]
-        if isinstance(last_claim, str):
-            last_claim = datetime.strptime(
-                last_claim,
-                "%Y-%m-%d %H:%M:%S"
-            )
-        cd_time = 24 * 60 * 60
-        if (
-            datetime.now() - last_claim
-        ).total_seconds() < cd_time:
-            time_remaining = get_formatted_time(
-                cd_time - (
-                    datetime.now() - last_claim
-                ).total_seconds()
-            )
+        (
+            elapsed_time, cd_time,
+            time_remaining, last_claim
+        ) = self._get_daily_cooldown(loot_info)
+        if elapsed_time < cd_time:
             await message.add_reaction("⌛")
             await message.reply(
                 embed=get_embed(
@@ -628,21 +718,21 @@ class ProfileCommands(Commands):
             :class:`~scripts.base.models.Boosts` can be purchased from
             the :class:`~scripts.base.shop.Shop`.
         """
-        on_cooldown = self.ctx.loot_cd.get(message.author, None)
-        perm_boosts = Boosts(
-            message.author
-        ).get()
-        loot_mult = 1 + (perm_boosts["lucky_looter"] * 0.05)
-        cd_reducer = perm_boosts["loot_lust"]
-        tr_mult = 0.1 * (perm_boosts["fortune_burst"] + 1)
+        perm_boosts = Boosts(message.author).get()
         boosts = BoostItem.get_boosts(str(message.author.id))
-        cd_reducer += boosts['boost_lt_cd']['stack']
-        loot_mult += 0.05 * boosts['boost_lt']['stack']
-        tr_mult += 0.1 * boosts['boost_tr']['stack']
-        cd_time = 60 * (10 - cd_reducer)
-        on_cd = await self.__loot_handle_cd(message, on_cooldown, cd_time)
+        on_cooldown = self.ctx.loot_cd.get(message.author, None)
+        elapsed, total_cd = self._get_loot_cooldown(
+            message, perm_boosts, boosts
+        )
+        on_cd = await self.__loot_handle_cd(
+            message, on_cooldown, (total_cd - elapsed)
+        )
         if on_cd:
             return
+        loot_mult = 1 + (perm_boosts["lucky_looter"] * 0.05)
+        tr_mult = 0.1 * (perm_boosts["fortune_burst"] + 1)
+        loot_mult += 0.05 * boosts['boost_lt']['stack']
+        tr_mult += 0.1 * boosts['boost_tr']['stack']
         profile = Profiles(message.author)
         loot_model = Loots(message.author)
         loot_info = loot_model.get()
@@ -663,6 +753,36 @@ class ProfileCommands(Commands):
             "Added to your balance.**",
             embed=embed
         )
+
+    def _get_loot_cooldown(
+        self, message: Message,
+        perm_boosts: Union[Dict, Boosts],
+        temp_boosts: Dict
+    ) -> Tuple[int, int]:
+        """Get the loot cooldown for the user.
+
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param perm_boosts: The permanent boosts for the user.
+        :type perm_boosts: Union[Dict, Boosts]
+        :param temp_boosts: The temporary boosts for the user.
+        :type temp_boosts: Dict
+        :return: The time remaining and total cd time in seconds.
+        :rtype: Tuple[int, int]
+        """
+        if isinstance(perm_boosts, Boosts):
+            perm_boosts = perm_boosts.get()
+        cd_reducer = perm_boosts["loot_lust"]
+        cd_reducer += temp_boosts['boost_lt_cd']['stack']
+        cd_time = 60 * (10 - cd_reducer)
+        loot_cd = self.ctx.loot_cd.get(
+            message.author,
+            datetime.now() - timedelta(minutes=10)
+        )
+        elapsed = (
+            datetime.now() - loot_cd
+        ).total_seconds()
+        return elapsed, cd_time
 
     @model([Profiles, Blacklist])
     @alias("pr")
@@ -922,6 +1042,53 @@ class ProfileCommands(Commands):
         await message.reply(**to_send)
 
     @staticmethod
+    def _get_daily_cooldown(
+        loot_info: Union[Dict, Loots]
+    ) -> Tuple[str, int, int, datetime]:
+        """Get a list of time counts for the daily cooldown.
+
+        :param loot_info: The Loot object for the User.
+        :type loot_info: :class:`~scripts.base.models.Loots`
+        :return: Time remaining till next daily, elapsed time, cd & last claim.
+        :rtype: Tuple[str, int, int, datetime]
+        """
+        if isinstance(loot_info, Loots):
+            loot_info = loot_info.get()
+        last_claim = loot_info["daily_claimed_on"]
+        if isinstance(last_claim, str):
+            last_claim = datetime.strptime(
+                last_claim,
+                "%Y-%m-%d %H:%M:%S"
+            )
+        cd_time = 24 * 60 * 60
+        elapsed_time = (datetime.now() - last_claim).total_seconds()
+        time_remaining = get_formatted_time(
+            cd_time - elapsed_time
+        )
+        return elapsed_time, cd_time, time_remaining, last_claim
+
+    @staticmethod
+    def _get_vote_cooldown(votes: Votes) -> Tuple[str, int, int]:
+        """Get the cooldown for the vote command.
+
+        :param votes: The votes object for the User.
+        :type votes: :class:`~scripts.base.models.Votes`
+        :return: The cooldown message, elapsed time, base cooldown(12hrs).
+        :rtype: Tuple[str, int, int]
+        """
+        last_voted = votes.last_voted
+        now = datetime.now()
+        elapsed = (now - last_voted).total_seconds()
+        base_cd = 12
+        if elapsed // 3600 >= base_cd:
+            cd_msg = "You can vote **now**!"
+        else:
+            ends_on = last_voted + timedelta(hours=base_cd)
+            tot_secs = (ends_on - now).total_seconds()
+            cd_msg = f"You can vote again in {get_formatted_time(tot_secs)}."
+        return cd_msg, elapsed, (base_cd * 3600)
+
+    @staticmethod
     async def __background_get_url(message, reply):
         if len(reply.attachments) > 0:
             if reply.attachments[0].content_type not in (
@@ -986,23 +1153,13 @@ class ProfileCommands(Commands):
         modules = get_modules(self.ctx)
         return _get_lb(modules, mg_name, user)
 
-    async def __loot_handle_cd(self, message, on_cooldown, cd_time):
-        loot_cd = self.ctx.loot_cd.get(
-            message.author,
-            datetime.now() - timedelta(minutes=10)
-        )
-        elapsed = (
-            datetime.now() - loot_cd
-        ).total_seconds()
-        if on_cooldown and elapsed < cd_time:
-            time_remaining = get_formatted_time(
-                cd_time - elapsed,
-                show_hours=False
-            )
+    async def __loot_handle_cd(self, message, on_cooldown, time_remaining):
+        if on_cooldown and time_remaining > 0:
             await message.add_reaction("⌛")
+            remaining = get_formatted_time(time_remaining, show_hours=False)
             await message.reply(
                 embed=get_embed(
-                    f"Please wait {time_remaining} before looting again.",
+                    f"Please wait {remaining} before looting again.",
                     embed_type="warning",
                     title="On Cooldown"
                 )
@@ -1057,15 +1214,7 @@ class ProfileCommands(Commands):
             name=stk_name,
             value=stk_val
         )
-        last_voted = votes.last_voted
-        now = datetime.now()
-        elapsed = (now - last_voted).total_seconds() // 3600
-        if elapsed >= 12:
-            cd_msg = "You can vote **now**!"
-        else:
-            ends_on = last_voted + timedelta(hours=12)
-            tot_secs = (ends_on - now).total_seconds()
-            cd_msg = f"You can vote again in {get_formatted_time(tot_secs)}."
+        cd_msg, elapsed, _ = self._get_vote_cooldown(votes)
         emb.add_field(
             name="Vote Cooldown",
             value=cd_msg,
