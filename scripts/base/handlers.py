@@ -242,7 +242,10 @@ class SlashHandler:
         current_commands = []
         for module in get_modules(self.ctx):
             for attr in dir(module):
-                if not attr.startswith("cmd_") or "no_slash" in dir(getattr(module, attr)):
+                if (
+                    not attr.startswith("cmd_")
+                    or "no_slash" in dir(getattr(module, attr))
+                ):
                     continue
                 current_commands.append(
                     getattr(module, attr)
