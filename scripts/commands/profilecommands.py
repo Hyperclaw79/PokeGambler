@@ -297,12 +297,11 @@ class ProfileCommands(Commands):
 
         .. rubric:: Description
 
-        ``👑 Owner Command``
         Check the time remaining before you can use the command again for:
 
-            - Loot
-            - Daily
-            - Vote
+            * Loot
+            * Daily
+            * Vote
         """
         def rand_style():
             return random.choice(['squares', 'circles'])
