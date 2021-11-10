@@ -165,7 +165,7 @@ class CommandListing(list):
         :type command: Union[:class:`~.components.AppCommand`, Dict]
         """
         if isinstance(command, dict):
-            command = self.Component(**command)
+            command = self.Component.from_dict(command)
         super().append(command)
 
     def remove(self, command: Union[str, Dict, AppCommand]):
