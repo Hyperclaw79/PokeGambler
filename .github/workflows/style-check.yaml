@@ -29,7 +29,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Code Style Checks
       run: |
-        pycodestyle scripts bot.py launcher.py
+        pycodestyle --max-line-length=85 scripts bot.py launcher.py
     - name: Run Linting
       run: |
         pylint -f colorized scripts bot.py launcher.py
