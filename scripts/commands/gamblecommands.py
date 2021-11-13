@@ -95,7 +95,7 @@ class GambleCommands(Commands):
         :param args: The list of arguments that were passed.
         :type args: List[fee: Optional[int]]
         :param kwargs: Any additional keyword arguments.
-        :type kwargs: Dict[lower_wins: Optional[bool]]]
+        :type kwargs: Dict[lower_wins: Optional[bool], max_players: Optional[int]]
 
         .. meta::
             :description: The core command of the bot - Gamble.
@@ -104,7 +104,7 @@ class GambleCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}gamble [50 < fee] [--lower_wins]
+            {command_prefix}gamble [50 < fee] [--lower_wins] [--max_players num]
 
         .. rubric:: Description
 
@@ -183,7 +183,7 @@ class GambleCommands(Commands):
                 message.author,
                 started_by=message.author,
                 participants=profiles,
-                winner=self.ctx.get_user(int(winner)),
+                winner=winner,
                 lower_wins=lower_wins,
                 deal_cost=fee,
                 by_joker=is_joker
@@ -397,7 +397,7 @@ class GambleCommands(Commands):
             )
             if kwargs.get("verbose", False):
                 emb.add_field(
-                    name="Mode",
+                    name="Lower Wins",
                     value=f"```py\n{match['lower_wins']}\n```",
                     inline=True
                 )

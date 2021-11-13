@@ -913,12 +913,12 @@ class Matches(Model):
     ):
         super().__init__(user)
         self.played_at = datetime.now()
-        self.started_by = started_by
+        self.started_by = to_dict(started_by)
         self.participants = [
             to_dict(user)
             for user in participants
         ] if participants else None
-        self.winner = winner
+        self.winner = to_dict(winner)
         self.deal_cost = deal_cost
         self.lower_wins = lower_wins
         self.by_joker = by_joker
