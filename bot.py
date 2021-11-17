@@ -313,7 +313,7 @@ class PokeGambler(discord.AutoShardedClient):
         :param guild: The guild which was removed from PokeGambler.
         :type guild: :class:`discord.Guild`
         """
-        if not self.is_prod:
+        if not self.is_prod or not guild.name or guild.unavailable:
             return
         await self.topgg.post_guild_count()
         emb = get_embed(
