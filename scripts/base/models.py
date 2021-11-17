@@ -484,7 +484,7 @@ class DuelActionsModel(Model):
         """
         filter_ = {}
         if user_id:
-            filter_.update({"user_id": user_id})
+            filter_["user_id"] = user_id
         if not cls.mongo.count(filter_):
             return None
         results = cls.mongo.find(filter_)
@@ -848,7 +848,7 @@ class Minigame(Model):
             "played_by": str(self.user.id)
         }
         if wins:
-            filter_.update({"won": True})
+            filter_["won"] = True
         return list(self.mongo.aggregate([
             {
                 "$match": filter_
@@ -1603,7 +1603,7 @@ class Duels(Minigame):
             "played_by": str(self.user.id)
         }
         if wins:
-            filter_.update({"won": str(self.user.id)})
+            filter_["won"] = str(self.user.id)
         return list(self.mongo.aggregate([
             {
                 "$match": filter_
