@@ -242,54 +242,7 @@ class PokeGambler(discord.AutoShardedClient):
         :param guild: The guild which added PokeGambler.
         :type guild: :class:`discord.Guild`
         """
-        if not self.is_prod:
-            return
-        await self.topgg.post_guild_count()
-        image = None
-        if guild.banner:
-            image = guild.banner.url
-        elif guild.splash:
-            image = guild.splash.url
-        elif guild.icon:
-            image = guild.icon.url
-        emb = get_embed(
-            embed_type="info",
-            title=f"Added to {guild}.",
-            image=image
-        )
-        for attr in (
-            "description", "owner",
-            "member_count", "created_at"
-        ):
-            emb.add_field(
-                name=attr.replace("_", " ").title(),
-                value=str(getattr(guild, attr))
-            )
-        if guild.large:
-            emb.color = discord.Colour.gold()
-        jq_log_channel = discord.utils.get(
-            self.get_guild(
-                self.official_server
-            ).text_channels,
-            name="joined_guilds_log"
-        )
-        await jq_log_channel.send(embed=emb)
-        chan = guild.system_channel or discord.utils.get(
-            guild.text_channels, name="general"
-        )
-        if chan:
-            try:
-                await chan.send(
-                    embed=get_embed(
-                        title="Thanks for adding me!",
-                        content=f"See `{self.prefix}info` to get started.",
-                        image="https://media.discordapp.net/attachments/"
-                        "874623706339618827/874628993939308554/pg_banner.png"
-                        "?width=640&height=360"
-                    )
-                )
-            except (discord.Forbidden, discord.HTTPException):
-                pass
+        await self.__handle_guild_change("join", guild)
 
     async def on_guild_remove(self, guild: discord.Guild):
         """Called when a :class:`discord.Guild` is removed
@@ -313,22 +266,7 @@ class PokeGambler(discord.AutoShardedClient):
         :param guild: The guild which was removed from PokeGambler.
         :type guild: :class:`discord.Guild`
         """
-        if not self.is_prod or not guild.name or guild.unavailable:
-            return
-        await self.topgg.post_guild_count()
-        emb = get_embed(
-            embed_type="info",
-            title=f"Left {guild}.",
-            image=None,
-            color=discord.Colour.dark_red()
-        )
-        jq_log_channel = discord.utils.get(
-            self.get_guild(
-                self.official_server
-            ).text_channels,
-            name="joined_guilds_log"
-        )
-        await jq_log_channel.send(embed=emb)
+        await self.__handle_guild_change("leave", guild)
 
     async def on_member_update(
         self, before: discord.Member,
@@ -813,3 +751,59 @@ class PokeGambler(discord.AutoShardedClient):
             await self.get_channel(
                 self.error_log_channel
             ).send(err_msg)
+
+    async def __handle_guild_change(self, event, guild):
+        if not guild.name or guild.unavailable:
+            return
+        await self.topgg.post_guild_count()
+        image = None
+        if guild.banner:
+            image = guild.banner.url
+        elif guild.splash:
+            image = guild.splash.url
+        elif guild.icon:
+            image = guild.icon.url
+        action = 'Added to' if event == 'join' else 'Left'
+        emb = get_embed(
+            embed_type="info",
+            title=f"{action} {guild}【{guild.id}】",
+            image=image,
+            color=(
+                discord.Color.dark_red()
+                if event != 'join' else None
+            )
+        )
+        for attr in (
+            "description", "owner",
+            "member_count", "created_at"
+        ):
+            emb.add_field(
+                name=attr.replace("_", " ").title(),
+                value=str(getattr(guild, attr))
+            )
+        if guild.large:
+            emb.color = discord.Colour.gold()
+        jq_log_channel = discord.utils.get(
+            self.get_guild(
+                self.official_server
+            ).text_channels,
+            name="joined_guilds_log"
+        )
+        await jq_log_channel.send(embed=emb)
+        if event == "join":
+            chan = guild.system_channel or discord.utils.get(
+                guild.text_channels, name="general"
+            )
+            if chan:
+                try:
+                    await chan.send(
+                        embed=get_embed(
+                            title="Thanks for adding me!",
+                            content=f"See `{self.prefix}info` to get started.",
+                            image="https://media.discordapp.net/attachments/"
+                            "874623706339618827/874628993939308554/pg_banner.png"
+                            "?width=640&height=360"
+                        )
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
