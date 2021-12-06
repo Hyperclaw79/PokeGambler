@@ -753,7 +753,7 @@ class PokeGambler(discord.AutoShardedClient):
             ).send(err_msg)
 
     async def __handle_guild_change(self, event, guild):
-        if not guild.name or guild.unavailable:
+        if not self.is_prod or not guild.name or guild.unavailable:
             return
         await self.topgg.post_guild_count()
         image = None
