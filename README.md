@@ -4,6 +4,7 @@
 [![Docs](https://readthedocs.org/projects/pokegambler/badge/?version=latest)](https://pokegambler.readthedocs.io/en/latest/?badge=latest)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/4ae74458ca5941d1884e669a4b3446c0)](https://www.codacy.com/gh/Hyperclaw79/PokeGambler/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Hyperclaw79/PokeGambler&amp;utm_campaign=Badge_Grade)
 [![Discord](https://img.shields.io/discord/361522003355631617?logo=discord)](https://discord.gg/g4TmVyfwj4)
+[![GitNFT](https://img.shields.io/badge/%F0%9F%94%AE-Open%20in%20GitNFT-darkviolet?style=flat)](https://gitnft.quine.sh/app/commits/list/repo/PokeGambler)
 
 PokeGambler uses pokemon themed playing cards for entertaining gambling matches.
 
