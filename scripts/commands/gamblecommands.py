@@ -368,7 +368,7 @@ class GambleCommands(Commands):
             played_at = match["played_at"]
             pot = match["deal_cost"] * len(match['participants'])
             parts = "\n".join(
-                plyr["name"]
+                plyr["name"] or "Unknown"
                 for plyr in match["participants"]
             )
             parts = f"```py\n{parts}\n```"
