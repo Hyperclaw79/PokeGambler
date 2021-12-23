@@ -57,6 +57,9 @@ class OverriddenChannel:
             item, getattr(self.channel, item)
         )
 
+    def __str__(self) -> str:
+        return str(self.channel)
+
     async def send(self, *args, **kwargs):
         """
         :meth:`discord.TextChannel.send` like behavior for
@@ -85,6 +88,9 @@ class CustomInteraction:
         return self.__dict__.get(
             item, getattr(self.interaction, item)
         )
+
+    def __str__(self) -> str:
+        return str(self.interaction)
 
     async def reply(self, *args, **kwargs):
         """

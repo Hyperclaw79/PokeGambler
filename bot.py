@@ -440,7 +440,10 @@ class PokeGambler(discord.AutoShardedClient):
             if task:
                 await task
         except Exception:  # pylint: disable=broad-except
-            await self.__handle_error()
+            await self.__handle_error(
+                message=kwargs["message"],
+                command=method.__name__.replace("cmd_", "")
+            )
 
     @staticmethod
     def __get_commands(module, role="owner"):
@@ -730,7 +733,7 @@ class PokeGambler(discord.AutoShardedClient):
                 ]
             setattr(self, itbl, val)
 
-    async def __handle_error(self):
+    async def __handle_error(self, message, command):
         tb_obj = sys.exc_info()[2]
         tb_obj = traceback.format_exc()
         self.logger.pprint(
@@ -738,19 +741,35 @@ class PokeGambler(discord.AutoShardedClient):
             timestamp=True,
             color="red"
         )
+        err_emb = get_embed(
+            embed_type="error",
+            title="An error has occured."
+        )
+        err_meta = {
+            "Command": command,
+            "User": f"{message.author} ({message.author.id})",
+            "Channel": f"{message.channel} ({message.channel.id})"
+        }
+        if message.guild:
+            err_meta["Guild"] = f"{message.guild} ({message.guild.id})"
+        err_meta["Timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for key, val in err_meta.items():
+            err_emb.add_field(name=key, value=val)
         err_msg = f"```py\n{tb_obj}\n```"
-        if len(err_msg) > 2000:
+        if len(err_msg) <= 4000:
+            err_emb.add_field(name="Traceback", value=err_msg, inline=False)
+            err_fl = None
+        else:
             err_fl = discord.File(
                 BytesIO(str(tb_obj).encode()),
                 filename="error.py"
             )
-            await self.get_channel(
-                self.error_log_channel
-            ).send(file=err_fl)
-        else:
-            await self.get_channel(
-                self.error_log_channel
-            ).send(err_msg)
+        error_log_channel = self.get_channel(
+            self.error_log_channel
+        )
+        err_report_msg = await error_log_channel.send(embed=err_emb)
+        if err_fl:
+            await err_report_msg.reply(file=err_fl)
 
     async def __handle_guild_change(self, event, guild):
         if not self.is_prod or not guild.name or guild.unavailable:
