@@ -60,6 +60,9 @@ class OverriddenChannel:
     def __str__(self) -> str:
         return str(self.channel)
 
+    def __eq__(self, other: OverriddenChannel) -> bool:
+        return self.channel.id == other.channel.id
+
     async def send(self, *args, **kwargs):
         """
         :meth:`discord.TextChannel.send` like behavior for
@@ -91,6 +94,9 @@ class CustomInteraction:
 
     def __str__(self) -> str:
         return str(self.interaction)
+
+    def __eq__(self, other: CustomInteraction) -> bool:
+        return self.interaction.id == other.interaction.id
 
     async def reply(self, *args, **kwargs):
         """

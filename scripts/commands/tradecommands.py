@@ -1428,7 +1428,7 @@ class TradeCommands(Commands):
         reply = await self.ctx.wait_for(
             "message",
             check=lambda msg: (
-                msg.channel == opt_msg.channel
+                msg.channel.id == opt_msg.channel.id
                 and msg.author == message.author
             )
         )
