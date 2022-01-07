@@ -756,7 +756,7 @@ class PokeGambler(discord.AutoShardedClient):
         for key, val in err_meta.items():
             err_emb.add_field(name=key, value=val)
         err_msg = f"```py\n{tb_obj}\n```"
-        if len(err_msg) <= 4000:
+        if len(err_msg) <= 1024:
             err_emb.add_field(name="Traceback", value=err_msg, inline=False)
             err_fl = None
         else:
