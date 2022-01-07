@@ -516,8 +516,8 @@ class Exchanges(Model):
         super().__init__(user)
         self.exchanged_at = datetime.now()
         self.user_id = str(user.id)
-        self.admin = admin
-        self.pokebot = pokebot
+        self.admin = to_dict(admin)
+        self.pokebot = to_dict(pokebot)
         self.chips = chips
         self.mode = mode
 
@@ -1049,7 +1049,7 @@ class Trades(Model):
         super().__init__(user)
         self.traded_at = datetime.now()
         self.traded_by = str(user.id)
-        self.traded_to = traded_to
+        self.traded_to = to_dict(traded_to)
         self.given_chips = given_chips
         self.taken_chips = taken_chips
         self.given_items = given_items
