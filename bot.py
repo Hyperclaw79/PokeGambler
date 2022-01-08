@@ -104,7 +104,7 @@ class PokeGambler(discord.AutoShardedClient):
         )
         #: The :class:`~scripts.base.cardgen.CardGambler` for Gamble matches.
         self.dealer = CardGambler(self.assets_path)
-        #: :class:`topgg.DBLClient` for handling votes and stats.
+        #: :class:`topgg.client.DBLClient` for handling votes and stats.
         #:
         #: .. tip:: Check out PokeGambler's `Top.gg`_  page.
         self.topgg = topgg.DBLClient(
