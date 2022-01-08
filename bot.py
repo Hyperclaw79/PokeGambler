@@ -46,6 +46,7 @@ from scripts.base.models import (
 from scripts.base.items import Item
 from scripts.base.shop import PremiumShop, Shop
 from scripts.base.handlers import ContextHandler, SlashHandler
+from scripts.base.views import MoreInfoView
 
 from scripts.helpers.logger import CustomLogger
 # pylint: disable=cyclic-import
@@ -97,6 +98,8 @@ class PokeGambler(discord.AutoShardedClient):
         self.loot_cd = {}
         self.pending_cmds = {}
         self.views = {}
+        with open('deprecation.md', encoding='utf-8') as depr_fl:
+            self.depr_notice = depr_fl.read()
         # Classes
         #: The :class:`~scripts.helpers.logger.CustomLogger` for PokeGambler.
         self.logger = CustomLogger(
@@ -177,6 +180,32 @@ class PokeGambler(discord.AutoShardedClient):
             }
             if message.mentions:
                 kwargs["mentions"] = message.mentions
+            if cmd != "cmd_invite":
+                tldr, desc, changes = self.depr_notice.split("\n\n")
+                changes = changes.replace("%prefix%", self.prefix)
+                deprec_embed = get_embed(
+                    content=tldr,
+                    embed_type="warning",
+                    title="Migrating completely to Slash Commands..."
+                )
+                more_info_embed = deprec_embed.copy()
+                more_info_embed.description = f"""**```fix\n{desc}\n```**"""
+                more_info_embed.add_field(
+                    name="Changelist",
+                    value=f"""**```md\n{changes}\n```**""",
+                    inline=False
+                )
+                more_info_embed.add_field(
+                    name="Reference Link",
+                    value="https://support-dev.discord.com/hc/en-us"
+                    "/articles/4404772028055",
+                    inline=False
+                )
+                more_info_view = MoreInfoView(embed=more_info_embed)
+                await message.reply(embed=deprec_embed, view=more_info_view)
+                self.loop.create_task(
+                    more_info_view.dispatch(module=self.normalcommands)
+                )
             await self.__exec_command(method, kwargs)
 
     async def on_interaction(self, interaction: Interaction):

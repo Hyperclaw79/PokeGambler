@@ -374,3 +374,50 @@ class GambleCounter(BaseView):
             inline=False
         )
         return embed
+
+
+class MoreInfoView(BaseView):
+    """A view that morphs the message content/embed on button click.
+
+    :param content: The content to be displayed after the button is clicked.
+    :type content: Optional[str]
+    :param embed: The embed to be displayed after the button is clicked.
+    :type embed: Optional[:class:`discord.Embed`]
+    """
+    def __init__(
+        self, content: Optional[str] = None,
+        embed: Optional[discord.Embed] = None,
+        overwrite: Optional[bool] = True,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.content = content
+        self.embed = embed
+        self.overwrite = overwrite
+
+    @discord.ui.button(label='More Info', emoji='ℹ')
+    async def more_info(
+        self, button: discord.ui.Button,
+        interaction: discord.Interaction
+    ):
+        """Morph the message content/embed on button click.
+
+        :param button: The button that was pressed.
+        :type button: :class:`discord.ui.Button`
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
+        """
+        if self.overwrite:
+            await interaction.message.edit(**{
+                "embed": self.embed,
+                "content": self.content,
+                "view": None
+            })
+        else:
+            msg_kwargs = {"view": None}
+            if self.content is not None:
+                msg_kwargs["content"] = self.content
+            if self.embed is not None:
+                msg_kwargs["embed"] = self.embed
+            await interaction.message.edit(**msg_kwargs)
+        self.stop()

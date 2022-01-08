@@ -291,7 +291,8 @@ class NormalCommands(Commands):
         invite_view = LinkView(
             emoji="<:pokegambler:844321894488342559>",
             url="https://discordapp.com/oauth2/authorize?client_id="
-            f"{self.ctx.user.id}&scope=bot&permissions=259711691856"
+            f"{self.ctx.user.id}&scope=bot%20applications.commands"
+            "&permissions=259711691856"
         )
         await message.reply(
             embed=inv_emb,
