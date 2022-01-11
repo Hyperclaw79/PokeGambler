@@ -30,7 +30,7 @@ from typing import (
 import discord
 from discord.http import Route
 
-from .components import AppCommand, ContextMenu, SlashCommand
+from .components import AppCommand, ContextMenu, GuildEvent, GuildEventType, SlashCommand
 
 from ..helpers.parsers import CustomRstParser
 from ..helpers.utils import get_modules
@@ -745,3 +745,95 @@ class ContextHandler:
         if not self.update_counter:
             msg = "No new context menu commands found."
         self.ctx.logger.pprint(msg, color='green')
+
+
+class GuildEventHandler:
+    """Class which handles guild events.
+
+    :param ctx: The pokegambler client.
+    :type ctx: :class:`bot.PokeGambler`
+    """
+    def __init__(self, ctx: PokeGambler):
+        self.ctx = ctx
+        self.http = ctx.http
+
+    async def list_events(self, guild_id: Union[int, str]) -> List[GuildEvent]:
+        """List all the events for a guild.
+
+        :param guild_id: The guild id.
+        :type guild_id: Union[int, str]
+        :return: The list of events.
+        :rtype: List[:class:`~scripts.base.components.GuildEvent`]
+        """
+        route = Route(
+            method="GET",
+            path=f"/guilds/{guild_id}/scheduled-events"
+        )
+        try:
+            resp = await self.http.request(route)
+            return [
+                GuildEvent.from_dict(event)
+                for event in resp
+            ]
+        except discord.HTTPException as excp:
+            self.ctx.logger.pprint(
+                excp, color='red'
+            )
+            return None
+
+    async def register_event(
+        self, guild_id: Union[int, str],
+        event: GuildEvent
+    ) -> GuildEvent:
+        """Register a guild event.
+
+        :param guild_id: The guild id.
+        :type guild_id: Union[int, str]
+        :param event: The event to register.
+        :type event: :class:`~scripts.base.components.GuildEvent`
+        :return: The registered event.
+        :rtype: :class:`~scripts.base.components.GuildEvent`
+        """
+        route = Route(
+            method="POST",
+            path=f"/guilds/{guild_id}/scheduled-events"
+        )
+        if not isinstance(event, GuildEvent):
+            event = self.dict_to_event(event)
+        try:
+            resp = await self.http.request(route, json=event.to_payload())
+            return GuildEvent.from_dict(resp)
+        except discord.HTTPException as excp:
+            self.ctx.logger.pprint(
+                excp, color='red'
+            )
+            return None
+
+    @staticmethod
+    def dict_to_event(event: Dict) -> GuildEvent:
+        """Convert a dict to a :class:`.components.GuildEvent`
+
+        :param event: The dict to convert.
+        :type event: Dict
+        :return: The converted event.
+        :rtype: :class:`~scripts.base.components.GuildEvent`
+        """
+        if "start" in event:
+            event["scheduled_start_time"] = event.pop("start")
+        if "end" in event:
+            event["scheduled_end_time"] = event.pop("end")
+        text_channel = event.pop("text_channel", None)
+        voice_channel = event.pop("voice_channel", None)
+        gevent = GuildEvent.from_dict(event)
+        if text_channel:
+            gevent.set_text_channel(str(text_channel))
+        elif voice_channel:
+            gevent.set_voice_channel(str(voice_channel))
+        elif (
+            gevent.entity_type == GuildEventType.EXTERNAL
+            and (not gevent.entity_metadata or not gevent.entity_metadata.get('location'))
+        ):
+            gevent.entity_metadata = {
+                'location': "Here"
+            }
+        return gevent
