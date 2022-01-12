@@ -475,7 +475,7 @@ class NormalCommands(Commands):
         handlers = {
             "Latency": lambda: f"{round(self.ctx.latency * 1000, 2)} ms",
             # pylint: disable=no-member
-            "Total Users": Profiles.mongo.count,
+            "Total Users": Profiles.mongo.estimated_document_count,
             "Total Servers": lambda: len(self.ctx.guilds),
             "Most Active User": self.__info_most_active_user,
             "Most Voted By": lambda: self.__info_most_active_user(mode="vote"),

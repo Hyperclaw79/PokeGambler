@@ -441,9 +441,9 @@ class CommandData(Model):
         :return: The number of commands used by the user.
         :rtype: int
         """
-        return cls.mongo.find({
+        return cls.mongo.count_documents({
             "user_id": user_id
-        }).count()
+        })
 
 
 class DuelActionsModel(Model):
@@ -485,7 +485,7 @@ class DuelActionsModel(Model):
         filter_ = {}
         if user_id:
             filter_["user_id"] = user_id
-        if not cls.mongo.count(filter_):
+        if not cls.mongo.count_documents(filter_):
             return None
         results = cls.mongo.find(filter_)
         yield from results
@@ -930,7 +930,7 @@ class Matches(Model):
         :return: Number of matches played.
         :rtype: int
         """
-        return self.mongo.find({
+        return self.mongo.count_documents({
             "$or": [
                 {
                     "played_by": str(self.user.id)
@@ -939,7 +939,7 @@ class Matches(Model):
                     "participants.id": self.user.id
                 }
             ]
-        }).count()
+        })
 
     @property
     def num_wins(self) -> int:
@@ -948,9 +948,9 @@ class Matches(Model):
         :return: Number of matches won.
         :rtype: int
         """
-        return self.mongo.find({
+        return self.mongo.count_documents({
             "winner.id": self.user.id
-        }).count()
+        })
 
     def get_stats(self) -> Tuple[int, int]:
         """Get Match :meth:`num_matches` and :meth:`num_wins` as a Tuple.
