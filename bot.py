@@ -381,7 +381,7 @@ class PokeGambler(discord.AutoShardedClient):
             await self.ctx_cmds.register_all()
         await online_now(self)
         game = discord.Game(
-            f"with the strings of fate. | Check: {self.prefix}info"
+            "with the strings of fate. | Check: /info"
         )
         await self.change_presence(activity=game)
         self.__reward_nitro_boosters.start()
@@ -847,7 +847,7 @@ class PokeGambler(discord.AutoShardedClient):
                     await chan.send(
                         embed=get_embed(
                             title="Thanks for adding me!",
-                            content=f"See `{self.prefix}info` to get started.",
+                            content="See `/info` to get started.",
                             image="https://media.discordapp.net/attachments/"
                             "874623706339618827/874628993939308554/pg_banner.png"
                             "?width=640&height=360"
