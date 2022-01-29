@@ -445,6 +445,24 @@ class CommandData(Model):
             "user_id": user_id
         })
 
+    @classmethod
+    def clean_guild(cls, guild_id: int) -> int:
+        """Replaces the given guild ID in all commands with "REDACTED".
+
+        :param guild_id: The ID of the guild.
+        :type guild_id: str
+        :return: The number of removed commands.
+        :rtype: int
+        """
+        return cls.mongo.update_many(
+            {"guild.id": guild_id},
+            {
+                "$set": {
+                    "guild.id": "REDACTED"
+                }
+            }
+        ).modified_count
+
 
 class DuelActionsModel(Model):
     """

@@ -801,7 +801,7 @@ class PokeGambler(discord.AutoShardedClient):
             await err_report_msg.reply(file=err_fl)
 
     async def __handle_guild_change(self, event, guild):
-        if not self.is_prod or not guild.name or guild.unavailable:
+        if not guild.name or guild.unavailable:
             return
         await self.topgg.post_guild_count()
         image = None
@@ -855,3 +855,10 @@ class PokeGambler(discord.AutoShardedClient):
                     )
                 except (discord.Forbidden, discord.HTTPException):
                     pass
+        else:
+            count = CommandData.clean_guild(guild.id)
+            self.logger.pprint(
+                f"Cleaned {count} command records from guild "
+                f"{guild.name} ({guild.id})",
+                color="green"
+            )
