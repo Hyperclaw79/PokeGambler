@@ -30,7 +30,11 @@ from typing import (
 import discord
 from discord.http import Route
 
-from .components import AppCommand, ContextMenu, GuildEvent, GuildEventType, SlashCommand
+from .components import (
+    AppCommand, ContextMenu,
+    GuildEvent, GuildEventType,
+    SlashCommand
+)
 
 from ..helpers.parsers import CustomRstParser
 from ..helpers.utils import get_modules
@@ -831,7 +835,10 @@ class GuildEventHandler:
             gevent.set_voice_channel(str(voice_channel))
         elif (
             gevent.entity_type == GuildEventType.EXTERNAL
-            and (not gevent.entity_metadata or not gevent.entity_metadata.get('location'))
+            and (
+                not gevent.entity_metadata
+                or not gevent.entity_metadata.get('location')
+            )
         ):
             gevent.entity_metadata = {
                 'location': "Here"

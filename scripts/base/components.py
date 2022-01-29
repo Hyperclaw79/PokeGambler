@@ -37,6 +37,7 @@ from typing import (
 
 import discord
 
+
 def from_dict(cls: Any, data: Dict[str, Any]) -> Any:
     """Populate the Dataclass from a dictionary.
 
@@ -396,9 +397,13 @@ class GuildEvent:
         :rtype: :class:`GuildEvent`
         """
         event_cls = from_dict(cls, data)
-        event_cls.scheduled_start_time = IsoTimeStamp(event_cls.scheduled_start_time)
+        event_cls.scheduled_start_time = IsoTimeStamp(
+            event_cls.scheduled_start_time
+        )
         if event_cls.scheduled_end_time is not None:
-            event_cls.scheduled_end_time = IsoTimeStamp(event_cls.scheduled_end_time)
+            event_cls.scheduled_end_time = IsoTimeStamp(
+                event_cls.scheduled_end_time
+            )
         return event_cls
 
     def to_dict(self) -> Dict:
