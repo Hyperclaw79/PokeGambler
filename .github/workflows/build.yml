@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - main
-      - wip
+      # - wip
     paths-ignore:
       - README.MD
       - LICENSE.md
@@ -30,11 +30,11 @@ jobs:
         echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
         echo "SECRET_VERSION=latest" >> $GITHUB_ENV
 
-    - name: Set TAG to Beta
-      if: "!(endsWith(github.ref, '/main'))"
-      run: |
-       echo "TAG=beta" >> $GITHUB_ENV
-       echo "SECRET_VERSION=1" >> $GITHUB_ENV
+    # - name: Set TAG to Beta
+    #   if: "!(endsWith(github.ref, '/main'))"
+    #   run: |
+    #    echo "TAG=beta" >> $GITHUB_ENV
+    #    echo "SECRET_VERSION=1" >> $GITHUB_ENV
 
     - name: Set TAG to Version
       if: github.event_name == 'release'
@@ -103,13 +103,15 @@ jobs:
         echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
         echo "SECRET_VERSION=latest" >> $GITHUB_ENV
         echo "FOLDER=prod" >> $GITHUB_ENV
+        echo "IS_PROD=true" >> $GITHUB_ENV
 
-    - name: Set TAG to Beta
-      if: "!(endsWith(github.ref, '/main'))"
-      run: |
-       echo "TAG=beta" >> $GITHUB_ENV
-       echo "SECRET_VERSION=1" >> $GITHUB_ENV
-       echo "FOLDER=beta" >> $GITHUB_ENV
+    # - name: Set TAG to Beta
+    #   if: "!(endsWith(github.ref, '/main'))"
+    #   run: |
+    #    echo "TAG=beta" >> $GITHUB_ENV
+    #    echo "SECRET_VERSION=1" >> $GITHUB_ENV
+    #    echo "FOLDER=beta" >> $GITHUB_ENV
+    #    echo "IS_PROD=false" >> $GITHUB_ENV
 
     - name: Set TAG to Version
       if: github.event_name == 'release'
@@ -117,6 +119,7 @@ jobs:
         echo "TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
         echo "SECRET_VERSION=latest" >> $GITHUB_ENV
         echo "FOLDER=prod" >> $GITHUB_ENV
+        echo "IS_PROD=true" >> $GITHUB_ENV
 
     - name: Checkout
       uses: actions/checkout@v2
@@ -138,27 +141,27 @@ jobs:
         cluster_name: pokegambler-cluster
         location: us-central1-c
 
-    - name: Get Secrets from GSM
-      uses: google-github-actions/get-secretmanager-secrets@main
-      id: secrets
-      with:
-        secrets: |-
-          TOKEN:pokegambler/TOKEN/${{ env.SECRET_VERSION }}
-          IS_PROD:pokegambler/IS_PROD/${{ env.SECRET_VERSION }}
-          MONGO_CLUSTER_STRING:pokegambler/MONGO_CLUSTER_STRING/${{ env.SECRET_VERSION }}
-          DISCORD_WEBHOOK_CHANNEL:pokegambler/DISCORD_WEBHOOK_CHANNEL/${{ env.SECRET_VERSION }}
-          DISCORD_WEBHOOK_TOKEN:pokegambler/DISCORD_WEBHOOK_TOKEN/${{ env.SECRET_VERSION }}
-          OFFICIAL_SERVER:pokegambler/OFFICIAL_SERVER/${{ env.SECRET_VERSION }}
-          TOPGG_TOKEN:pokegambler/TOPGG_TOKEN/${{ env.SECRET_VERSION }}
-          ADMIN_CMD_LOG_CHANNEL:pokegambler/ADMIN_CMD_LOG_CHANNEL/${{ env.SECRET_VERSION }}
-          ANNOUNCEMENT_CHANNEL:pokegambler/ANNOUNCEMENT_CHANNEL/${{ env.SECRET_VERSION }}
-          ERROR_LOG_CHANNEL:pokegambler/ERROR_LOG_CHANNEL/${{ env.SECRET_VERSION }}
-          IMG_UPLOAD_CHANNEL:pokegambler/IMG_UPLOAD_CHANNEL/${{ env.SECRET_VERSION }}
-          OWNER_ID:pokegambler/OWNER_ID/${{ env.SECRET_VERSION }}
-          ALLOWED_USERS:pokegambler/ALLOWED_USERS/${{ env.SECRET_VERSION }}
-          DEFAULT_GUILDMODE:pokegambler/DEFAULT_GUILDMODE/${{ env.SECRET_VERSION }}
-          BLACKLIST_GUILDS:pokegambler/BLACKLIST_GUILDS/${{ env.SECRET_VERSION }}
-          WHITELIST_GUILDS:pokegambler/WHITELIST_GUILDS/${{ env.SECRET_VERSION }}
+    # - name: Get Secrets from GSM
+    #   uses: google-github-actions/get-secretmanager-secrets@main
+    #   id: secrets
+    #   with:
+    #     secrets: |-
+    #       TOKEN:pokegambler/TOKEN/${{ env.SECRET_VERSION }}
+    #       IS_PROD:pokegambler/IS_PROD/${{ env.SECRET_VERSION }}
+    #       MONGO_CLUSTER_STRING:pokegambler/MONGO_CLUSTER_STRING/${{ env.SECRET_VERSION }}
+    #       DISCORD_WEBHOOK_CHANNEL:pokegambler/DISCORD_WEBHOOK_CHANNEL/${{ env.SECRET_VERSION }}
+    #       DISCORD_WEBHOOK_TOKEN:pokegambler/DISCORD_WEBHOOK_TOKEN/${{ env.SECRET_VERSION }}
+    #       OFFICIAL_SERVER:pokegambler/OFFICIAL_SERVER/${{ env.SECRET_VERSION }}
+    #       TOPGG_TOKEN:pokegambler/TOPGG_TOKEN/${{ env.SECRET_VERSION }}
+    #       ADMIN_CMD_LOG_CHANNEL:pokegambler/ADMIN_CMD_LOG_CHANNEL/${{ env.SECRET_VERSION }}
+    #       ANNOUNCEMENT_CHANNEL:pokegambler/ANNOUNCEMENT_CHANNEL/${{ env.SECRET_VERSION }}
+    #       ERROR_LOG_CHANNEL:pokegambler/ERROR_LOG_CHANNEL/${{ env.SECRET_VERSION }}
+    #       IMG_UPLOAD_CHANNEL:pokegambler/IMG_UPLOAD_CHANNEL/${{ env.SECRET_VERSION }}
+    #       OWNER_ID:pokegambler/OWNER_ID/${{ env.SECRET_VERSION }}
+    #       ALLOWED_USERS:pokegambler/ALLOWED_USERS/${{ env.SECRET_VERSION }}
+    #       DEFAULT_GUILDMODE:pokegambler/DEFAULT_GUILDMODE/${{ env.SECRET_VERSION }}
+    #       BLACKLIST_GUILDS:pokegambler/BLACKLIST_GUILDS/${{ env.SECRET_VERSION }}
+    #       WHITELIST_GUILDS:pokegambler/WHITELIST_GUILDS/${{ env.SECRET_VERSION }}
 
     - name: Set up Kustomize
       run: |-
@@ -170,22 +173,22 @@ jobs:
         cd deployments/${{ env.FOLDER}}
         kubectl delete secret pokegambler-${{ env.FOLDER }} --ignore-not-found
         kubectl create secret generic pokegambler-${{ env.FOLDER }} \
-          --from-literal=TOKEN=${{ steps.secrets.outputs.TOKEN }} \
-          --from-literal=IS_PROD=${{ steps.secrets.outputs.IS_PROD }} \
-          --from-literal=DISCORD_WEBHOOK_CHANNEL=${{ steps.secrets.outputs.DISCORD_WEBHOOK_CHANNEL }} \
-          --from-literal=DISCORD_WEBHOOK_TOKEN=${{ steps.secrets.outputs.DISCORD_WEBHOOK_TOKEN }} \
-          --from-literal=TOPGG_TOKEN=${{ steps.secrets.outputs.TOPGG_TOKEN }} \
-          --from-literal=OFFICIAL_SERVER=${{ steps.secrets.outputs.OFFICIAL_SERVER }} \
-          --from-literal=ADMIN_CMD_LOG_CHANNEL=${{ steps.secrets.outputs.ADMIN_CMD_LOG_CHANNEL }} \
-          --from-literal=ANNOUNCEMENT_CHANNEL=${{ steps.secrets.outputs.ANNOUNCEMENT_CHANNEL }} \
-          --from-literal=ERROR_LOG_CHANNEL=${{ steps.secrets.outputs.ERROR_LOG_CHANNEL }} \
-          --from-literal=IMG_UPLOAD_CHANNEL=${{ steps.secrets.outputs.IMG_UPLOAD_CHANNEL }} \
-          --from-literal=OWNER_ID=${{ steps.secrets.outputs.OWNER_ID }} \
-          --from-literal=ALLOWED_USERS='${{ steps.secrets.outputs.ALLOWED_USERS }}' \
-          --from-literal=DEFAULT_GUILDMODE=${{ steps.secrets.outputs.DEFAULT_GUILDMODE }} \
-          --from-literal=BLACKLIST_GUILDS='${{ steps.secrets.outputs.BLACKLIST_GUILDS }}' \
-          --from-literal=WHITELIST_GUILDS='${{ steps.secrets.outputs.WHITELIST_GUILDS }}' \
-          --from-literal=MONGO_CLUSTER_STRING='${{ steps.secrets.outputs.MONGO_CLUSTER_STRING }}'
+          --from-literal=TOKEN=${{ secrets.TOKEN }} \
+          --from-literal=IS_PROD=${{ env.IS_PROD }} \
+          --from-literal=DISCORD_WEBHOOK_CHANNEL=${{ secrets.DISCORD_WEBHOOK_CHANNEL }} \
+          --from-literal=DISCORD_WEBHOOK_TOKEN=${{ secrets.DISCORD_WEBHOOK_TOKEN }} \
+          --from-literal=TOPGG_TOKEN=${{ secrets.TOPGG_TOKEN }} \
+          --from-literal=OFFICIAL_SERVER=${{ secrets.OFFICIAL_SERVER }} \
+          --from-literal=ADMIN_CMD_LOG_CHANNEL=${{ secrets.ADMIN_CMD_LOG_CHANNEL }} \
+          --from-literal=ANNOUNCEMENT_CHANNEL=${{ secrets.ANNOUNCEMENT_CHANNEL }} \
+          --from-literal=ERROR_LOG_CHANNEL=${{ secrets.ERROR_LOG_CHANNEL }} \
+          --from-literal=IMG_UPLOAD_CHANNEL=${{ secrets.IMG_UPLOAD_CHANNEL }} \
+          --from-literal=OWNER_ID=${{ secrets.OWNER_ID }} \
+          --from-literal=ALLOWED_USERS='${{ secrets.ALLOWED_USERS }}' \
+          --from-literal=DEFAULT_GUILDMODE=${{ secrets.DEFAULT_GUILDMODE }} \
+          --from-literal=BLACKLIST_GUILDS='${{ secrets.BLACKLIST_GUILDS }}' \
+          --from-literal=WHITELIST_GUILDS='${{ secrets.WHITELIST_GUILDS }}' \
+          --from-literal=MONGO_CLUSTER_STRING='${{ secrets.MONGO_CLUSTER_STRING }}'
 
     - name: Send Restart Webhook to Discord
       run: |-
@@ -196,7 +199,7 @@ jobs:
           | sed "s/\[Update\]//g"
         )
         changelog=$([[ $changes ]] && echo \`\`\`md$"\n"# Changelog"\n"$changes\`\`\` || echo "")
-        curl -X POST 'https://discord.com/api/webhooks/${{ steps.secrets.outputs.DISCORD_WEBHOOK_CHANNEL }}/${{ steps.secrets.outputs.DISCORD_WEBHOOK_TOKEN }}' \
+        curl -X POST 'https://discord.com/api/webhooks/${{ secrets.DISCORD_WEBHOOK_CHANNEL }}/${{ secrets.DISCORD_WEBHOOK_TOKEN }}' \
         -H 'Content-Type: application/json' \
         -d '{"content": "<:update:874626019846402110>\t**Restart Initiated**\nPokeGambler will be updating now.\n\u200b'"$changelog"'\n\u200b\n", "username": "PokeGambler Status Monitor"}'
 
