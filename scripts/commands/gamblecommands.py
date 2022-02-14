@@ -872,12 +872,14 @@ class GambleCommands(Commands):
                 # Rare case where no one reacts
                 if idx == len(players):
                     break
-        winner = None
-        # Force Joker to win in lower_wins mode.
-        for player in players:
-            if player[1]["card_num"] == "Joker":
-                winner = player[0]
-                break
+        winner = next(
+            (
+                player[0]
+                for player in players
+                if player[1]["card_num"] == "Joker"
+            ), None
+        )
+
         if winner is None:
             winner = players[0][0]
         rolled = [

@@ -612,12 +612,10 @@ class AdminCommands(Commands):
         })
         labels['asset_url']['validator'] = ImageUrlValidator
         if issubclass(catogclass, Tradable):
-            labels.update({
-                "price": {
-                    "dtype": int,
-                    "validator": IntegerValidator
-                }
-            })
+            labels["price"] = {
+                "dtype": int,
+                "validator": IntegerValidator
+            }
         if catogclass is Rewardbox:
             labels.update({
                 "chips": {

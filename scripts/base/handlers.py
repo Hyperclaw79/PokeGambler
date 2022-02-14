@@ -145,10 +145,13 @@ class CommandListing(list):
                 yield item
 
     def __getitem__(self, item: str) -> AppCommand:
-        for command in self:
-            if command.name == item:
-                return command
-        return None
+        return next(
+            (
+                command
+                for command in self
+                if command.name == item
+            ), None
+        )
 
     def __setitem__(self, key: str, value: AppCommand) -> None:
         if isinstance(value, dict):
@@ -257,15 +260,17 @@ class SlashHandler:
             }
         current_commands = []
         for module in get_modules(self.ctx):
-            for attr in dir(module):
+            current_commands.extend(
+                getattr(module, attr)
+                for attr in dir(module)
                 if (
-                    not attr.startswith("cmd_")
-                    or "no_slash" in dir(getattr(module, attr))
-                ):
-                    continue
-                current_commands.append(
-                    getattr(module, attr)
+                    attr.startswith("cmd_")
+                    and "no_slash" not in dir(
+                        getattr(module, attr)
+                    )
                 )
+            )
+
         await self.__sync_commands(current_commands, **kwargs)
         for command in current_commands:
             await self.register_command(command, **kwargs)
@@ -316,10 +321,13 @@ class SlashHandler:
         :return: The corresponding Slash Command object.
         :rtype: :class:`~.components.SlashCommand`
         """
-        for cmd in self.registered:
-            if cmd.name == command:
-                return cmd
-        return None
+        return next(
+            (
+                cmd
+                for cmd in self.registered
+                if cmd.name == command
+            ), None
+        )
 
     def get_route(self, method="POST", **kwargs):
         """Get the route for the query based on the kwargs.

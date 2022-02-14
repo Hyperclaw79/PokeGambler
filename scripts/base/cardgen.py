@@ -119,7 +119,7 @@ class CardGambler:
         :return: The closed deck image.
         :rtype: :class:`PIL.Image.Image`
         """
-        cards = [self.closed_card for i in range(num_cards)]
+        cards = [self.closed_card for _ in range(num_cards)]
         return self.get_deck(cards, sep=sep, reverse=True)
 
     def get_random_card(self) -> Image.Image:

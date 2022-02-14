@@ -63,8 +63,7 @@ class UnicodeProgressBar:
         for idx, char in enumerate(self.seq):
             if idx >= self.total:
                 break
-            unicode_bar = unicode_bar.replace(self.base, char, 1)
-            yield unicode_bar
+            yield unicode_bar.replace(self.base, char, 1)
 
     def get(self, count: int) -> str:
         """Return the progress bar at a specific count.

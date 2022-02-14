@@ -337,9 +337,10 @@ class CustomRstParser:
 
     @staticmethod
     def __clean_line(line: str) -> str:
-        if not line:
-            return None
-        return " ".join(line.split())
+        return (
+            None if not line
+            else " ".join(line.split())
+        )
 
     def __handle_directives(self, dir_matches):
         dir_matches = dir_matches.groupdict()
