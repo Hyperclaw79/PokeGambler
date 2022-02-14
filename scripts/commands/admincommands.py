@@ -78,7 +78,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}announce
+            /announce
 
         .. rubric:: Description
 
@@ -127,7 +127,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}add_chips user_id amount [--purchased]
+            /add_chips user_id amount [--purchased]
 
         .. rubric:: Description
 
@@ -142,14 +142,14 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}add_chips 12345 50
+            /add_chips 12345 50
 
         * To add 500 exchanged {pokechip_emoji} to user 67890
 
         .. code:: coffee
             :force:
 
-            {command_prefix}add_chips 67890 500 --purchased
+            /add_chips 67890 500 --purchased
         """
         if len(args) < 2:
             await message.channel.send(
@@ -205,7 +205,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}blacklist_user user_id [--reason text]
+            /blacklist_user user_id [--reason text]
 
         .. rubric:: Description
 
@@ -220,14 +220,14 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}blacklist_user 12345
+            /blacklist_user 12345
 
         * To blacklist user 12345 from using PokeGambler for spamming
 
         .. code:: coffee
             :force:
 
-            {command_prefix}blacklist_user 12345 --reason Spamming
+            /blacklist_user 12345 --reason Spamming
         """
         user_id = int(args[0])
         user = message.guild.get_member(user_id)
@@ -271,7 +271,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}get_user_profile user_id
+            /get_user_profile user_id
 
         .. rubric:: Description
 
@@ -286,7 +286,7 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}get_user_profile 12345
+            /get_user_profile 12345
         """
         user_id = int(args[0])
         profile = await get_profile(message, user_id)
@@ -320,7 +320,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}pardon_user user_id
+            /pardon_user user_id
 
         .. rubric:: Description
 
@@ -335,7 +335,7 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}pardon 12345
+            /pardon 12345
         """
         user_id = int(args[0])
         user = message.guild.get_member(user_id)
@@ -385,7 +385,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}reset_user user_id
+            /reset_user user_id
 
         .. rubric:: Description
 
@@ -399,7 +399,7 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}reset_user 12345
+            /reset_user 12345
         """
         user_id = int(args[0])
         profile = await get_profile(message, user_id)
@@ -429,7 +429,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}update_user user_id
+            /update_user user_id
 
         .. rubric:: Description
 
@@ -448,7 +448,7 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}update_user 12345
+            /update_user 12345
         """
         user_id = int(args[0])
         profile = await get_profile(message, user_id)
@@ -534,7 +534,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}create_item [--premium]
+            /create_item [--premium]
 
         .. rubric:: Description
 
@@ -558,14 +558,14 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}create_item
+            /create_item
 
         * To create a premium item
 
         .. code:: coffee
             :force:
 
-            {command_prefix}create_item --premium
+            /create_item --premium
         """
         # pylint: disable=no-member
 
@@ -695,7 +695,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}delete_item itemid
+            /delete_item itemid
 
         .. rubric:: Description
 
@@ -710,7 +710,7 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}delete_item 0000FFFF
+            /delete_item 0000FFFF
         """
         item = kwargs.get("item")
         if item.premium and not is_owner(self.ctx, message.author):
@@ -747,7 +747,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}distribute_item itemid
+            /distribute_item itemid
 
         .. rubric:: Description
 
@@ -761,7 +761,7 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}distribute_item 0000FFFF
+            /distribute_item 0000FFFF
         """
         item = kwargs["item"]
         if item.premium and not is_owner(self.ctx, message.author):
@@ -805,7 +805,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}give_item user_id itemid
+            /give_item user_id itemid
 
         .. rubric:: Description
 
@@ -824,7 +824,7 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}give_item 12345 0000FFFF
+            /give_item 12345 0000FFFF
         """
         if len(args) < 2:
             await message.channel.send(
@@ -894,7 +894,7 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}update_item itemid
+            /update_item itemid
 
         .. rubric:: Description
 
@@ -912,7 +912,7 @@ class AdminCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}update_item 0000FFFF
+            /update_item 0000FFFF
         """
         item = kwargs.get("item")
         options = {

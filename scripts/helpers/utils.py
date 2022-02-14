@@ -200,7 +200,7 @@ async def dm_send(
             )
     except discord.Forbidden:
         msg = await message.reply(
-            content=f"{content if content else ''}",
+            content=f"{content or ''}",
             embed=embed,
             **kwargs
         )
@@ -370,9 +370,9 @@ def get_formatted_time(
     seconds = divmod(minutes[1], 1)
     disp_tm = f"**{int(seconds[0]):02d} seconds**"
     if show_mins:
-        disp_tm = f"**{int(minutes[0]):02d} minutes** and " + disp_tm
+        disp_tm = f'**{int(minutes[0]):02d} minutes** and {disp_tm}'
     if show_hours:
-        disp_tm = f"**{int(hours[0]):02d} hours**, " + disp_tm
+        disp_tm = f'**{int(hours[0]):02d} hours**, {disp_tm}'
     return disp_tm
 
 
@@ -611,7 +611,7 @@ def prettify_discord(
     func = getattr(ctx, f"get_{mode}")
     return '\n\t'.join(
         ', '.join(
-            f"{func(id=elem)} ({str(elem)})"
+            f"{func(id=elem)} ({elem})"
             for elem in iterable[i: i + 2]
         )
         for i in range(0, len(iterable), 2)
@@ -677,7 +677,7 @@ def get_commands(
     return '\n'.join(
         sorted(
             [
-                cmd.replace("cmd_", ctx.prefix)
+                cmd.replace("cmd_", "/")
                 for cmd in dir(module)
                 if all([
                     cmd.startswith("cmd_"),

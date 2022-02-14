@@ -81,7 +81,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}channel option [channel_id]
+            /channel option [channel_id]
 
         .. rubric:: Description
 
@@ -104,28 +104,28 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}channel + 1234
+            /channel + 1234
 
         * To remove channel with ID 1234
 
         .. code:: coffee
             :force:
 
-            {command_prefix}channel - 1234
+            /channel - 1234
 
         * To display the active channels list
 
         .. code:: coffee
             :force:
 
-            {command_prefix}channel list
+            /channel list
 
         * To reset the active channels list
 
         .. code:: coffee
             :force:
 
-            {command_prefix}channel reset
+            /channel reset
         """
         if len(args) >= 2:
             if args and all(dig.isdigit() for dig in args[1]):
@@ -192,7 +192,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}command_history [limit] [--filter param:value]
+            /command_history [limit] [--filter param:value]
 
         .. rubric:: Description
 
@@ -213,14 +213,14 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}cmd_hist 10
+            /cmd_hist 10
 
         * To retrieve latest commands used by admins
 
         .. code:: coffee
             :force:
 
-            {command_prefix}cmd_hist --filter admin_cmd:True
+            /cmd_hist --filter admin_cmd:True
         """
         if kwargs:
             kwargs.pop("mentions")
@@ -259,7 +259,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}export_items [--pretty level]
+            /export_items [--pretty level]
 
         .. rubric:: Description
 
@@ -275,14 +275,14 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}export_items
+            /export_items
 
         * To see a pretty version of items JSON file
 
         .. code:: coffee
             :force:
 
-            {command_prefix}export_items --pretty 3
+            /export_items --pretty 3
         """
         items = Item.get_unique_items()
         for item in items:
@@ -311,7 +311,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}import_items
+            /import_items
 
         .. rubric:: Description
 
@@ -359,7 +359,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}latest [--limit limit]
+            /latest [--limit limit]
 
         .. rubric:: Description
 
@@ -423,7 +423,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}purge_tables [table_name]
+            /purge_tables [table_name]
 
         .. rubric:: Description
 
@@ -438,14 +438,14 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}purge_tables profiles
+            /purge_tables profiles
 
         * To purge all the tables
 
         .. code:: coffee
             :force:
 
-            {command_prefix}purge_tables
+            /purge_tables
         """
         locked, unlocked = self.__get_collections()
         if kwargs.get("all", False):
@@ -485,7 +485,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}reload module_name
+            /reload module_name
 
         .. rubric:: Description
 
@@ -499,7 +499,7 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}reload normal
+            /reload normal
         """
         module = args[0].lower()
         possible_modules = self.__possible_modules
@@ -535,7 +535,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}timeit cmd_name
+            /timeit cmd_name
 
         .. rubric:: Description
 
@@ -549,7 +549,7 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}timeit lb
+            /timeit lb
         """
         modules = get_modules(self.ctx)
         cmd = args[0].lower()
@@ -568,7 +568,7 @@ class ControlCommands(Commands):
         tot = round(end - start, 2)
         await message.channel.send(
             embed=get_embed(
-                f"Command `{self.ctx.prefix}{cmd}` "
+                f"Command `/{cmd}` "
                 f"took **{tot}** seconds to execute."
             )
         )
@@ -592,7 +592,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}toggle property [state]
+            /toggle property [state]
 
         .. rubric:: Description
 
@@ -621,14 +621,14 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}toggle channelmode
+            /toggle channelmode
 
         To switch the guild mode to whitelist mode
 
         .. code:: coffee
             :force:
 
-            {command_prefix}toggle guildmode whitelist
+            /toggle guildmode whitelist
         """
         props = {
             "Channel_Mode": "channel_mode",
@@ -718,7 +718,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}toggle_module_state module_name state
+            /toggle_module_state module_name state
 
         .. rubric:: Description
 
@@ -737,14 +737,14 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}tgl_mod_st control on
+            /tgl_mod_st control on
 
         To disable the Normalcommands module
 
         .. code:: coffee
             :force:
 
-            {command_prefix}tgl_mod_st normal off
+            /tgl_mod_st normal off
         """
         if args:
             if len(args) >= 2:
@@ -802,7 +802,7 @@ class ControlCommands(Commands):
         )
         emb.add_field(
             name="Command",
-            value=f'**{self.ctx.prefix}{cmd["command"]}**',
+            value=f'**/{cmd["command"]}**',
             inline=True
         )
         emb.add_field(

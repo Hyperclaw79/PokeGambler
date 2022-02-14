@@ -104,7 +104,7 @@ class GambleCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}gamble [50 < fee] [--lower_wins] [--max_players num]
+            /gamble [50 < fee] [--lower_wins] [--max_players num]
 
         .. rubric:: Description
 
@@ -125,21 +125,21 @@ class GambleCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}gamble
+            /gamble
 
         * To gamble for 1000 {pokechip_emoji}
 
         .. code:: coffee
             :force:
 
-            {command_prefix}gamble 1000
+            /gamble 1000
 
         * To gamble in lower_wins mode
 
         .. code:: coffee
             :force:
 
-            {command_prefix}gamble --lower_wins
+            /gamble --lower_wins
         """
         kwargs.pop("mentions", [])
         try:
@@ -215,7 +215,7 @@ class GambleCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}quickflip [50 < amount < 9999]
+            /quickflip [50 < amount < 9999]
 
         .. rubric:: Description
 
@@ -233,14 +233,14 @@ class GambleCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}flip
+            /flip
 
         * To flip for 1000 {pokechip_emoji}
 
         .. code:: coffee
             :force:
 
-            {command_prefix}flip 1000
+            /flip 1000
         """
         profile = Profiles(message.author)
         amount = await self.__flip_input_handler(
@@ -329,7 +329,7 @@ class GambleCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}matches [quantity] [--verbose]
+            /matches [quantity] [--verbose]
 
         .. rubric:: Description
 
@@ -344,21 +344,21 @@ class GambleCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}matches
+            /matches
 
         * To list latest 5 matches
 
         .. code:: coffee
             :force:
 
-            {command_prefix}matches 5
+            /matches 5
 
         * To see if Joker spawned in last 5 matches
 
         .. code:: coffee
             :force:
 
-            {command_prefix}matches 5 --verbose
+            /matches 5 --verbose
         """
         limit = int(args[0]) if args else 10
         matches = Matches.get_matches(limit=limit)
@@ -434,7 +434,7 @@ class GambleCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}mole [--difficulty number]
+            /mole [--difficulty number]
 
         .. rubric:: Description
         .. code:: py
@@ -461,14 +461,14 @@ class GambleCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}mole
+            /mole
 
         * To play the extreme mode (level 5)
 
         .. code:: coffee
             :force:
 
-            {command_prefix}mole --difficulty 5
+            /mole --difficulty 5
         """
         boards = [
             f"{i + 3}x{i + 3}"

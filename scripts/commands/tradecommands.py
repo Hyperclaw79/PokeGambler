@@ -93,7 +93,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}buy itemid [--quantity value]
+            /buy itemid [--quantity value]
 
         .. rubric:: Description
 
@@ -109,14 +109,14 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}buy boost_lt
+            /buy boost_lt
 
         * To buy 10 items with ID 0000FFFF
 
         .. code:: coffee
             :force:
 
-            {command_prefix}buy 0000FFFF --quantity 10
+            /buy 0000FFFF --quantity 10
         """
         itemid = args[0].lower()
         quantity = int(kwargs.get('quantity', 1))
@@ -181,7 +181,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}deposit
+            /deposit
 
         .. rubric:: Description
 
@@ -223,7 +223,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}details itemid
+            /details itemid
 
         .. rubric:: Description
 
@@ -242,7 +242,7 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}details 0000FFFF
+            /details 0000FFFF
         """
         item = kwargs["item"]
         await message.reply(embed=item.details)
@@ -266,7 +266,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}exchange_rates [currency]
+            /exchange_rates [currency]
 
         .. rubric:: Description
 
@@ -279,14 +279,14 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}exchange_rates
+            /exchange_rates
 
         * To check the exchange rates for PokeTwo
 
         .. code:: coffee
             :force:
 
-            {command_prefix}rates pokétwo
+            /rates pokétwo
         """
         enums = CurrencyExchange
         if args:
@@ -329,7 +329,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}give amount @mention
+            /give amount @mention
 
         .. rubric:: Description
 
@@ -346,7 +346,7 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}give 500 @ABCD#1234
+            /give 500 @ABCD#1234
         """
         error_tuple = self.__give_santize(message, args, mentions)
         if error_tuple:
@@ -404,7 +404,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}ids item_name
+            /ids item_name
 
         .. rubric:: Description
 
@@ -417,7 +417,7 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}ids Common Chest
+            /ids Common Chest
         """
         item_name = " ".join(arg.title() for arg in args)
         ids = Inventory(
@@ -449,7 +449,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}inventory
+            /inventory
 
         .. rubric:: Description
 
@@ -460,7 +460,7 @@ class TradeCommands(Commands):
         emb = get_embed(
             "Your personal inventory categorized according to item type.\n"
             "You can get the list of IDs for an item using "
-            f"`{self.ctx.prefix}ids item_name`.\n"
+            f"`/ids item_name`.\n"
             "\n> Your inventory's net worth, excluding Chests, is "
             f"**{net_worth}** {self.chip_emoji}.",
             title=f"{message.author.name}'s Inventory",
@@ -520,7 +520,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}open itemid/chest name [--quantity value]
+            /open itemid/chest name [--quantity value]
 
         .. rubric:: Description
 
@@ -558,21 +558,21 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}open common chest
+            /open common chest
 
         * To open 3 Gold Chests
 
         .. code:: coffee
             :force:
 
-            {command_prefix}open gold chest --quantity 3
+            /open gold chest --quantity 3
 
         * To open a lootbag/reward box with ID 0000AAAA
 
         .. code:: coffee
             :force:
 
-            {command_prefix}open 0000AAAA
+            /open 0000AAAA
         """
         openables = self.__open_get_openables(message, args)
         if not openables:
@@ -604,7 +604,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}redeem_chips amount
+            /redeem_chips amount
 
         .. rubric:: Description
 
@@ -617,7 +617,7 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}redeem_chips 500
+            /redeem_chips 500
         """
         valid = await MinValidator(
             min_value=10, message=message,
@@ -681,7 +681,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}sell itemid/name [--quantity value]
+            /sell itemid/name [--quantity value]
 
         .. rubric:: Description
 
@@ -700,14 +700,14 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}sell 0000FFFF
+            /sell 0000FFFF
 
         * To sell 10 Gears (Tradables)
 
         .. code:: coffee
             :force:
 
-            {command_prefix}sell Gear --quantity 10
+            /sell Gear --quantity 10
         """
         # pylint: disable=no-member
         inventory = Inventory(message.author)
@@ -790,7 +790,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}shop [category] [--premium]
+            /shop [category] [--premium]
 
         .. rubric:: Description
 
@@ -810,21 +810,21 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}shop
+            /shop
 
         * To view the shop for Titles
 
         .. code:: coffee
             :force:
 
-            {command_prefix}shop titles
+            /shop titles
 
         * To view the Premium shop for Gladiators
 
         .. code:: coffee
             :force:
 
-            {command_prefix}shop gladiators --premium
+            /shop gladiators --premium
         """
         shop = Shop
         profile = Profiles(message.author)
@@ -896,7 +896,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}use ticket_id
+            /use ticket_id
 
         .. rubric:: Description
 
@@ -909,7 +909,7 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}use FFF000
+            /use FFF000
         """
         valid = await HexValidator(
             message=message,
@@ -980,7 +980,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}withdraw
+            /withdraw
 
         .. rubric:: Description
 
@@ -1102,14 +1102,15 @@ class TradeCommands(Commands):
             )
         return error_tuple
 
-    def __ids_get_embeds(self, message, item_name, ids):
+    @staticmethod
+    def __ids_get_embeds(message, item_name, ids):
         embeds = []
         for idx in range(0, len(ids), 10):
             cnt_str = f'{idx + 1} - {min(idx + 11, len(ids))} / {len(ids)}'
             emb = get_embed(
                 f'**{item_name}**『{cnt_str}』',
                 title=f"{message.author.name}'s Item IDs",
-                footer=f"Use 『{self.ctx.prefix}details itemid』"
+                footer="Use 『/details itemid』"
                 "for detailed view.",
                 color=Profiles(message.author).get('embed_color')
             )
@@ -1241,7 +1242,8 @@ class TradeCommands(Commands):
             )
         )
 
-    def __shop_get_catogs(self, shop, profile):
+    @staticmethod
+    def __shop_get_catogs(shop, profile):
         categories = {
             key: catog
             for key, catog in sorted(
@@ -1256,7 +1258,7 @@ class TradeCommands(Commands):
         for i in range(0, len(catogs), 3):
             emb = get_embed(
                 "**To view the items in a specific category:**\n"
-                f"**`{self.ctx.prefix}shop category`**",
+                "**`/shop category`**",
                 title="PokeGambler Shop",
                 footer="All purchases except Tradables "
                 "are non-refundable.",
@@ -1267,7 +1269,7 @@ class TradeCommands(Commands):
                     name=str(catog),
                     value=f"```diff\n{dedent(catog.description)}\n"
                     "To view the items:\n"
-                    f"{self.ctx.prefix}shop {catog.name}\n```",
+                    f"/shop {catog.name}\n```",
                     inline=False
                 )
             embeds.append(emb)
@@ -1302,7 +1304,7 @@ class TradeCommands(Commands):
                 else f"`{profile.get('won_chips'):,}` {self.chip_emoji}"
             )
             emb = get_embed(
-                    f"**To buy any item, use `{self.ctx.prefix}buy itemid`**"
+                    f"**To buy any item, use `/buy itemid`**"
                     f"\n**You currently have: {balance}**",
                     title=f"{catog} {shopname}",
                     no_icon=True,
@@ -1326,7 +1328,7 @@ class TradeCommands(Commands):
                         inline=False
                     )
             # pylint: disable=undefined-loop-variable
-            emb.set_footer(text=f"Example:『{self.ctx.prefix}buy {itemid}』")
+            emb.set_footer(text=f"Example:『/buy {itemid}』")
         return emb
 
     async def __admin_accept(
@@ -1491,7 +1493,7 @@ class TradeCommands(Commands):
             content = None
             if mode == "deposit":
                 content = f"{message.author.mention}, check your balance" + \
-                    f" using the `{self.ctx.prefix}balance` command."
+                    " using the `/balance` command."
             await thread.send(
                 content=content,
                 embed=get_embed(

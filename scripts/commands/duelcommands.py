@@ -138,7 +138,7 @@ class DuelCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}create_action
+            /create_action
 
         .. rubric:: Description
 
@@ -285,7 +285,7 @@ class DuelCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}duel [chips] @player
+            /duel [chips] @player
 
         .. rubric:: Description
 
@@ -306,14 +306,14 @@ class DuelCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}duel @ABCD#1234
+            /duel @ABCD#1234
 
         * To battle user EFGH#5678 for 50,000 chips
 
         .. code:: coffee
             :force:
 
-            {command_prefix}duel @EFGH#5678 50000
+            /duel @EFGH#5678 50000
         """
         if not mentions or mentions[0].id == message.author.id:
             await dm_send(
@@ -403,7 +403,7 @@ class DuelCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}gladnick
+            /gladnick
 
         .. rubric:: Description
 

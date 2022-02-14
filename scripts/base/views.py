@@ -74,7 +74,7 @@ class SelectComponent(discord.ui.Select):
     :param heading: The heading of the component.
     :type heading: str
     :param options: The options for the Select.
-    :type options: dict
+    :type options: Dict
     :param serializer: The serializer to be used for the options.,
         defaults to ``str``.
     :type serializer: Optional[Callable]
@@ -125,6 +125,9 @@ class SelectComponent(discord.ui.Select):
                 for child in self.view.children
             ):
                 self.view.stop()
+            return
+        if isinstance(self.view, MorphView):
+            await self.view.morph(interaction, value)
             return
         if not self.view.no_response:
             await interaction.response.send_message(
@@ -421,3 +424,37 @@ class MoreInfoView(BaseView):
                 msg_kwargs["embed"] = self.embed
             await interaction.message.edit(**msg_kwargs)
         self.stop()
+
+
+class MorphView(BaseView):
+    """Dynamically Morphing Embed based on Select component's value.
+
+    :param info_dict: The mapping between Select label and its embed.
+    :type info_dict: Dict[str, :class:`discord.Embed`]
+    """
+    def __init__(self, info_dict: Dict[str, discord.Embed]):
+        super().__init__(timeout=None)
+        self.info_dict = info_dict
+        self.add_item(
+            SelectComponent(
+                heading="Choose Commands Category.",
+                options={
+                    key: ""
+                    for key in info_dict
+                }
+            )
+        )
+
+    async def morph(self, interaction, label: str):
+        """Morph the message content/embed on SelectComponent's label change.
+
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
+        :param label: The new label of the SelectComponent.
+        :type label: str
+        """
+        self.children[0].placeholder = label
+        await interaction.message.edit(
+            embed=self.info_dict[label],
+            view=self
+        )

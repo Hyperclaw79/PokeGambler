@@ -95,11 +95,11 @@ def admin_only(func: Callable):
                 ).send(
                     embed=get_embed(
                         f"```json\n{cmd_dump}\n```",
-                        title=func.__name__.replace("cmd_", self.ctx.prefix)
+                        title=func.__name__.replace("cmd_", "/")
                     )
                 )
             return func_with_callback(self, *args, message=message, **kwargs)
-        func_name = func.__name__.replace("cmd_", self.ctx.prefix)
+        func_name = func.__name__.replace("cmd_", "/")
         return message.channel.send(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by '
@@ -129,7 +129,7 @@ def dealer_only(func: Callable):
             is_owner(self.ctx, message.author)
         ]):
             return func(self, *args, message=message, **kwargs)
-        func_name = func.__name__.replace("cmd_", self.ctx.prefix)
+        func_name = func.__name__.replace("cmd_", "/")
         return message.channel.send(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by '
@@ -156,7 +156,7 @@ def owner_only(func: Callable):
     def wrapped(self, message, *args, **kwargs):
         if is_owner(self.ctx, message.author):
             return func(self, *args, message=message, **kwargs)
-        func_name = func.__name__.replace("cmd_", self.ctx.prefix)
+        func_name = func.__name__.replace("cmd_", "/")
         self.logger.pprint(
             f'Command {func_name} can only be used by owners.',
             color="red",
@@ -543,7 +543,7 @@ def needs_ticket(name: str):
                 embed_content = "You do not have any renaming tickets.\n" + \
                     "You can buy one from the Consumables Shop."
                 if itemid:
-                    embed_content += f"\nUse `{self.ctx.prefix}buy" + \
+                    embed_content += "\nUse `/buy" + \
                         f" {itemid}` to buy it."
                 return message.channel.send(
                     embed=get_embed(

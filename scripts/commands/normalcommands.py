@@ -27,7 +27,7 @@ from typing import Callable, List, Optional, TYPE_CHECKING
 import discord
 
 from ..base.models import CommandData, Profiles, Votes
-from ..base.views import LinkView
+from ..base.views import LinkView, MorphView
 from ..helpers.parsers import CustomRstParser
 from ..helpers.utils import (
     get_commands, get_embed, get_modules,
@@ -66,7 +66,7 @@ class NormalCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}commands [role] [--module name]
+            /commands [role] [--module name]
 
         .. rubric:: Description
 
@@ -83,21 +83,21 @@ class NormalCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}commands
+            /commands
 
         * To check the commands specific to admin
 
         .. code:: coffee
             :force:
 
-            {command_prefix}commands admin
+            /commands admin
 
         * To check only profile commands
 
         .. code:: coffee
             :force:
 
-            {command_prefix}commands --module profile
+            /commands --module profile
         """
         modules = get_modules(self.ctx)
         if kwargs.get("module"):
@@ -124,19 +124,31 @@ class NormalCommands(Commands):
             )
             return
         embed = get_embed(
-            f"Use `{self.ctx.prefix}help [command name]` for details",
+            "Use `/help [command name]` for details",
             title="PokeGambler Commands List"
         )
+        embed_all = embed.copy()
+        info_dict = {}
         for key, val in command_dict.items():
             if val:
-                embed.add_field(name=key, value=f"**```fix\n{val}\n```**")
-        embed.set_footer(
-            text="This command helped? You can help me too by donating at "
-            "https://www.paypal.me/hyperclaw79.",
-            icon_url="https://emojipedia-us.s3.dualstack.us-west-1."
-            "amazonaws.com/thumbs/160/facebook/105/money-bag_1f4b0.png"
-        )
-        await message.reply(embed=embed)
+                if not kwargs.get("module"):
+                    emb_new = embed.copy()
+                    emb_new.add_field(
+                        name=key,
+                        value=f"**```fix\n{val}\n```**"
+                    )
+                    info_dict[key] = emb_new
+                embed_all.add_field(
+                    name=key,
+                    value=f"**```fix\n{val}\n```**"
+                )
+        if not kwargs.get("module"):
+            info_dict["All Commands"] = embed_all
+            morpher = MorphView(info_dict=info_dict)
+            await message.reply(embed=embed, view=morpher)
+            self.ctx.loop.create_task(morpher.dispatch(module=self))
+        else:
+            await message.reply(embed=embed_all)
 
     @alias("?")
     async def cmd_help(
@@ -157,7 +169,7 @@ class NormalCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}help [command]
+            /help [command]
 
         .. rubric:: Description
 
@@ -172,14 +184,14 @@ class NormalCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}help profile
+            /help profile
 
         * To view help for all the commands
 
         .. code:: coffee
             :force:
 
-            {command_prefix}help
+            /help
         """
         modules = get_modules(self.ctx)
         commands = list(
@@ -243,7 +255,7 @@ class NormalCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}info
+            /info
 
         .. rubric:: Description
 
@@ -266,7 +278,7 @@ class NormalCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}invite
+            /invite
 
         .. rubric:: Description
 
@@ -312,7 +324,7 @@ class NormalCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}ping
+            /ping
 
         .. rubric:: Description
 
@@ -345,8 +357,8 @@ class NormalCommands(Commands):
                 return emb
             got_doc = True
             doc_str = cmd.__doc__.replace(
-                "{command_prefix}",
-                self.ctx.prefix
+                "/",
+                "/"
             ).replace(
                 "{pokechip_emoji}",
                 self.chip_emoji
@@ -415,15 +427,15 @@ class NormalCommands(Commands):
         emb.add_field(
             name="**Getting Started**",
             value=dedent(
-                f"""
+                """
                 ```diff
                 You can create a new profile using:
-                    {self.ctx.prefix}profile
+                    /profile
                 Every players gets free 100 Pokechips
                 For a list of commands you can access:
-                    {self.ctx.prefix}commands
+                    /commands
                 For usage guide of these commands:
-                    {self.ctx.prefix}help
+                    /help
                     🛈 Check the help for every command before using it.
 
                 🛈 Also keep an eye out for sudden gambling matches.

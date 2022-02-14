@@ -88,7 +88,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}background
+            /background
 
         .. rubric:: Description
 
@@ -152,7 +152,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}badges
+            /badges
 
         .. rubric:: Description
 
@@ -182,7 +182,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}bal
+            /bal
 
         .. rubric:: Description
 
@@ -222,7 +222,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}boosts
+            /boosts
 
         .. rubric:: Description
 
@@ -293,7 +293,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}timers
+            /timers
 
         .. rubric:: Description
 
@@ -390,7 +390,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}daily
+            /daily
 
         .. rubric:: Description
 
@@ -447,7 +447,7 @@ class ProfileCommands(Commands):
         Inventory(message.author).save(chest.itemid)
         embed = get_embed(
             f"Here's your daily **{chest}**.\n"
-            f"Claim the chest with `{self.ctx.prefix}open {chest.itemid}`.",
+            f"Claim the chest with `/open {chest.itemid}`.",
             title="**Daily Chest**",
             thumbnail=chest.asset_url,
             footer="You get bonus pokechips for every 5 streak.",
@@ -486,7 +486,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}embed_color
+            /embed_color
 
         .. rubric:: Description
 
@@ -562,7 +562,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}leaderboard ["balance"/minigame]
+            /leaderboard ["balance"/minigame]
 
         .. rubric:: Description
 
@@ -577,21 +577,21 @@ class ProfileCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}leaderboard
+            /leaderboard
 
         * To check the leaderboard in terms of balance
 
         .. code:: coffee
             :force:
 
-            {command_prefix}leaderboard balance
+            /leaderboard balance
 
         * To check the leaderboard for QuickFlip
 
         .. code:: coffee
             :force:
 
-            {command_prefix}leaderboard flip
+            /leaderboard flip
         """
         with LineTimer(self.logger, "Get Leaderboards"):
             if args and not args[0].lower().startswith("bal"):
@@ -703,7 +703,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}loot
+            /loot
 
         .. rubric:: Description
 
@@ -807,7 +807,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}profile [id/mention]
+            /profile [id/mention]
 
         .. rubric:: Description
 
@@ -821,21 +821,21 @@ class ProfileCommands(Commands):
         .. code:: coffee
             :force:
 
-            {command_prefix}profile
+            /profile
 
         * To check Alan's profile
 
         .. code:: coffee
             :force:
 
-            {command_prefix}pr @Alan#1234
+            /pr @Alan#1234
 
         * To check profile of user with ID 12345
 
         .. code:: coffee
             :force:
 
-            {command_prefix}profile 12345
+            /profile 12345
         """
         user = kwargs["selected_user"]
         profile = await get_profile(message, user)
@@ -881,7 +881,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}rank
+            /rank
 
         .. rubric:: Description
 
@@ -923,7 +923,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}stats
+            /stats
 
         .. rubric:: Description
 
@@ -974,7 +974,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            {command_prefix}vote
+            /vote
 
         .. rubric:: Description
 
