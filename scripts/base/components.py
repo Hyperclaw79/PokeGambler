@@ -205,7 +205,11 @@ class SlashCommand(AppCommand):
         :rtype:
         """
         return {
-            opt.name: (opt.type, opt.required or False)
+            opt.name: {
+                field: val
+                for field, val in opt.items()
+                if val is not None
+            }
             for opt in self.options
             if opt.name is not None
         }

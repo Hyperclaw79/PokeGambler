@@ -2,6 +2,7 @@
 
 # -- Path setup --------------------------------------------------------------
 
+import inspect
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
@@ -106,7 +107,7 @@ html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
 html_css_files = [
-    'css/spoiler.css',
+    'css/spoiler.css'
 ]
 
 html_js_files = [
@@ -125,13 +126,15 @@ def setup(app):
 
     command_prefix = os.environ.get("COMMAND_PREFIX", "->")
     arg_info_patt = re.compile(r"#.+#")
+    colon_enclosed_patt = re.compile(r":(?P<attr>[^:]+)\s(?P<name>.+):\s(?P<value>.+)")
 
     def format_docs(app, what, name, obj, options, lines):
         cut_lines(17, what=['module'])(
             app, what, name, obj, options, lines
         )
         # For Commands
-        for idx, line in enumerate(lines):
+        param_dict = {}
+        for idx, line in enumerate(lines.copy()):
             lines[idx] = arg_info_patt.sub(
                 '',
                 line.replace(
@@ -140,6 +143,31 @@ def setup(app):
                     "{pokechip_emoji}", "Pokechips"
                 )
             )
+            if name.split('.')[-1].startswith('cmd_'):
+                populate_param_table(lines, param_dict, idx, line)
+        add_alias(obj, lines)
+        add_models(obj, lines)
+        for _ in range(lines.count('<DEL>')):
+            lines.remove('<DEL>')
+        add_param_table(lines, param_dict)
+
+    def add_models(obj, lines):
+        if (
+          hasattr(obj, "models")
+          and isinstance(obj.models, list)
+          and obj.models
+        ):
+            model_str = ', '.join(
+                f":class:`~{model.__module__}.{model.__qualname__}`"
+                for model in obj.models
+            )
+            lines.extend([
+                ".. rubric:: Models",
+                "",
+                model_str
+            ])
+
+    def add_alias(obj, lines):
         if (
             hasattr(obj, "alias")
             and isinstance(obj.alias, list)
@@ -155,20 +183,51 @@ def setup(app):
                 alias_str,
                 ""
             ])
-        if (
-          hasattr(obj, "models")
-          and isinstance(obj.models, list)
-          and obj.models
-        ):
-            model_str = ', '.join(
-                f":class:`~{model.__module__}.{model.__qualname__}`"
-                for model in obj.models
+
+    def add_param_table(lines, param_dict):
+        def get_elem(idx, attr):
+            return f"    {'*' if idx == 0 else ' '} - {attr.title()}"
+
+        if param_dict:
+            lines.extend([
+                "",
+                ".. rubric:: Parameter Config",
+                ""
+            ])
+            justify = (
+                ' justify-content: space-evenly;' if len(param_dict) > 1
+                else ''
             )
             lines.extend([
-                ".. rubric:: Models",
+                ".. raw:: html",
                 "",
-                model_str
+                f"    <div style='display: flex;{justify}'>",
             ])
+        for param_name, attrs in param_dict.items():
+            lines.extend([
+                f".. list-table:: **{param_name.title()}**",
+                "",
+                *[get_elem(idx, attr) for idx, attr in enumerate(attrs)],
+                *[get_elem(idx2, val) for idx2, val in enumerate(attrs.values())],
+                "",
+            ])
+        if param_dict:
+            lines.extend([
+                ".. raw:: html",
+                "",
+                "    </div>",
+                ""
+            ])
+
+    def populate_param_table(lines, param_dict, idx, line):
+        is_coloned = colon_enclosed_patt.search(line)
+        valids = ('default', 'min_value', 'max_value', 'choices')
+        if is_coloned and is_coloned.group('attr') in valids:
+            group = is_coloned.groupdict()
+            if group['name'] not in param_dict:
+                param_dict[group['name']] = {}
+            param_dict[group['name']][group['attr']] = group['value']
+            lines[idx] = '<DEL>'
 
     def clean_sigs(app, what, name, obj, options, signature, return_annotation):
         return ('', return_annotation)

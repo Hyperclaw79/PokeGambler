@@ -30,15 +30,9 @@ Decorators
 
 .. autodecorator:: scripts.commands.basecommand.ctx_command
 
-.. autodecorator:: scripts.commands.basecommand.ensure_args
-
 .. autodecorator:: scripts.commands.basecommand.ensure_item
 
 .. autodecorator:: scripts.commands.basecommand.ensure_user
-
-.. autodecorator:: scripts.commands.basecommand.get_chan
-
-.. autodecorator:: scripts.commands.basecommand.get_user
 
 .. autodecorator:: scripts.commands.basecommand.maintenance
 

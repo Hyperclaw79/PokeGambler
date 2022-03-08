@@ -82,7 +82,7 @@ class PokeGambler(discord.AutoShardedClient):
         # pylint: disable=assigning-non-slot
         intents.presences = False
         super().__init__(intents=intents)
-        self.version = "v1.2.0"
+        self.version = "v1.3.0"
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
         self.__update_configs()
@@ -363,28 +363,36 @@ class PokeGambler(discord.AutoShardedClient):
         Shop.refresh_tradables()
         PremiumShop.refresh_tradables()
         await self.topgg.post_guild_count()
-        if self.is_prod or self.is_local:
-            self.logger.pprint(
-                "Syncing up the slash commands now.",
-                color='blue'
-            )
-            kwargs = {}
-            if self.is_local:
-                kwargs["guild_id"] = self.whitelist_guilds[0]
-            elif self.is_prod:
-                kwargs["guild_id"] = self.official_server
-            await self.slasher.add_slash_commands(**kwargs)
-            self.logger.pprint(
-                "Registering the context menu commands now.",
-                color='blue'
-            )
-            await self.ctx_cmds.register_all()
+        await self.slash_sync()
         await online_now(self)
         game = discord.Game(
             "with the strings of fate. | Check: /info"
         )
         await self.change_presence(activity=game)
         self.__reward_nitro_boosters.start()
+
+    async def slash_sync(self):
+        """Synchronizes the slash commands."""
+        if not any([
+            self.is_prod,
+            self.is_local
+        ]):
+            return
+        self.logger.pprint(
+            "Syncing up the slash commands now.",
+            color='blue'
+        )
+        kwargs = {}
+        if self.is_local:
+            kwargs["guild_id"] = self.whitelist_guilds[0]
+        elif self.is_prod:
+            kwargs["guild_id"] = self.official_server
+        await self.slasher.add_slash_commands(**kwargs)
+        self.logger.pprint(
+            "Registering the context menu commands now.",
+            color='blue'
+        )
+        await self.ctx_cmds.register_all()
 
     def load_commands(
         self, module_type: str,
@@ -454,7 +462,7 @@ class PokeGambler(discord.AutoShardedClient):
             opts = {
                 key: val
                 for key, val in kwargs.items()
-                if key not in ("message", "mentions", "args")
+                if key not in ("message", "args")
             }
             cmd_name = method.__name__.replace("cmd_", "")
             if "no_log" not in dir(method) or not self.is_local:

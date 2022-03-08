@@ -51,9 +51,18 @@ class OptionTypes(Enum, metaclass=CustomEnumMeta):
     Enum for the different types of options that can be used in a
     command.
     """
-    STR = 3
+    SUB_COMMAND = 1
+    SUB_COMMAND_GROUP = 2
+    STRING = 3
     INT = 4
+    INTEGER = 4
     BOOL = 5
-    MENTION = 6
+    BOOLEAN = 5
+    USER = 6
+    CHANNEL = 7
+    ROLE = 8
+    MENTIONABLE = 9  # Do not use this.
     FLOAT = 10
+    NUMBER = 10
+    ATTACHMENT = 11
     DEFAULT = 3

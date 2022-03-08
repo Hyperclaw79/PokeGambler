@@ -20,6 +20,7 @@ RestructuredText and Parameter parsers
 """
 
 import re
+from functools import cached_property
 from typing import Any, Dict, List, Optional
 
 from ..base.enums import OptionTypes
@@ -128,7 +129,7 @@ class Param:
     :type description: str
     """
 
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-few-public-methods,too-many-instance-attributes
 
     def __init__(
         self, name: str,
@@ -137,6 +138,10 @@ class Param:
         self.name = name
         self.description = description
         self.type = None
+        self.default = None
+        self.choices = None
+        self.min_value = None
+        self.max_value = None
         self._parse_pattern = re.compile(
             r'[ld]i[sc]t\[(.+)\]',
             re.IGNORECASE
@@ -146,65 +151,101 @@ class Param:
             r'(?P<type>[a-zA-Z_\[\]]+)'
             r'(?:\s=\s(?P<default>[^\]]+))?'
         )
+        self._discord_pattern = re.compile(
+            r':class:`discord\.(.+)`'
+        )
         self._optional_pattern = re.compile(
             r'Optional\[(.+)\]'
         )
+        self._list_pattern = re.compile(
+            r'\[(.+)\]'
+        )
 
-    @property
-    def variables(self) -> List[str]:
-        """All the parsed variable names.
+    def __repr__(self) -> str:
+        cleaned_type = self._discord_pattern.sub(
+            r'\1',
+            self._optional_pattern.sub(r'\1', self.type)
+        )
+        required = 'Optional' not in str(self.type)
+        return f'Param(name={self.name}, type={cleaned_type}, ' \
+            f'description={self.description}, ' \
+            f'default={self.default}, ' \
+            f'required={required})'
 
-        :return: Returns a list of variable names
-        :rtype: List[str]
-        """
-        for var in self.__get_var_strings():
-            yield self._vals_pattern.search(
-                var
-            ).groupdict()['name']
+    def __setattribute__(self, name: str, value: Any) -> None:
+        setattr(self, name, value)
+        if name == 'choices':
+            self.__resolve_choices()
 
-    def parse(self) -> List[Dict[str, Any]]:
+    def parse(self) -> Dict[str, Any]:
         """Resolves the parameter type into attributes
         using regular expressions.
 
         :return: The resolved parameters.
-        :rtype: List[Dict[str, Any]]
+        :rtype: Dict[str, Any]
         """
-        if self.name == 'mentions':
-            return [{
-                'name': 'user-mentions',
-                'type': OptionTypes.MENTION.value,
-                'description': 'Users to mention',
-                'required': 'Optional' not in str(self.type)
-            }]
-        if self.name not in ('args', 'kwargs'):
+        if self.name == 'message':
             return []
-        parsed_list = []
-        variables = self.__get_var_strings()
-        for var in variables:
-            parsed = self._vals_pattern.search(var).groupdict()
-            parsed['required'] = 'Optional' not in parsed['type']
-            parsed['type'] = OptionTypes[
-                self._optional_pattern.sub(r'\1', parsed['type'])
-            ].value
-            parsed['description'] = parsed.get(
-                'description'
-            ) or 'Please enter a value.'
-            if parsed.get('default') is not None:
-                if parsed['type'] == 4:
-                    parsed['default'] = int(parsed['default'])
-                elif parsed['type'] == 10:
-                    parsed['default'] = float(parsed['default'])
-                elif parsed['type'] == 5:
-                    parsed['default'] = parsed['default'] == 'True'
-                parsed['description'] += f" Default is {parsed['default']}."
-            parsed_list.append(parsed)
-        return parsed_list
+        parsed = {
+            attr: getattr(self, attr)
+            for attr in ('name', 'description', 'type', 'default')
+        }
+        self.__resolve_special_types(parsed)
+        parsed['required'] = 'Optional' not in parsed['type']
+        parsed['type'] = OptionTypes[
+            self._optional_pattern.sub(r'\1', parsed['type'])
+        ]
+        parsed['description'] = parsed.get(
+            'description'
+        ) or 'Please enter a value.'
+        if parsed.get('default') is not None:
+            if parsed['default'] == 'None':
+                parsed['default'] = None
+            elif parsed['type'] == OptionTypes.INTEGER:
+                parsed['default'] = int(parsed['default'])
+            elif parsed['type'] == OptionTypes.NUMBER:
+                parsed['default'] = float(parsed['default'])
+            elif parsed['type'] == OptionTypes.BOOLEAN:
+                parsed['default'] = parsed['default'] == 'True'
+            parsed['description'] += f" Default is {parsed['default']}."
+        operation = str
+        if parsed['type'] == OptionTypes.INTEGER:
+            operation = int
+        elif parsed['type'] == OptionTypes.NUMBER:
+            operation = float
+        if parsed['type'] in (OptionTypes.INTEGER, OptionTypes.FLOAT):
+            for attr in ('min_value', 'max_value'):
+                if getattr(self, attr) is not None:
+                    parsed[attr] = operation(getattr(self, attr))
+        parsed['type'] = parsed['type'].value
+        if self.choices is not None:
+            self.__resolve_choices(operation)
+            parsed['choices'] = self.choices
+        return parsed
 
-    def __get_var_strings(self):
-        match_ = self._parse_pattern.search(self.type)
-        if match_ is None:
-            raise ValueError('Invalid Parameter.')
-        yield from match_.group(1).split(', ')
+    def __resolve_choices(self, operation=None):
+        if isinstance(self.choices, list):
+            return
+        choice_str = self._list_pattern.sub(r'\1', self.choices)
+        self.choices = [
+            {
+                "name": choice.strip(),
+                "value": (
+                    operation(choice.strip()) if operation
+                    else choice.strip()
+                )
+            }
+            for choice in choice_str.split(',')
+            if choice.strip()
+        ]
+
+    def __resolve_special_types(self, parsed: Dict[str, Any]) -> None:
+        """
+        Handler for discord types like User, Member, Channel, etc.
+        """
+        parsed['type'] = self._discord_pattern.sub(r'\1', parsed['type'])
+        if 'Member' in parsed['type']:
+            parsed['type'] = parsed['type'].replace('Member', 'User')
 
 
 class CustomRstParser:
@@ -236,20 +277,24 @@ class CustomRstParser:
         >>> assert parser.sections == []
     """
     def __init__(self):
+        param_patts = [
+            re.compile(
+                fr':(?P<attr>{attr})\s(?P<name>[^:]+):(?:\s(?P<value>.+))?$'
+            )
+            for attr in (
+                'param', 'type', 'default',
+                'choices', 'min_value', 'max_value'
+            )
+        ]
         self._patterns = [
             re.compile(
                 r'^\.\. (?P<directive>\w+)\:\:(?:\s(?P<argument>.+))?$'
             ),
             re.compile(
                 r':(?P<option>\w+):(?:\s(?P<value>.+))?$'
-            ),
-            re.compile(
-                r':param\s(?P<name>[^:]+):(?:\s(?P<value>.+))?$'
-            ),
-            re.compile(
-                r':type\s(?P<name>[^:]+):(?:\s(?P<value>.+))?$'
-            ),
-            re.compile(r'\s{4}[^\*\d]+')
+            )
+        ] + param_patts + [
+            re.compile(r'\s{4}.+')
         ]
         self._tab_space = 8
         #: Meta :class:`Directive`
@@ -276,6 +321,31 @@ class CustomRstParser:
         self.params = {}
         self.sections = []
 
+    @cached_property
+    def parsed_params(self) -> List[Dict[str, Any]]:
+        """Returns a list of parsed parameters.
+
+        :return: The parsed params.
+        :rtype: List[Dict[str, Any]]
+        """
+        return [
+            param.parse()
+            for param in self.params.values()
+            if param.name != 'message'
+        ]
+
+    @property
+    def param_names(self) -> List[str]:
+        """Returns a list of parsed parameter names.
+
+        :return: The parsed params.
+        :rtype: List[str]
+        """
+        return [
+            param['name']
+            for param in self.parsed_params
+        ]
+
     def parse(self, text: str):
         """
         Parses the given text and updates the internal sections,
@@ -287,7 +357,7 @@ class CustomRstParser:
         for line in text.splitlines():
             (
                 dir_matches, options,
-                param, type_
+                param, *param_attrs
             ) = [
                 pattern.search(line.strip())
                 for pattern in self._patterns[:-1]
@@ -302,9 +372,14 @@ class CustomRstParser:
                         param.get('value')
                     )
                 )
-            elif type_:
-                type_ = type_.groupdict()
-                self.params[type_['name']].type = type_['value']
+            elif any(param_attrs):
+                for attr in param_attrs:
+                    if attr:
+                        attr = attr.groupdict()
+                        setattr(
+                            self.params[attr['name']],
+                            attr['attr'], attr['value']
+                        )
             elif options and self.directives:
                 options = options.groupdict()
                 self.directives[-1].options.update({
@@ -339,7 +414,7 @@ class CustomRstParser:
     def __clean_line(line: str) -> str:
         return (
             None if not line
-            else " ".join(line.split())
+            else line.lstrip(' ' * 4)
         )
 
     def __handle_directives(self, dir_matches):

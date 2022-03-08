@@ -30,6 +30,8 @@ from typing import (
 import discord
 from discord.http import Route
 
+from scripts.base.enums import OptionTypes
+
 from .components import (
     AppCommand, ContextMenu,
     GuildEvent, GuildEventType,
@@ -214,10 +216,12 @@ class CommandListing(list):
         """
         return [command.name for command in self]
 
-    async def refresh(self, **kwargs):
+    async def refresh(self, fresh=False, **kwargs):
         """
         Refreshes the command list.
         """
+        if fresh:
+            self.clear()
         route = self.handler.get_route('GET', **kwargs)
         commands = await self.handler.http.request(route)
         for command in commands:
@@ -378,20 +382,26 @@ class SlashHandler:
                     break
         with CustomRstParser() as rst_parser:
             rst_parser.parse(method.__doc__)
-            args = rst_parser.params.get('args', None)
-        if 'resolved' in data:
-            mentions = [
-                interaction.guild.get_member(int(uid))
-                for uid in data['resolved']['users']
-            ]
-            kwargs['mentions'] = mentions
+            param_names = rst_parser.param_names
         for opt in data.get('options', {}):
-            if opt['name'] == 'user-mentions':
-                continue
-            if args and opt['name'] in args.variables:
-                kwargs['args'].append(opt['value'])
-                continue
-            kwargs[opt['name']] = opt['value']
+            if opt['name'] in param_names:
+                if opt['type'] == OptionTypes.USER.value:
+                    getter = interaction.guild.get_member
+                    alt_getter = self.ctx.get_user
+                elif opt['type'] == OptionTypes.CHANNEL.value:
+                    getter = interaction.guild.get_channel
+                    alt_getter = self.ctx.get_channel
+                elif opt['type'] == OptionTypes.ROLE.value:
+                    getter = interaction.guild.get_role
+                    alt_getter = None
+                else:
+                    getter = None
+                if getter:
+                    opt['value'] = self.__get_entity(
+                        int(opt['value']),
+                        getter, alt_getter
+                    )
+                kwargs[opt['name']] = opt['value']
         return (method, kwargs)
 
     async def register_command(
@@ -488,13 +498,19 @@ class SlashHandler:
         with CustomRstParser() as rst_parser:
             rst_parser.parse(command.__doc__)
             if rst_parser.params:
-                for param in rst_parser.params.values():
-                    parsed = param.parse()
-                    if parsed:
-                        for var in parsed:
-                            params[var['name']] = (
-                                var['type'], var['required']
-                            )
+                params = {
+                    key: {
+                        field: val
+                        for field, val in param.parse().items()
+                        if all([
+                            val is not None,
+                            # Fix for Discord API not supporting Default option
+                            field != 'default'
+                        ])
+                    }
+                    for key, param in rst_parser.params.items()
+                    if key != 'message'
+                }
         registered_cmd_params = self.registered[cmd_name].parameters
         return params == registered_cmd_params
 
@@ -560,32 +576,18 @@ class SlashHandler:
             return {}
         if not command.__doc__:
             return {}
+        description = command.__doc__.split("\n")[0]
         with CustomRstParser() as rst_parser:
             rst_parser.parse(command.__doc__)
             meta = rst_parser.meta
-            params = rst_parser.params
-        options = []
-        description = command.__doc__.split("\n")[0]
+            options = rst_parser.parsed_params
         desc = meta.description
-        args = None
-        kwargs = None
-        for key, param in params.items():
-            if key == "args":
-                args = param
-                options.extend(args.parse())
-            elif key == "kwargs":
-                kwargs = param
-                options.extend(kwargs.parse())
-            elif key == "mentions":
-                options.append({
-                    "name": "user-mentions",
-                    "description": "Users to mention",
-                    "type": 6,
-                    "required": 'Optional' not in param.type
-                })
         if len(desc) <= 100:
             description = desc
         options = sorted(options, key=lambda x: -x['required'])
+        # Fix for Discord API not supporting Default Option
+        for option in options:
+            option.pop('default', None)
         cmd_name = command.__name__.replace("cmd_", "")
         if self.ctx.is_local:
             cmd_name += "_"
@@ -598,7 +600,7 @@ class SlashHandler:
 
     async def __sync_commands(self, current_commands, **kwargs):
         if not self.ctx.is_local:
-            await self.registered.refresh()
+            await self.registered.refresh(fresh=True)
         await self.registered.refresh(**kwargs)
         pad = '' if not self.ctx.is_local else '_'
         cmds = [
@@ -608,6 +610,12 @@ class SlashHandler:
         for command in self.registered:
             if command.name not in cmds:
                 await self.delete_command(command, **kwargs)
+
+    @staticmethod
+    def __get_entity(val, getter, alt_getter=None):
+        id_ = int(val)
+        alt_getter = alt_getter or getter
+        return getter(id_) or alt_getter(id_)
 
 
 class ContextHandler:

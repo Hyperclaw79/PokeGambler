@@ -44,8 +44,8 @@ from ..helpers.utils import (
     get_modules, wait_for
 )
 from .basecommand import (
-    ensure_args, model, owner_only, no_log,
-    alias, Commands
+    model, owner_only,
+    no_log, alias, Commands
 )
 
 if TYPE_CHECKING:
@@ -61,138 +61,42 @@ class ControlCommands(Commands):
         Only the Owners have access to these commands.
     '''
 
-    @owner_only
-    @no_log
-    @ensure_args
-    async def cmd_channel(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """
-        :param message: The message which triggered this command.
-        :type message: :class:`discord.Message`
-        :param args: The arguments for this command.
-        :type args: List[option: str, channel_id: Optional[int]]
-
-        .. meta::
-            :description: Set the active channel for the commands.
-
-        .. rubric:: Syntax
-        .. code:: coffee
-
-            /channel option [channel_id]
-
-        .. rubric:: Description
-
-        ``👑 Owner Command``
-        Useful for redirecting echo command.
-        Supported options
-
-            * +/add/append: Add channel to active list.
-
-            * -/remove/del/delete: Remove channel from active list.
-
-            * list: Display active channels list.
-
-            * reset: Reset active channels list.
-
-        .. rubric:: Examples
-
-        * To add channel with ID 1234
-
-        .. code:: coffee
-            :force:
-
-            /channel + 1234
-
-        * To remove channel with ID 1234
-
-        .. code:: coffee
-            :force:
-
-            /channel - 1234
-
-        * To display the active channels list
-
-        .. code:: coffee
-            :force:
-
-            /channel list
-
-        * To reset the active channels list
-
-        .. code:: coffee
-            :force:
-
-            /channel reset
-        """
-        if len(args) >= 2:
-            if args and all(dig.isdigit() for dig in args[1]):
-                if args[0].lower() in ["+", "add", "append"]:
-                    curr_chan = self.ctx.get_channel(int(args[1]))
-                    self.ctx.active_channels.append(curr_chan)
-                    self.logger.pprint(
-                        f"Added {curr_chan}({curr_chan.id}) "
-                        "as active channel.",
-                        timestamp=True,
-                        color="blue"
-                    )
-                elif args[0].lower() in ["-", "remove", "del", "delete"]:
-                    curr_chan = self.ctx.get_channel(int(args[1]))
-                    self.ctx.active_channels = [
-                        chan
-                        for chan in self.ctx.active_channels
-                        if chan.id != curr_chan.id
-                    ]
-                    self.logger.pprint(
-                        f"Removed {curr_chan}({curr_chan.id}) "
-                        "from active channels.",
-                        timestamp=True,
-                        color="blue"
-                    )
-        elif args[0].lower() == "list":
-            await message.channel.send(
-                "\n".join(
-                    f"{chan}({chan.id})"
-                    for chan in self.ctx.active_channels
-                ) or "None."
-            )
-
-        elif args[0].lower() == "reset":
-            self.ctx.active_channels = []
-            self.logger.pprint(
-                "All channels have been succesfully reset.",
-                timestamp=True,
-                color="green"
-            )
-
+    # pylint: disable=too-many-arguments
     @owner_only
     @no_log
     @model(CommandData)
     @alias('cmd_hist')
     async def cmd_command_history(
         self, message: Message,
-        args: Optional[List] = None,
+        limit: Optional[int] = 5,
+        admin_cmd: Optional[bool] = None,
+        user: Optional[discord.Member] = None,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The arguments for this command.
-        :type args: List[limit: Optional[int]]
-        :param kwargs: Extra Keyword arguments for this command.
-        :type kwargs: Dict[filter: Optional[str]]
+        :param limit: The number of commands to show.
+        :type limit: Optional[int]
+        :default limit: 5
+        :min_value limit: 1
+        :max_value limit: 50
+        :param user: The user to show commands for.
+        :type user: Optional[:class:`discord.Member`]
+        :default user: None
+        :param admin_cmd: Whether or not to show admin commands.
+        :type admin_cmd: Optional[bool]
+        :default admin_cmd: None
 
         .. meta::
             :description: Retrieves the latest command history based \
-                on provided kwargs.
+                on provided filters.
             :aliases: cmd_hist
 
         .. rubric:: Syntax
         .. code:: coffee
 
-            /command_history [limit] [--filter param:value]
+            /command_history [limit:number] [user:@User] [admin_cmd:True/False]
 
         .. rubric:: Description
 
@@ -201,11 +105,6 @@ class ControlCommands(Commands):
         Defaults to a limit of 5 commands.
         Filter must be comma-separated key value pairs of format key:value.
 
-        .. tip::
-
-            Check :class:`~scripts.base.models.CommandData`
-            for available parameters.
-
         .. rubric:: Examples
 
         * To retrieve the 10 latest commands
@@ -213,25 +112,21 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            /cmd_hist 10
+            /cmd_hist limit:10
 
         * To retrieve latest commands used by admins
 
         .. code:: coffee
             :force:
 
-            /cmd_hist --filter admin_cmd:True
+            /cmd_hist admin_cmd:True
         """
-        if kwargs:
-            kwargs.pop("mentions")
-        limit = int(args[0]) if args else 5
-        filter_ = kwargs.get("filter", '')
-        cmd_kwargs = {
-            param_str.strip().split(':')[0]: param_str.strip().split(':')[1]
-            for param_str in filter_.split(',')
-            if param_str
-        }
-        history = CommandData.history(limit=limit, **cmd_kwargs)
+        filter_ = {}
+        if user is not None:
+            filter_["user_id"] = str(user.id)
+        if admin_cmd is not None:
+            filter_["admin_cmd"] = admin_cmd
+        history = CommandData.history(limit=limit, **filter_)
         if not history:
             await message.channel.send(
                 embed=get_embed(
@@ -245,12 +140,19 @@ class ControlCommands(Commands):
     @owner_only
     @no_log
     # pylint: disable=no-self-use
-    async def cmd_export_items(self, message: Message, **kwargs):
+    async def cmd_export_items(
+        self, message: Message,
+        pretty: Optional[int] = 3,
+        **kwargs
+    ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param kwargs: Extra Keyword arguments for this command.
-        :type kwargs: Dict[pretty: Optional[int]]]
+        :param pretty: The number of spaces to indent the JSON.
+        :type pretty: Optional[int]
+        :default pretty: 3
+        :min_value pretty: 1
+        :max_value pretty: 4
 
         .. meta::
             :description: Exports the :class:`~scripts.base.items.Item` \
@@ -259,14 +161,14 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /export_items [--pretty level]
+            /export_items [pretty:level]
 
         .. rubric:: Description
 
         ``👑 Owner Command``
-        Exports the dynamically created items from the database as JSON.
+        Exports the dynamicall_y created items from the database as JSON.
         The JSON is uploaded as a file in the channel.
-        A --pretty kwarg can be used to provide indentation level.
+        The pretty option can be used to provide indentation level.
 
         .. rubric:: Examples
 
@@ -282,14 +184,14 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            /export_items --pretty 3
+            /export_items pretty:3
         """
         items = Item.get_unique_items()
         for item in items:
             item.pop("created_on", None)
         jsonified = json.dumps(
             items,
-            indent=kwargs.get("pretty"),
+            indent=pretty,
             sort_keys=False
         )
         byio = BytesIO()
@@ -345,12 +247,19 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
-    async def cmd_latest(self, message: Message, **kwargs):
+    async def cmd_latest(
+        self, message: Message,
+        limit: Optional[int] = 5,
+        **kwargs
+    ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param kwargs: Extra Keyword arguments for this command.
-        :type kwargs: Dict[limit: Optional[int]]]
+        :param limit: The number of documents to show.
+        :type limit: Optional[int]
+        :default limit: 5
+        :min_value limit: 1
+        :max_value limit: 50
 
         .. meta::
             :description: Retrieves the latest documents \
@@ -359,7 +268,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /latest [--limit limit]
+            /latest [limit:number]
 
         .. rubric:: Description
 
@@ -373,7 +282,6 @@ class ControlCommands(Commands):
         )
         if not cltn:
             return
-        limit = int(kwargs.get("limit", 5))
         documents = cltn.latest(limit=limit)
         if not documents:
             await message.channel.send(
@@ -407,14 +315,15 @@ class ControlCommands(Commands):
     @alias('prg_tbl')
     async def cmd_purge_tables(
         self, message: Message,
-        args: Optional[List] = None,
+        all_: Optional[bool] = False,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The table name to purge.
-        :type args: List[table: Optional[str]]
+        :param all_: Whether to purge all tables.
+        :type all_: Optional[bool]
+        :default all_: False
 
         .. meta::
             :description: Purges the tables in the database.
@@ -423,32 +332,31 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /purge_tables [table_name]
+            /purge_tables [all_:True/False]
 
         .. rubric:: Description
 
         ``👑 Owner Command``
         Purges the tables in the database.
-        If no table name is given, purges all the tables.
 
         .. rubric:: Examples
 
-        * To purge the profiles table
+        * To choose a table to purge
 
         .. code:: coffee
             :force:
 
-            /purge_tables profiles
+            /purge_tables
 
         * To purge all the tables
 
         .. code:: coffee
             :force:
 
-            /purge_tables
+            /purge_tables all_:True
         """
         locked, unlocked = self.__get_collections()
-        if kwargs.get("all", False):
+        if all_:
             collections = locked + unlocked
         else:
             cltn = await self.__get_model_view(
@@ -467,17 +375,17 @@ class ControlCommands(Commands):
 
     @owner_only
     @no_log
-    @ensure_args
     async def cmd_reload(
         self, message: Message,
-        args: List[str] = None,
+        module: str,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The module name to reload.
-        :type args: List[module: str]
+        :param module: The module to reload.
+        :type module: str
+        :choices module: [Admin, Control, Normal, Duel, Gamble, Profile, Trade]
 
         .. meta::
             :description: Reloads a command module.
@@ -485,7 +393,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /reload module_name
+            /reload module:name
 
         .. rubric:: Description
 
@@ -499,9 +407,9 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            /reload normal
+            /reload module:normal
         """
-        module = args[0].lower()
+        module = module.lower()
         possible_modules = self.__possible_modules
         if module not in possible_modules:
             embed = get_enum_embed(
@@ -511,23 +419,23 @@ class ControlCommands(Commands):
             await message.channel.send(embed=embed)
         else:
             self.ctx.load_commands(module, reload_module=True)
+            await self.ctx.slash_sync()
             await message.channel.send(
                 embed=get_embed(f"Successfully reloaded {module}.")
             )
 
     @owner_only
     @no_log
-    @ensure_args
     async def cmd_timeit(
         self, message: Message,
-        args: List[str] = None,
+        command: str,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The command name to time.
-        :type args: List[command: str]
+        :param command: The command to time.
+        :type command: str
 
         .. meta::
             :description: Executes a command and displays time taken to run it.
@@ -535,7 +443,7 @@ class ControlCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /timeit cmd_name
+            /timeit command:name
 
         .. rubric:: Description
 
@@ -549,10 +457,10 @@ class ControlCommands(Commands):
         .. code:: coffee
             :force:
 
-            /timeit lb
+            /timeit command:leaderboard
         """
         modules = get_modules(self.ctx)
-        cmd = args[0].lower()
+        cmd = command.lower()
         for module in modules:
             command = getattr(
                 module,
@@ -561,7 +469,6 @@ class ControlCommands(Commands):
             )
             if command:
                 break
-        kwargs["args"] = args[1:]
         start = time.time()
         await command(message=message, **kwargs)
         end = time.time()
@@ -572,211 +479,6 @@ class ControlCommands(Commands):
                 f"took **{tot}** seconds to execute."
             )
         )
-
-    @owner_only
-    @no_log
-    async def cmd_toggle(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """
-        :param message: The message which triggered this command.
-        :type message: :class:`discord.Message`
-        :param args: The property to toggle and to which state.
-        :type args: List[property: str, state: Optional[str]]
-
-        .. meta::
-            :description: Toggle a boolean property of the PokeGambler class.
-
-        .. rubric:: Syntax
-        .. code:: coffee
-
-            /toggle property [state]
-
-        .. rubric:: Description
-
-        ``👑 Owner Command``
-        Toggle some of the config options dynamically.
-        Currently, the supported properties are:
-
-            * guildmode
-
-            * channelmode
-
-        The available states are:
-
-            * enable/on/whitelist
-
-            * disable/off/blacklist
-
-        .. warning::
-
-            This command will be deprecated in the future.
-
-        .. rubric:: Examples
-
-        To switch the channel mode
-
-        .. code:: coffee
-            :force:
-
-            /toggle channelmode
-
-        To switch the guild mode to whitelist mode
-
-        .. code:: coffee
-            :force:
-
-            /toggle guildmode whitelist
-        """
-        props = {
-            "Channel_Mode": "channel_mode",
-            "Guild_Mode": "guild_mode",
-            "Owner_Mode": "owner_mode"
-        }
-        if args:
-            if len(args) >= 2:
-                prop = args[0].title()
-                state = args[1].lower()
-            elif len(args) == 1:
-                prop = args[0].title()
-                state = None
-        else:
-            await message.channel.send(
-                embed=get_enum_embed(
-                    list(props),
-                    title="List of Possible Options"
-                )
-            )
-            return
-        if prop not in list(props):
-            await message.channel.send(
-                embed=get_enum_embed(
-                    list(props),
-                    title="List of Possible Options"
-                )
-            )
-            return
-        bool_toggles = ["enable", "on", "disable", "off"]
-        str_toggles = ["whitelist", "blacklist"]
-        possible_states = bool_toggles + str_toggles
-        if state in bool_toggles:
-            state = bool_toggles.index(state) < 2
-        elif state in str_toggles:
-            if prop not in ["Guild_Mode", "Channel_Mode"]:
-                await message.channel.send(
-                    embed=get_enum_embed(
-                        list(props)[2:4],
-                        title="List of Possible Options"
-                    )
-                )
-                return
-        elif state is None:
-            if getattr(self.ctx, props[prop], None) not in [
-                "whitelist", "blacklist"
-            ]:
-                state = not getattr(self.ctx, props[prop])
-            else:
-                state = str_toggles[
-                    1 - str_toggles.index(
-                        getattr(self.ctx, props[prop])
-                    )
-                ]
-        else:
-            embed = get_enum_embed(
-                possible_states,
-                title="Possible toggle states"
-            )
-            await message.channel.send(embed=embed)
-            return
-        setattr(self.ctx, props[prop], state)
-        await message.channel.send(
-            embed=get_embed(
-                f"Successfully toggled **{prop}** to `{str(state).title()}`."
-            )
-        )
-
-    @owner_only
-    @no_log
-    @alias('tgl_mod_st')
-    async def cmd_toggle_module_state(
-        self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
-    ):
-        """
-        :param message: The message which triggered this command.
-        :type message: :class:`discord.Message`
-        :param args: The command module to toggle and to which state.
-        :type args: List[module: str, state: Optional[str]]
-
-        .. meta::
-            :description: Enable or Disable different command modules.
-            :aliases: tgl_mod_st
-
-        .. rubric:: Syntax
-        .. code:: coffee
-
-            /toggle_module_state module_name state
-
-        .. rubric:: Description
-
-        ``👑 Owner Command``
-        Enable or disable (eg. during maintenance) a command module.
-        The available states are:
-
-            * on/enable
-
-            * off/disable
-
-        .. rubric:: Examples
-
-        To enable the Controlcommands module
-
-        .. code:: coffee
-            :force:
-
-            /tgl_mod_st control on
-
-        To disable the Normalcommands module
-
-        .. code:: coffee
-            :force:
-
-            /tgl_mod_st normal off
-        """
-        if args:
-            if len(args) >= 2:
-                module = args[0].lower()
-                state = args[1].lower()
-            elif len(args) == 1:
-                module = args[0].lower()
-                state = "enable"
-        else:
-            module = ""
-            state = "enable"
-        possible_states = ["enable", "on", "disable", "off"]
-        if state in possible_states:
-            enable = possible_states.index(state) < 2
-        else:
-            embed = get_enum_embed(
-                possible_states,
-                title="Possible toggle states"
-            )
-            await message.channel.send(embed=embed)
-        possible_modules = self.__possible_modules
-        if module not in possible_modules:
-            embed = get_enum_embed(
-                possible_modules,
-                title="List of toggleable modules"
-            )
-            await message.channel.send(embed=embed)
-        else:
-            getattr(self.ctx, f"{module}commands").enabled = enable
-            await message.channel.send(
-                embed=get_embed(f"Successfully switched {module} to {state}.")
-            )
 
     @property
     def __possible_modules(self):

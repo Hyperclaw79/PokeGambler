@@ -42,7 +42,7 @@ from ..helpers.utils import (
     img2file, wait_for, dm_send
 )
 from ..helpers.validators import (
-    MaxLengthValidator, MinValidator,
+    ItemNameValidator, MinValidator,
     RegexValidator
 )
 from .basecommand import (
@@ -152,8 +152,8 @@ class DuelCommands(Commands):
 
         .. admonition:: Actions
 
-            * **Normal**: Damage < 150, Costs: 200 Pokechips
-            * **Critical**: Damage > 150, Costs: 300 Pokechips
+            1. **Normal**: Damage < 150, Costs: 200 Pokechips
+            2. **Critical**: Damage > 150, Costs: 300 Pokechips
         """
         levels = ["Normal", "Critical"]
         desc_info = [
@@ -266,17 +266,19 @@ class DuelCommands(Commands):
     @alias(["fight", "gladiator", "battle"])
     async def cmd_duel(
         self, message: Message,
-        args: Optional[List] = None,
-        mentions: List[Member] = None,
+        opponent: Member,
+        chips: Optional[int] = 50,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[chips: Optional[int]]
-        :param mentions: User mentions.
-        :type mentions: List[:class:`discord.Member`]
+        :param opponent: The user to duel against
+        :type opponent: :class:`discord.Member`
+        :param chips: Amount of Pokechips to bet on the duel.
+        :type chips: Optional[int]
+        :default chips: 50
+        :min_value chips: 50
 
         .. meta::
             :description: 1v1 Gladiator duels
@@ -285,7 +287,7 @@ class DuelCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /duel [chips] @player
+            /duel opponent:@player [chips:amount]
 
         .. rubric:: Description
 
@@ -306,16 +308,16 @@ class DuelCommands(Commands):
         .. code:: coffee
             :force:
 
-            /duel @ABCD#1234
+            /duel opponent:@ABCD#1234
 
         * To battle user EFGH#5678 for 50,000 chips
 
         .. code:: coffee
             :force:
 
-            /duel @EFGH#5678 50000
+            /duel opponent:@EFGH#5678 chips:50000
         """
-        if not mentions or mentions[0].id == message.author.id:
+        if not opponent or opponent.id == message.author.id:
             await dm_send(
                 message, message.author,
                 embed=get_embed(
@@ -326,7 +328,7 @@ class DuelCommands(Commands):
             )
             return
         user_profile = Profiles(message.author)
-        amount = await self.__duel_get_cost(message, user_profile, args)
+        amount = await self.__duel_get_cost(message, user_profile, chips)
         if not amount:
             return
         gladiator1 = await self.__duel_get_gladiator(
@@ -334,10 +336,9 @@ class DuelCommands(Commands):
         )
         if not gladiator1:
             return
-        user2 = mentions[0]
         na_checks = [
-            user2.bot,
-            Blacklist.is_blacklisted(user2.id)
+            opponent.bot,
+            Blacklist.is_blacklisted(opponent.id)
         ]
         if any(na_checks):
             reasons = [
@@ -356,21 +357,21 @@ class DuelCommands(Commands):
                 )
             )
             return
-        other_profile = Profiles(user2)
+        other_profile = Profiles(opponent)
         confirmed = await self.__duel_confirmation(
-            message, user2,
+            message, opponent,
             amount, other_profile
         )
         if not confirmed:
             return
         gladiator2 = await self.__duel_get_gladiator(
-            message, user2, other_profile,
+            message, opponent, other_profile,
             notify=False
         )
         if not gladiator2:
             await message.channel.send(
                 embed=get_embed(
-                    f"Gladiator Match cancelled cause **{user2.name}**"
+                    f"Gladiator Match cancelled cause **{opponent.name}**"
                     " has no gladiator.",
                     embed_type="warning",
                     title="Duel cancelled."
@@ -378,7 +379,7 @@ class DuelCommands(Commands):
             )
             return
         proceed = await self.__duel_proceed(
-            message, user2, other_profile,
+            message, opponent, other_profile,
             gladiator2, amount
         )
         if proceed:
@@ -444,8 +445,7 @@ class DuelCommands(Commands):
             ]),
             timeout="inf"
         )
-        proceed = await MaxLengthValidator(
-            10,
+        proceed = await ItemNameValidator(
             message=message,
             on_error={
                 "title": "Invalid Nickname",
@@ -511,15 +511,15 @@ class DuelCommands(Commands):
     async def __duel_get_cost(
         self, message: Message,
         user_profile: Profiles,
-        args: Optional[List] = None
+        chips: int = None
     ) -> int:
-        if args:
+        if chips:
             proceed = await MinValidator(
                 50, message=message
-            ).validate(args[0])
+            ).validate(chips)
             if not proceed:
                 return 0
-            amount = int(args[0])
+            amount = int(chips)
         else:
             amount = 50
             if user_profile.get('balance') >= 50:
@@ -565,8 +565,7 @@ class DuelCommands(Commands):
             return None
         available = []
         for glad in glads['Gladiator']:
-            itemid = inv.from_name(name=glad['name'])[0]
-            gld = Item.from_id(itemid)
+            gld = Item.from_id(glad['_id'])
             available.append(gld)
         if len(available) > 1:
             choices_view = SelectView(

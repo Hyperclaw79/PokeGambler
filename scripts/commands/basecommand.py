@@ -71,7 +71,8 @@ def admin_only(func: Callable):
     def wrapped(self, message, *args, **kwargs):
         if any([
             is_admin(message.author),
-            is_owner(self.ctx, message.author)
+            is_owner(self.ctx, message.author),
+            self.ctx.is_local
         ]):
             async def func_with_callback(
                 self, *args, message=message, **kwargs
@@ -126,7 +127,8 @@ def dealer_only(func: Callable):
     def wrapped(self, message, *args, **kwargs):
         if any([
             is_dealer(message.author),
-            is_owner(self.ctx, message.author)
+            is_owner(self.ctx, message.author),
+            self.ctx.is_local
         ]):
             return func(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", "/")
@@ -214,17 +216,17 @@ def cache_images(func: Callable):
 
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        user = kwargs.get("selected_user", message.author)
+        user = kwargs.get("user", message.author)
         if (
             user.id not in func.__dict__["image_cache"]
             or func.__dict__["image_cache"][user.id].kwargs != kwargs
         ):
             cache = func.__dict__["image_cache"]
             cache.update({
-                user.id: ImageCacher(
-                    user=user,
-                    **kwargs
-                )
+                user.id: ImageCacher(**{
+                    **kwargs,
+                    "user": user
+                })
             })
             if user.id not in Commands.caches:
                 Commands.caches.update({user.id: []})
@@ -307,28 +309,6 @@ def ctx_command(func: Callable):
     return wrapped
 
 
-def ensure_args(func: Callable):
-    '''Ensure that the command has arguments paased to it.
-
-    :param func: The command to be decorated.
-    :type func: Callable
-    :return: The decorated function.
-    :rtype: Callable
-    '''
-    @wraps(func)
-    def wrapped(self, message, *args, **kwargs):
-        if not kwargs.get("args"):
-            return message.channel.send(
-                embed=get_embed(
-                    "Please provide arguments to this command.",
-                    embed_type="error",
-                    title="Missing Arguments"
-                )
-            )
-        return func(self, *args, message=message, **kwargs)
-    return wrapped
-
-
 def ensure_item(func: Callable):
     '''Make sure that the Item with the given ID exists already.
 
@@ -339,8 +319,7 @@ def ensure_item(func: Callable):
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        args = kwargs.pop("args", None)
-        if not args:
+        if not kwargs.get("itemid", None):
             return message.channel.send(
                 embed=get_embed(
                     "You need to provide am Item ID.",
@@ -350,7 +329,7 @@ def ensure_item(func: Callable):
             )
         if not HexValidator(
             message=message
-        ).check(args[0]):
+        ).check(kwargs["itemid"]):
             return message.channel.send(
                 embed=get_embed(
                     "You need to provide a valid item ID.",
@@ -358,7 +337,7 @@ def ensure_item(func: Callable):
                     title="Invalid ID"
                 )
             )
-        item = Item.from_id(args[0])
+        item = Item.from_id(kwargs["itemid"])
         if not item:
             return message.channel.send(
                 embed=get_embed(
@@ -368,9 +347,7 @@ def ensure_item(func: Callable):
                 )
             )
         kwargs["item"] = item
-        kwargs["args"] = args
-        args = []
-        return func(self, *args, message=message, **kwargs)
+        return func(self, message=message, **kwargs)
     return wrapped
 
 
@@ -384,7 +361,7 @@ def ensure_user(func: Callable):
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
-        if not kwargs.get("args"):
+        if not kwargs.get("user_id", None):
             return message.channel.send(
                 embed=get_embed(
                     "You need to provide a user ID.",
@@ -394,7 +371,7 @@ def ensure_user(func: Callable):
             )
         if not IntegerValidator(
             message=message
-        ).check(kwargs["args"][0]):
+        ).check(kwargs["user_id"]):
             return message.channel.send(
                 embed=get_embed(
                     "You need to provide a valid user ID.",
@@ -402,7 +379,7 @@ def ensure_user(func: Callable):
                     title="Invalid ID"
                 )
             )
-        if not message.guild.get_member(int(kwargs["args"][0])):
+        if not message.guild.get_member(int(kwargs["user_id"])):
             return message.channel.send(
                 embed=get_embed(
                     "Unable to fetch this user.\n"
@@ -411,58 +388,6 @@ def ensure_user(func: Callable):
                     title="Invalid User"
                 )
             )
-        return func(self, *args, message=message, **kwargs)
-    return wrapped
-
-
-def get_chan(func: Callable):
-    '''Gets the active channel if there's one present.
-    Else returns the message channel.
-
-    :param func: The command to be decorated.
-    :type func: Callable
-    :return: The decorated function.
-    :rtype: Callable
-    '''
-    @wraps(func)
-    def wrapped(self, message, *args, **kwargs):
-        if kwargs.get("channel"):
-            chan = kwargs["channel"]
-        elif kwargs.get("chan"):
-            chan = kwargs["chan"]
-        elif self.ctx.active_channels:
-            chan = self.ctx.active_channels[-1]
-        else:
-            chan = message.channel
-        kwargs.update({'chan': chan})
-        return func(self, *args, message=message, **kwargs)
-    return wrapped
-
-
-def get_user(func: Callable):
-    '''Gets the mentioned user.
-    Defaults to the message author.
-
-    :param func: The command to be decorated.
-    :type func: Callable
-    :return: The decorated function.
-    :rtype: Callable
-    '''
-    @wraps(func)
-    def wrapped(self, message, *args, **kwargs):
-        if args or kwargs.get("args"):
-            uid = int(
-                args[0] if args
-                else kwargs["args"][0]
-            )
-            user = self.ctx.get_guild(
-                self.ctx.official_server
-            ).get_member(uid)
-        elif kwargs["mentions"]:
-            user = kwargs["mentions"][0]
-        else:
-            user = message.author
-        kwargs.update({'selected_user': user})
         return func(self, *args, message=message, **kwargs)
     return wrapped
 
@@ -620,10 +545,16 @@ def os_only(func: Callable):
 # endregion
 
 
-async def get_profile(message: Message, user: Union[int, str, Member]):
+async def get_profile(
+    ctx: PokeGambler,
+    message: Message,
+    user: Union[int, str, Member]
+) -> Profiles:
     """Retrieves the Profile for a user (creates for new users).
     If the user is not found in the guild, returns None.
 
+    :param ctx: The PokeGambler bot class.
+    :type ctx: :class:`bot.PokeGambler`
     :param message: The message that triggered the command.
     :type message: :class:`discord.Message`
     :param user: The user to get the Profile for.
@@ -633,7 +564,12 @@ async def get_profile(message: Message, user: Union[int, str, Member]):
     """
     try:
         if isinstance(user, (int, str)):
-            user = message.guild.get_member(user)
+            user = message.guild.get_member(int(user))
+            if not user:
+                official_guild = ctx.get_guild(
+                    int(ctx.official_server)
+                )
+                user = official_guild.get_member(int(user))
             if not user:
                 await message.channel.send(
                     embed=get_embed(

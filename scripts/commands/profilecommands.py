@@ -37,7 +37,7 @@ from ..base.models import (
     Matches, Minigame, Profiles, Votes
 )
 from ..base.shop import BoostItem
-from ..base.views import LinkView
+from ..base.views import LinkView, SelectView
 
 from ..helpers.checks import user_check
 from ..helpers.imageclasses import (
@@ -52,8 +52,8 @@ from ..helpers.utils import (
 from ..helpers.validators import HexValidator, ImageUrlValidator
 
 from .basecommand import (
-    Commands, alias, check_completion, cache_images, cooldown, get_user,
-    model, get_profile, needs_ticket
+    Commands, alias, check_completion, cache_images,
+    cooldown, model, get_profile, needs_ticket
 )
 
 if TYPE_CHECKING:
@@ -158,7 +158,7 @@ class ProfileCommands(Commands):
 
         Check the list of available badges and what all you have unlocked.
         """
-        profile = await get_profile(message,  message.author)
+        profile = await get_profile(self.ctx, message, message.author)
         badges = profile.get_badges()
         badgestrip = self.bdgen.get(badges)
         discord_file = img2file(badgestrip, "badges.png", ext="PNG")
@@ -189,7 +189,7 @@ class ProfileCommands(Commands):
         Quickly check how many {pokechip_emoji} you have.
         """
         profile = (
-            await get_profile(message,  message.author)
+            await get_profile(self.ctx, message, message.author)
         ).get()
         data = {
             key: (
@@ -543,7 +543,7 @@ class ProfileCommands(Commands):
     @alias("lb")
     async def cmd_leaderboard(
         self, message: Message,
-        args: Optional[List] = None,
+        sort_by: Optional[str] = "Balance",
         **kwargs
     ):
 
@@ -552,8 +552,10 @@ class ProfileCommands(Commands):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: List of arguments for the command.
-        :type args: List[sort_by: Optional[str]]
+        :param sort_by: The field to sort by.
+        :type sort_by: Optional[str]
+        :choices sort_by: [Balance, Minigame]
+        :default sort_by: Balance
 
         .. meta::
             :description: Check the global leaderboard.
@@ -562,7 +564,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /leaderboard ["balance"/minigame]
+            /leaderboard [sort_by:Balance/Minigame]
 
         .. rubric:: Description
 
@@ -584,86 +586,43 @@ class ProfileCommands(Commands):
         .. code:: coffee
             :force:
 
-            /leaderboard balance
+            /leaderboard sort_by:Balance
 
         * To check the leaderboard for QuickFlip
 
         .. code:: coffee
             :force:
 
-            /leaderboard flip
+            /leaderboard sort_by:Minigame
         """
-        with LineTimer(self.logger, "Get Leaderboards"):
-            if args and not args[0].lower().startswith("bal"):
-                lbrd = self.__lb_get_minigame_lb(
-                    args[0].lower(),
-                    message.author
-                )
-                if lbrd is None:
-                    await message.reply(
-                        embed=get_embed(
-                            "You can choose a minigame name or 'balance'.",
-                            embed_type="error",
-                            title="Invalid Input"
-                        )
-                    )
-                    return
-                leaderboard = []
-                lbrd = [
-                    {
-                        "member": (
-                            message.guild.get_member(int(res["_id"]))
-                            or self.ctx.get_guild(
-                                self.ctx.official_server
-                            ).get_member(int(res["_id"]))
-                        ),
-                        **res,
-                        "rank": idx + 1
-                    }
-                    for idx, res in enumerate(lbrd)
-                    if (
-                        message.guild.get_member(int(res["_id"]))
-                        or self.ctx.get_guild(
-                            self.ctx.official_server
-                        ).get_member(int(res["_id"]))
-                    )
-                ]
-                for res in lbrd:
-                    profile = Profiles(res["member"]).get()
-                    balance = res.get("earned", 0) or profile["balance"]
-                    name = profile["name"]
-                    leaderboard.append({
-                        "rank": res["rank"],
-                        "user_id": res["_id"],
-                        "name": name,
-                        "num_matches": res["num_matches"],
-                        "num_wins": res["num_wins"],
-                        "balance": balance
-                    })
-            else:
-                sort_by = [
-                    "num_wins", "num_matches"
-                ] if not args else ["balance"]
-                leaderboard = Profiles.get_leaderboard(
-                    sort_by=sort_by
-                )
-            if not leaderboard:
-                await message.reply(
-                    embed=get_embed(
-                        "No matches were played yet.",
-                        embed_type="warning"
-                    )
-                )
+        if sort_by == "Minigame":
+            leaderboard = await self.__lb_handle_mg_input(message)
+            if leaderboard is None:
                 return
-            lbd = []
-            idx = 0
-            for data in leaderboard:
-                if not self.ctx.get_user(int(data["user_id"])):
-                    continue
-                data["rank"] = idx + 1
-                data["balance"] = f'{data["balance"]:,}'
-                lbd.append(data)
-                idx += 1
+        else:
+            sort_by = [
+                "num_wins", "num_matches"
+            ] if not sort_by else ["balance"]
+            leaderboard = Profiles.get_leaderboard(
+                sort_by=sort_by
+            )
+        if not leaderboard:
+            await message.reply(
+                embed=get_embed(
+                    "No matches were played yet.",
+                    embed_type="warning"
+                )
+            )
+            return
+        lbd = []
+        idx = 0
+        for data in leaderboard:
+            if not self.ctx.get_user(int(data["user_id"])):
+                continue
+            data["rank"] = idx + 1
+            data["balance"] = f'{data["balance"]:,}'
+            lbd.append(data)
+            idx += 1
         embeds = []
         files = []
         with LineTimer(self.logger, "Create Leaderboard Images"):
@@ -785,20 +744,18 @@ class ProfileCommands(Commands):
 
     @model([Profiles, Blacklist])
     @alias("pr")
-    @get_user
     @cache_images
     async def cmd_profile(
         self, message: Message,
-        args: Optional[List] = None,
+        user: Optional[discord.Member] = None,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The arguments for the command.
-        :type args: List[user_id: Optional[int]]
-        :param mentions: User mentions.
-        :type mentions: List[Optional[:class:`discord.Member`]]
+        :param user: The user to get the profile of.
+        :type user: Optional[:class:`discord.Member`]
+        :default user: Author of the Message
 
         .. meta::
             :description: Get the profile of a user.
@@ -807,7 +764,7 @@ class ProfileCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /profile [id/mention]
+            /profile [user:@User]
 
         .. rubric:: Description
 
@@ -828,17 +785,18 @@ class ProfileCommands(Commands):
         .. code:: coffee
             :force:
 
-            /pr @Alan#1234
+            /profile user:@Alan#1234
 
         * To check profile of user with ID 12345
 
         .. code:: coffee
             :force:
 
-            /profile 12345
+            /profile user:12345
         """
-        user = kwargs["selected_user"]
-        profile = await get_profile(message, user)
+        if user is None:
+            user = message.author
+        profile = await get_profile(self.ctx, message, user)
         if not profile:
             return
         badges = profile.get_badges()
@@ -890,6 +848,7 @@ class ProfileCommands(Commands):
         """
         with LineTimer(self.logger, "Get Profile"):
             profile = await get_profile(
+                self.ctx,
                 message,
                 message.author
             )
@@ -1115,6 +1074,61 @@ class ProfileCommands(Commands):
             return None
         return reply.content
 
+    async def __lb_handle_mg_input(self, message):
+        mg_view = SelectView(
+            heading="Choose the Minigame",
+            options={
+                mg.__name__: ""
+                for mg in Minigame.__subclasses__()
+            },
+            no_response=True,
+            check=lambda x: x.user.id == message.author.id
+        )
+        await message.channel.send(
+            content="Which minigame do you need the Leaderboard for?",
+            view=mg_view
+        )
+        await mg_view.dispatch(self)
+        if mg_view.result is None:
+            return
+        lbrd = self.__lb_get_minigame_lb(
+            mg_view.result.lower(),
+            message.author
+        )
+        leaderboard = []
+        lbrd = [
+            {
+                "member": (
+                    message.guild.get_member(int(res["_id"]))
+                    or self.ctx.get_guild(
+                        self.ctx.official_server
+                    ).get_member(int(res["_id"]))
+                ),
+                **res,
+                "rank": idx + 1
+            }
+            for idx, res in enumerate(lbrd)
+            if (
+                message.guild.get_member(int(res["_id"]))
+                or self.ctx.get_guild(
+                    self.ctx.official_server
+                ).get_member(int(res["_id"]))
+            )
+        ]
+        for res in lbrd:
+            profile = Profiles(res["member"]).get()
+            balance = res.get("earned", 0) or profile["balance"]
+            name = profile["name"]
+            leaderboard.append({
+                "rank": res["rank"],
+                "user_id": res["_id"],
+                "name": name,
+                "num_matches": res["num_matches"],
+                "num_wins": res["num_wins"],
+                "balance": balance
+            })
+        return leaderboard
+
     def __lb_get_minigame_lb(self, mg_name: str, user: Member) -> List[Dict]:
         def _commands(module):
             return [
@@ -1136,8 +1150,15 @@ class ProfileCommands(Commands):
             leaderboard = None
             for module in modules:
                 possibilities = _aliases(module) + _commands(module)
-                if mg_name in possibilities:
-                    command = getattr(module, f"cmd_{mg_name}")
+                if any([
+                    mg_name in possibilities,
+                    mg_name.rstrip('s') in possibilities
+                ]):
+                    command = getattr(
+                        module,
+                        f"cmd_{mg_name}",
+                        getattr(module, f"cmd_{mg_name.rstrip('s')}")
+                    )
                     models = getattr(command, "models", [])
                     if not models:
                         continue

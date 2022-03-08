@@ -22,7 +22,8 @@ Normal Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
-from typing import Callable, List, Optional, TYPE_CHECKING
+import re
+from typing import Callable, Optional, TYPE_CHECKING
 
 import discord
 
@@ -48,16 +49,18 @@ class NormalCommands(Commands):
     @alias("cmds")
     async def cmd_commands(
         self, message: Message,
-        args: Optional[List] = None,
+        module: Optional[str] = None,
+        role: Optional[discord.Role] = None,
         **kwargs
     ):
         """
         :param message: The messag which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The arguments for this command.
-        :type args: List[role: Optional[str]]
-        :param kwargs: Extra keyword arguments for this command.
-        :type kwargs: Dict[module: Optional[str]]
+        :param module: The module to show commands for.
+        :type module: Optional[str]
+        :choices module: [Profile, Gamble, Duel, Normal, Trade, Control, Admin]
+        :param role: The role to show commands for. (None/Admin/Owner)
+        :type role: Optional[:class:`discord.Role`]
 
         .. meta::
             :description: Lists all usable commands for the user.
@@ -66,7 +69,7 @@ class NormalCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /commands [role] [--module name]
+            /commands [role:Role] [module:name]
 
         .. rubric:: Description
 
@@ -90,48 +93,51 @@ class NormalCommands(Commands):
         .. code:: coffee
             :force:
 
-            /commands admin
+            /commands role:admin
 
         * To check only profile commands
 
         .. code:: coffee
             :force:
 
-            /commands --module profile
+            /commands module:Profile
         """
         modules = get_modules(self.ctx)
-        if kwargs.get("module"):
+        if module:
             modules = [
                 mod
                 for mod in modules
                 if mod.__class__.__name__.lower().startswith(
-                    kwargs["module"].lower()
+                    module.lower()
                 )
             ]
         command_dict = {
             module.__class__.__name__.replace(
                 "Commands", " Commands"
-            ): get_commands(self.ctx, message.author, module, args)
+            ): get_commands(
+                self.ctx, message.author,
+                module, [str(role) if role else None]
+            )
             for module in modules
         }
         if set(command_dict.values()) == {''}:
             await message.reply(
                 embed=get_embed(
-                    "Did not find ant commands for the given query.",
+                    "Did not find any commands for the given query.",
                     embed_type="warning",
                     title="No Commands found"
                 )
             )
             return
         embed = get_embed(
-            "Use `/help [command name]` for details",
+            "Use `/help command:name` for details",
             title="PokeGambler Commands List"
         )
         embed_all = embed.copy()
         info_dict = {}
         for key, val in command_dict.items():
             if val:
-                if not kwargs.get("module"):
+                if not module:
                     emb_new = embed.copy()
                     emb_new.add_field(
                         name=key,
@@ -142,7 +148,7 @@ class NormalCommands(Commands):
                     name=key,
                     value=f"**```fix\n{val}\n```**"
                 )
-        if not kwargs.get("module"):
+        if not module:
             info_dict["All Commands"] = embed_all
             morpher = MorphView(info_dict=info_dict)
             await message.reply(embed=embed, view=morpher)
@@ -153,14 +159,14 @@ class NormalCommands(Commands):
     @alias("?")
     async def cmd_help(
         self, message: Message,
-        args: Optional[List] = None,
+        command: Optional[str] = None,
         **kwargs
     ):
         """
         :param message: The messag which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The arguments for this command.
-        :type args: List[command: Optional[str]]
+        :param command: The command to get help for.
+        :type command: Optional[str]
 
         .. meta::
             :description: What did you expect? This is just the Help command.
@@ -169,7 +175,7 @@ class NormalCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /help [command]
+            /help [command:name]
 
         .. rubric:: Description
 
@@ -184,7 +190,7 @@ class NormalCommands(Commands):
         .. code:: coffee
             :force:
 
-            /help profile
+            /help command:profile
 
         * To view help for all the commands
 
@@ -213,19 +219,19 @@ class NormalCommands(Commands):
             }
         )
 
-        if args:
+        if command:
             commands = [
                 cmd
                 for cmd in commands
                 if any([
-                    cmd.__name__ == f"cmd_{args[0].lower()}",
-                    args[0].lower() in getattr(cmd, "alias", [])
+                    cmd.__name__ == f"cmd_{command.lower()}",
+                    command.lower() in getattr(cmd, "alias", [])
                 ])
             ]
             if not commands:
                 await message.reply(
                     embed=get_embed(
-                        f"There's no command called **{args[0].title()}**\n"
+                        f"There's no command called **{command.title()}**\n"
                         "Or you don't have access to it.",
                         embed_type="error"
                     )
@@ -234,7 +240,7 @@ class NormalCommands(Commands):
         embeds = []
         for cmd in commands:
             emb = self.__help_generate_embed(
-                cmd, keep_footer=bool(args)
+                cmd, keep_footer=(command is not None)
             )
             embeds.append(emb)
         embeds.sort(key=lambda x: x.title)
@@ -357,9 +363,6 @@ class NormalCommands(Commands):
                 return emb
             got_doc = True
             doc_str = cmd.__doc__.replace(
-                "/",
-                "/"
-            ).replace(
                 "{pokechip_emoji}",
                 self.chip_emoji
             )
@@ -384,9 +387,13 @@ class NormalCommands(Commands):
         for key, val in meta.items():
             if val:
                 val = val.replace("  ", " ")
-                val = '\n'.join(
-                    m.lstrip()
-                    for m in val.split('\n')
+                val = re.sub(
+                    r'\\\|\\\|\~([^\\]+)\\\|\\\|',
+                    lambda x: x[1].split('.')[-1],
+                    '\n'.join(
+                        m.lstrip()
+                        for m in val.split('\n')
+                    )
                 )
                 emb.add_field(name=f"**{key}**", value=val, inline=False)
         if all([

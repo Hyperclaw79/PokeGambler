@@ -330,3 +330,17 @@ class UrlValidator(RegexValidator):
 
     def __init__(self, **kwargs):
         super().__init__(r'(?:http|https)://[^\s]+', **kwargs)
+
+
+class ItemNameValidator(RegexValidator):
+    """
+    Validates if a string is a valid item name.
+    """
+    #:
+    error_embed_title = "Invalid Item Name"
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))',
+            **kwargs
+        )

@@ -34,6 +34,7 @@ from typing import (
 )
 
 import discord
+from discord import Guild, Member, TextChannel, User, Role
 
 from ..base.items import Item, DB_CLIENT  # pylint: disable=cyclic-import
 
@@ -59,7 +60,8 @@ def expire_cache(func: Callable):
 def to_dict(
     dc_obj: Union[
         discord.User, discord.Guild,
-        discord.TextChannel
+        discord.TextChannel,
+        discord.Role
     ]
 ) -> Dict[str, Any]:
     """Convert a Discord object into a Dictionary.
@@ -68,7 +70,10 @@ def to_dict(
         Currently only supports User, Guild, and TextChannel.
 
     :param dc_obj: Discord object to be converted.
-    :type dc_obj: Union[discord.User, discord.Guild, discord.TextChannel]
+    :type dc_obj: Union[
+        :class:`discord.User`, :class:`discord.Guild`,
+        :class:`discord.TextChannel`,
+        :class:`discord.Role`]
     :return: Dictionary of Discord object.
     :rtype: Dict[str, Any]
     """
@@ -162,9 +167,10 @@ class Model(metaclass=NameSetter):
         :return: The attribute value.
         :rtype: Any
         """
-        if not param:
-            return dict(self)
-        return dict(self).get(param)
+        return (
+            dict(self) if not param
+            else dict(self).get(param)
+        )
 
     def save(self):
         """
@@ -317,6 +323,18 @@ class CommandData(Model):
         self.args = args
         self.kwargs = kwargs
 
+    def save(self):
+        """
+        Override Save to serialize Discord objects in args or kwargs.
+        """
+        for idx, arg in enumerate(self.args):
+            if isinstance(arg, (Guild, TextChannel, User, Member, Role)):
+                self.args[idx] = to_dict(arg)
+        for key, value in self.kwargs.items():
+            if isinstance(value, (Guild, TextChannel, User, Member, Role)):
+                self.kwargs[key] = to_dict(value)
+        super().save()
+
     @classmethod
     def history(cls, limit: Optional[int] = 5, **kwargs) -> List[Dict]:
         """Returns the list of commands used on PG till now.
@@ -326,7 +344,7 @@ class CommandData(Model):
         :return: The recorded commands from the DB.
         :rtype: List[Dict]
         """
-        return list(cls.mongo.find().limit(limit))
+        return list(cls.mongo.find(kwargs).sort("_id", -1).limit(limit))
 
     @classmethod
     def most_active_channel(cls) -> Dict:
@@ -505,8 +523,7 @@ class DuelActionsModel(Model):
             filter_["user_id"] = user_id
         if not cls.mongo.count_documents(filter_):
             return None
-        results = cls.mongo.find(filter_)
-        yield from results
+        yield from cls.mongo.find(filter_)
 
 
 class Exchanges(Model):
@@ -1219,7 +1236,7 @@ class Profiles(UnlockedModel):
         self.excludes = ['full_info']
         super().__init__(user)
         names = [self.user.name, self.name]
-        if self.user.nick:
+        if 'nick' in dir(self.user) and self.user.nick:
             names.append(self.user.nick)
         self.name = min(
             names,
@@ -1228,7 +1245,9 @@ class Profiles(UnlockedModel):
                 len(x)
             )
         )
-        if self.user.guild.id == int(os.getenv('OFFICIAL_SERVER')):
+        if 'guild' in dir(self.user) and self.user.guild.id == int(
+            os.getenv('OFFICIAL_SERVER')
+        ):
             if all([
                 "dealers" in [
                     role.name.lower()
@@ -1462,7 +1481,7 @@ class Profiles(UnlockedModel):
         :return: The leaderboard.
         :rtype: List[Dict]
         """
-        res = cls.mongo.aggregate([
+        yield from cls.mongo.aggregate([
             {
                 "$match": {"num_wins": {"$gte": 1}}
             },
@@ -1473,7 +1492,6 @@ class Profiles(UnlockedModel):
                 }
             }
         ])
-        yield from res
 
     @classmethod
     def reset_all(cls: Type[Profiles]):

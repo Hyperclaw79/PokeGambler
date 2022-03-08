@@ -689,13 +689,11 @@ def get_commands(
                     cmd not in getattr(module, "alias", []),
                     any([
                         role is None,
-                        all([
-                            role is not None,
-                            getattr(
-                                getattr(module, cmd),
-                                f"{role}_only", False
-                            )
-                        ])
+                        role is not None
+                        and getattr(
+                            getattr(module, cmd),
+                            f"{role.lower().rstrip('s')}_only", False
+                        )
                     ])
                 ])
             ],

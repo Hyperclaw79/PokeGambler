@@ -50,11 +50,11 @@ from ..helpers.utils import (
     get_embed, get_formatted_time, get_modules,
     is_admin, is_owner
 )
-from ..helpers.validators import HexValidator, MinMaxValidator, MinValidator
+from ..helpers.validators import HexValidator, MinMaxValidator
 
 from .basecommand import (
-    Commands, alias, check_completion, dealer_only,
-    ensure_args, ensure_item, model, os_only
+    Commands, alias, check_completion,
+    dealer_only, ensure_item, model, os_only
 )
 
 if TYPE_CHECKING:
@@ -73,19 +73,21 @@ class TradeCommands(Commands):
     }
 
     @model([Profiles, Loots, Inventory])
-    @ensure_args
     async def cmd_buy(
         self, message: Message,
-        args: Optional[List] = None,
+        itemid: str,
+        quantity: Optional[int] = 1,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[itemid: str]
-        :param kwargs: Extra keyword arguments for this command.
-        :type kwargs: Dict[quantity: int]
+        :param itemid: The ID of the item to buy.
+        :type itemid: str
+        :param quantity: The quantity of the item to buy.
+        :type quantity: Optional[int]
+        :min_value quantity: 1
+        :default quantity: 1
 
         .. meta::
             :description: Buy an item from the Shop.
@@ -93,7 +95,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /buy itemid [--quantity value]
+            /buy itemid:Id [quantity:number]
 
         .. rubric:: Description
 
@@ -109,18 +111,16 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /buy boost_lt
+            /buy itemid:boost_lt
 
         * To buy 10 items with ID 0000FFFF
 
         .. code:: coffee
             :force:
 
-            /buy 0000FFFF --quantity 10
+            /buy itemid:0000FFFF quantity:10
         """
-        itemid = args[0].lower()
-        quantity = int(kwargs.get('quantity', 1))
-        shop, item = await self.__buy_get_item(message, itemid)
+        shop, item = await self.__buy_get_item(message, itemid.lower())
         if item is None:
             return
         status = shop.validate(message.author, item, quantity)
@@ -167,7 +167,6 @@ class TradeCommands(Commands):
     @alias("cashin")
     async def cmd_deposit(
         self, message: Message,
-        args: Optional[List[str]] = None,
         **kwargs
     ):
         """
@@ -207,14 +206,13 @@ class TradeCommands(Commands):
     @alias(['item', 'detail'])
     async def cmd_details(  # pylint: disable=no-self-use
         self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
+        itemid: str, **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[itemid: str]
+        :param itemid: The ID of the item to get details for.
+        :type itemid: str
 
         .. meta::
             :description: Check the details of an Item.
@@ -223,7 +221,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /details itemid
+            /details itemid:Id
 
         .. rubric:: Description
 
@@ -242,7 +240,7 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /details 0000FFFF
+            /details itemid:0000FFFF
         """
         item = kwargs["item"]
         await message.reply(embed=item.details)
@@ -250,14 +248,14 @@ class TradeCommands(Commands):
     @alias("rates")
     async def cmd_exchange_rates(  # pylint: disable=no-self-use
         self, message: Message,
-        args: Optional[List] = None,
+        pokebot: Optional[str] = None,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[pokebot: str]
+        :param pokebot: The name of the Pokebot to get the rates for.
+        :type pokebot: Optional[str]
 
         .. meta::
             :description: Check the exchange rates of pokebot credits.
@@ -266,7 +264,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /exchange_rates [currency]
+            /exchange_rates [pokebot:Name]
 
         .. rubric:: Description
 
@@ -286,11 +284,11 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /rates pokétwo
+            /rates pokebot:pokétwo
         """
         enums = CurrencyExchange
-        if args:
-            res = enums[args[0]]
+        if pokebot:
+            res = enums[pokebot]
             if res is not enums.DEFAULT:
                 enums = [res]
         rates_str = '\n'.join(
@@ -310,17 +308,18 @@ class TradeCommands(Commands):
     @alias(["transfer", "pay"])
     async def cmd_give(
         self, message: Message,
-        args: Optional[List] = None,
-        mentions: Optional[List[Member]] = None,
+        chips: int,
+        user: discord.Member,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[amount: int]
-        :param mentions: User mentions
-        :type mentions: List[:class:`discord.Member`]
+        :param chips: The amount of chips to transfer.
+        :type chips: int
+        :min_value chips: 10
+        :param user: The user to transfer the chips to.
+        :type user: :class:`discord.Member`
 
         .. meta::
             :description: Transfer credits to other users.
@@ -329,7 +328,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /give amount @mention
+            /give chips:Amount user:@User
 
         .. rubric:: Description
 
@@ -346,9 +345,9 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /give 500 @ABCD#1234
+            /give chips:500 user:ABCD#1234
         """
-        error_tuple = self.__give_santize(message, args, mentions)
+        error_tuple = self.__give_santize(message, user, chips)
         if error_tuple:
             await message.reply(
                 embed=get_embed(
@@ -359,9 +358,8 @@ class TradeCommands(Commands):
             )
             return
         author_prof = Profiles(message.author)
-        mention_prof = Profiles(mentions[0])
-        amount = int(args[0])
-        if author_prof.get("balance") < amount:
+        mention_prof = Profiles(user)
+        if author_prof.get("balance") < chips:
             await message.reply(
                 embed=get_embed(
                     f"You don't have enough {self.chip_emoji}.",
@@ -370,33 +368,31 @@ class TradeCommands(Commands):
                 )
             )
             return
-        author_prof.debit(amount)
-        mention_prof.credit(amount)
+        author_prof.debit(chips)
+        mention_prof.credit(chips)
         Trades(
             message.author,
-            str(mentions[0].id), amount
+            str(user.id), chips
         ).save()
         await message.channel.send(
             embed=get_embed(
-                f"Amount transferred: **{amount}** {self.chip_emoji}"
-                f"\nRecipient: **{mentions[0]}**",
+                f"chips transferred: **{chips}** {self.chip_emoji}"
+                f"\nRecipient: **{user}**",
                 title="Transaction Successful",
                 color=author_prof.get('embed_color')
             )
         )
 
     @model(Inventory)
-    @ensure_args
     async def cmd_ids(
         self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
+        item_name: str, **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[item_name: str]
+        :param item_name: The name of the item to get IDs for.
+        :type item_name: str
 
         .. meta::
             :description: Check IDs of your items.
@@ -404,7 +400,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /ids item_name
+            /ids item_name:Name
 
         .. rubric:: Description
 
@@ -417,12 +413,11 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /ids Common Chest
+            /ids item_name:Common Chest
         """
-        item_name = " ".join(arg.title() for arg in args)
         ids = Inventory(
             message.author
-        ).from_name(item_name)
+        ).from_name(item_name.title())
         if not ids:
             await message.reply(
                 embed=get_embed(
@@ -497,10 +492,11 @@ class TradeCommands(Commands):
         await message.reply(embed=emb)
 
     @model([Loots, Profiles, Chest, Inventory])
-    @ensure_args
     async def cmd_open(
         self, message: Message,
-        args: Optional[List] = None,
+        itemid: Optional[str] = None,
+        item_name: Optional[str] = None,
+        quantity: Optional[int] = None,
         **kwargs
     ):
 
@@ -509,10 +505,13 @@ class TradeCommands(Commands):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The arguments for this command.
-        :type args: List[name#Can also be itemid.#: str]
-        :param kwargs: Extra keyword arguments for this command.
-        :type kwargs: Dict[quantity: Optional[int]]
+        :param itemid: The ID of the item to open.
+        :type itemid: Optional[str]
+        :param item_name: The name of the item to open.
+        :type item_name: Optional[str]
+        :param quantity: The number of items to open.
+        :type quantity: Optional[int]
+        :min_value quantity: 1
 
         .. meta::
             :description: Open a Treasure Chest, Lootbag or Reward Box.
@@ -520,7 +519,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /open itemid/chest name [--quantity value]
+            /open (itemid:Id or item_name:Name) [quantity:Number]
 
         .. rubric:: Description
 
@@ -558,23 +557,25 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /open common chest
+            /open item_name:common chest
 
         * To open 3 Gold Chests
 
         .. code:: coffee
             :force:
 
-            /open gold chest --quantity 3
+            /open item_name:gold chest quantity:3
 
         * To open a lootbag/reward box with ID 0000AAAA
 
         .. code:: coffee
             :force:
 
-            /open 0000AAAA
+            /open itemid:0000AAAA
         """
-        openables = self.__open_get_openables(message, args)
+        openables = self.__open_get_openables(
+            message, itemid, item_name, quantity
+        )
         if not openables:
             await message.reply(
                 embed=get_embed(
@@ -589,14 +590,14 @@ class TradeCommands(Commands):
     @model(Profiles)
     async def cmd_redeem_chips(
         self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
+        chips: int, **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[amount: int]
+        :param chips: The chips of chips to redeem.
+        :type chips: int
+        :min_value chips: 10
 
         .. meta::
             :description: Convert pokebonds to pokechips.
@@ -604,7 +605,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /redeem_chips amount
+            /redeem_chips chips:amount
 
         .. rubric:: Description
 
@@ -617,27 +618,17 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /redeem_chips 500
+            /redeem_chips chips:500
         """
-        valid = await MinValidator(
-            min_value=10, message=message,
-            on_null={
-                "title": "Invalid Amount",
-                "description": "You need to specify number of chips to redeem."
-            }
-        ).validate(args[0] if args else None)
-        if not valid:
-            return
-        if int(args[0]) % 10 != 0:
+        if chips % 10 != 0:
             await message.reply(
                 embed=get_embed(
                     "The number of chips must be a multiple of 10.",
                     embed_type="error",
-                    title="Invalid Amount"
+                    title="Invalid chips"
                 )
             )
             return
-        chips = int(args[0])
         profile = Profiles(message.author)
         if profile.get("pokebonds") < chips // 10:
             await message.reply(
@@ -661,19 +652,24 @@ class TradeCommands(Commands):
         )
 
     @model([Profiles, Item, Inventory])
-    @ensure_args
     async def cmd_sell(
         self, message: Message,
-        args: Optional[List] = None,
+        itemid: Optional[str] = None,
+        item_name: Optional[str] = None,
+        quantity: Optional[int] = 1,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[itemid: str]
-        :param kwargs: Extra arguments for this command.
-        :type kwargs: Dict[quantity: Optional[int]]
+        :param itemid: The ID of the item to sell.
+        :type itemid: Optional[str]
+        :param item_name: The name of the item to sell.
+        :type item_name: Optional[str]
+        :param quantity: The quantity of the item to sell.
+        :type quantity: Optional[int]
+        :min_value quantity: 1
+        :default quantity: 1
 
         .. meta::
             :description: Sells item from inventory.
@@ -681,7 +677,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /sell itemid/name [--quantity value]
+            /sell (itemid:Id or item_name:Name) [quantity:value]
 
         .. rubric:: Description
 
@@ -693,6 +689,10 @@ class TradeCommands(Commands):
 
             :class:`~scripts.base.items.Tradable` items aren't yet implemented.
 
+        .. note::
+
+            Quantity option is ignored if itemid is provided. Only one is sold.
+
         .. rubric:: Examples
 
         * To sell an item with ID 0000FFFF
@@ -700,20 +700,19 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /sell 0000FFFF
+            /sell itemid:0000FFFF
 
         * To sell 10 Gears (Tradables)
 
         .. code:: coffee
             :force:
 
-            /sell Gear --quantity 10
+            /sell item_name:Gear quantity:10
         """
         # pylint: disable=no-member
         inventory = Inventory(message.author)
-        try:
-            itemid = args[0]
-            item = inventory.from_id(args[0])
+        if itemid is None:
+            item = inventory.from_id(itemid)
             if not item:
                 await message.reply(
                     embed=get_embed(
@@ -734,11 +733,20 @@ class TradeCommands(Commands):
                 )
                 return
             deleted = inventory.delete(itemid, 1)
-        except ValueError:  # Item Name
-            quantity = int(kwargs.get('quantity', 1))
-            name = args[0].title()
-            new_item = Item.from_name(name)
-            deleted = inventory.delete(name, quantity, is_name=True)
+        elif item_name is None:
+            new_item = Item.from_name(item_name)
+            deleted = inventory.delete(
+                item_name, quantity, is_name=True
+            )
+        else:
+            await message.reply(
+                embed=get_embed(
+                    "You should mention either an Item ID or a name.",
+                    embed_type="error",
+                    title="Invalid Item"
+                )
+            )
+            return
         if deleted == 0:
             await message.reply(
                 embed=get_embed(
@@ -773,16 +781,18 @@ class TradeCommands(Commands):
     @model([Item, Profiles])
     async def cmd_shop(
         self, message: Message,
-        args: Optional[List] = None,
+        category: Optional[str] = None,
+        premium: Optional[bool] = False,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[category: Optional[str]]
-        :param kwargs: Extra arguments for this command.
-        :type kwargs: Dict[premium: Optional[bool]]]
+        :param category: The category of items to display.
+        :type category: Optional[str]
+        :param premium: Whether to display premium items.
+        :type premium: Optional[bool]
+        :default premium: False
 
         .. meta::
             :description: Access the PokeGambler Shop.
@@ -790,14 +800,14 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /shop [category] [--premium]
+            /shop [category:Name] [premium:True/False]
 
         .. rubric:: Description
 
         Used to access the PokeGambler :class:`~scripts.base.shop.Shop`.
-        If no arguments are provided, a list of categories will be displayed.
         If a category is provided, list of items will be shown.
-        To access the Premium shop, use the kwarg ``--premium`` at the end.
+        Otherwise a list of categories will be displayed.
+        To access the secret shop, use the Premium option.
 
         .. note::
 
@@ -817,18 +827,18 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /shop titles
+            /shop category:Titles
 
         * To view the Premium shop for Gladiators
 
         .. code:: coffee
             :force:
 
-            /shop gladiators --premium
+            /shop category:Gladiators premium:True
         """
         shop = Shop
         profile = Profiles(message.author)
-        if kwargs.get('premium'):
+        if premium:
             shop = PremiumShop
             if profile.get("pokebonds") == 0:
                 await message.reply(
@@ -843,7 +853,7 @@ class TradeCommands(Commands):
         shop.refresh_tradables()
         categories = shop.categories
         shop_alias = shop.alias_map
-        if args and args[0].title() not in shop_alias:
+        if category and category.title() not in shop_alias:
             cat_str = "\n".join(
                 f"+ {catog}" if shop.categories[catog].items
                 else f"- {catog} (To Be Implemented)"
@@ -861,12 +871,12 @@ class TradeCommands(Commands):
                 )
             )
             return
-        if not args:
+        if not category:
             embeds = self.__shop_get_catogs(shop, profile)
         else:
             emb = self.__shop_get_page(
                 shop,
-                args[0].title(),
+                category.title(),
                 message.author
             )
             embeds = [emb]
@@ -881,14 +891,13 @@ class TradeCommands(Commands):
     @model([Inventory, Item])
     async def cmd_use(
         self, message: Message,
-        args: Optional[List] = None,
-        **kwargs
+        ticket: str, **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments for this command.
-        :type args: List[ticket_id: str]
+        :param ticket: The ID of the ticket to use.
+        :type ticket: str
 
         .. meta::
             :description: Use a consumable ticket.
@@ -896,7 +905,7 @@ class TradeCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /use ticket_id
+            /use ticket:id
 
         .. rubric:: Description
 
@@ -909,7 +918,7 @@ class TradeCommands(Commands):
         .. code:: coffee
             :force:
 
-            /use FFF000
+            /use ticket:FFF000
         """
         valid = await HexValidator(
             message=message,
@@ -921,10 +930,10 @@ class TradeCommands(Commands):
                 'title': "No Ticket ID specified",
                 'description': "You need to enter a ticket ID."
             }
-        ).validate(args[0] if args else None)
+        ).validate(ticket)
         if not valid:
             return
-        ticket = Inventory(message.author).from_id(args[0])
+        ticket = Inventory(message.author).from_id(ticket)
         # pylint: disable=no-member
         if (
             not ticket
@@ -949,7 +958,7 @@ class TradeCommands(Commands):
                 if hasattr(command, "__dict__") and command.__dict__.get(
                     "ticket"
                 ) == ticket.name:
-                    await command(message, args=args, **kwargs)
+                    await command(message, **kwargs)
                     return
         await dm_send(
             message, message.author,
@@ -967,7 +976,6 @@ class TradeCommands(Commands):
     @alias("cashout")
     async def cmd_withdraw(
         self, message: Message,
-        args: Optional[List[str]] = None,
         **kwargs
     ):
         """
@@ -1071,31 +1079,29 @@ class TradeCommands(Commands):
         return True
 
     @staticmethod
-    def __give_santize(message, args, mentions):
+    def __give_santize(message, user, chips):
         error_tuple = ()
-        if not mentions:
+        if not user:
             error_tuple = (
                 "No user mentioned.",
                 "Please mention whom you want to give it to."
             )
-        elif not args or not MinValidator(
-            min_value=10, message=message
-        ).check(args[0]):
+        elif not chips:
             error_tuple = (
                 "Invalid amount.",
                 "Please provide a valid amount. (Min 10 chips)"
             )
-        elif message.author.id == mentions[0].id:
+        elif message.author.id == user.id:
             error_tuple = (
                 "Invalid user.",
                 "Nice try mate, but it wouldn't have made a difference."
             )
-        elif mentions[0].bot:
+        elif user.bot:
             error_tuple = (
                 "Bot account found.",
                 "We don't allow shady deals with bots."
             )
-        elif Blacklist.is_blacklisted(str(mentions[0].id)):
+        elif Blacklist.is_blacklisted(str(user.id)):
             error_tuple = (
                 "Blacklisted user.",
                 "That user is blacklisted and cannot receive any chips."
@@ -1126,69 +1132,54 @@ class TradeCommands(Commands):
     @staticmethod
     def __open_get_openables(
         message: Message,
-        args: List[str]
+        itemid: str,
+        item_name: str,
+        quantity: int
     ) -> List[Item]:
-        quantity = 0
-        try:
-            named_args = [
-                arg
-                for arg in args
-                if not arg.isdigit()
+        if itemid is not None:
+            openable = Inventory(
+                message.author
+            ).from_id(itemid)
+            return [openable] if openable else []
+        if item_name is None:
+            return []
+        lb_name = item_name.title()
+        chest_name = lb_name.replace(
+            'Chest', ''
+        ).strip()
+        chest_patt = re.compile(
+            fr"{chest_name}.*Chest",
+            re.IGNORECASE
+        )
+        if any(
+            chest_patt.match(chest.__name__)
+            for chest in Chest.__subclasses__()
+        ):
+            chests = Inventory(
+                message.author
+            ).from_name(fr"{chest_name}.*Chest")
+            if not chests:
+                return []
+            openables = [
+                Item.from_id(itemid)
+                for itemid in chests
             ]
-            quantity_args = [
-                int(arg)
-                for arg in args
-                if arg not in named_args
+        else:
+            bags = Inventory(
+                message.author
+            ).from_name(lb_name)
+            openables = [
+                Item.from_id(itemid)
+                for itemid in bags
             ]
-            if quantity_args:
-                quantity = quantity_args[0]
-            chest_name = " ".join(
-                named_args
-            ).title().replace('Chest', '').strip()
-            lb_name = " ".join(named_args).title()
-            chest_patt = re.compile(
-                fr"{chest_name}.*Chest",
-                re.IGNORECASE
-            )
-            if any(
-                chest_patt.match(chest.__name__)
-                for chest in Chest.__subclasses__()
+            if not openables or openables[0].category not in (
+                "Rewardbox", "Lootbag"
             ):
-                chests = Inventory(
-                    message.author
-                ).from_name(fr"{chest_name}.*Chest")
-                if not chests:
-                    raise ValueError(f"No {chest_name} Chests in Inventory.")
-                openables = [
-                    Item.from_id(itemid)
-                    for itemid in chests
-                ]
-            elif any(
-                word in lb_name
-                for word in [
-                    "Lootbag", "Reward", "Gift"
-                ]
-            ):
-                bags = Inventory(
-                    message.author
-                ).from_name(lb_name)
-                if not bags:
-                    raise ValueError(f"No {lb_name} in Inventory.")
-                openables = [
-                    Item.from_id(itemid)
-                    for itemid in bags
-                ]
-            else:
-                openable = Inventory(
-                    message.author
-                ).from_id(args[0])
-                if openable:
-                    openables = [openable]
-                else:
-                    raise ValueError("Item not found in inventory.")
-        except (ValueError, ZeroDivisionError):
-            openables = []
-        return openables[:quantity] if quantity else openables
+                return []
+        return (
+            openables[:quantity] if quantity is not None
+            else openables
+        )
 
     async def __open_handle_rewards(
         self, message: Message,

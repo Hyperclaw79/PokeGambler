@@ -26,7 +26,7 @@ from __future__ import annotations
 import asyncio
 import math
 import random
-from typing import List, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 import discord
 
@@ -86,16 +86,23 @@ class GambleCommands(Commands):
     @alias(["deal", "roll"])
     async def cmd_gamble(
         self, message: Message,
-        args: Optional[List] = None,
+        fee: Optional[int] = 50,
+        lower_wins: Optional[bool] = False,
+        max_players: Optional[int] = None,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments that were passed.
-        :type args: List[fee: Optional[int]]
-        :param kwargs: Any additional keyword arguments.
-        :type kwargs: Dict[lower_wins: Optional[bool], max_players: Optional[int]]
+        :param fee: The fee to be charged for the gamble.
+        :type fee: Optional[int]
+        :default fee: 50
+        :min_value fee: 50
+        :param lower_wins: Whether or not the lower number card wins.
+        :type lower_wins: Optional[bool]
+        :default lower_wins: False
+        :param max_players: The maximum number of players allowed.
+        :type max_players: Optional[int]
 
         .. meta::
             :description: The core command of the bot - Gamble.
@@ -104,14 +111,14 @@ class GambleCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /gamble [50 < fee] [--lower_wins] [--max_players num]
+            /gamble [fee:chips] [lower_wins:True/False] [max_players:number]
 
         .. rubric:: Description
 
         ``🎲 Dealer Command``
         Roll random pokemon themed cards for a fee and winner takes it all.
         If a fee is not specified, defaults to 50 {pokechip_emoji}.
-        To make the lower card win, use the kwarg --lower_wins.
+        To make the lower card win, use the option lower_wins.
 
         .. note::
             A small transaction fees will be levyed before
@@ -132,21 +139,21 @@ class GambleCommands(Commands):
         .. code:: coffee
             :force:
 
-            /gamble 1000
+            /gamble fee:1000
 
         * To gamble in lower_wins mode
 
         .. code:: coffee
             :force:
 
-            /gamble --lower_wins
+            /gamble lower_wins:True
         """
         kwargs.pop("mentions", [])
-        try:
-            fee = max(int(args[0]), 50) if args else 50
-        except (ZeroDivisionError, ValueError):
-            fee = 50
-        kwargs["fee"] = fee
+        kwargs.update({
+            "fee": fee,
+            "lower_wins": lower_wins,
+            "max_players": max_players
+        })
         gamble_channel, hot_time = await self.__gamble_register(
             message, **kwargs
         )
@@ -161,7 +168,6 @@ class GambleCommands(Commands):
             await self.__gamble_cleanup(gamble_channel, delay=10.0)
             return
         try:
-            lower_wins = kwargs.get("lower_wins", False)
             joker_chance = 0.2 if hot_time else 0.05
             num_cards = len(self.registered)
             dealed_deck, closed_decks = self.__gamble_get_decks(
@@ -200,14 +206,17 @@ class GambleCommands(Commands):
     @check_completion
     async def cmd_quickflip(
         self, message: Message,
-        args: Optional[List] = None,
+        amount: Optional[int] = 50,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments that were passed.
-        :type args: List[amount: Optional[int]]
+        :param amount: The amount to use for the flip.
+        :type amount: Optional[int]
+        :default amount: 50
+        :min_value amount: 50
+        :max_value amount: 9999
 
         .. meta::
             :description: Head/Tails coinflip for PokeGambler.
@@ -215,7 +224,7 @@ class GambleCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /quickflip [50 < amount < 9999]
+            /quickflip [amount:chips]
 
         .. rubric:: Description
 
@@ -240,11 +249,11 @@ class GambleCommands(Commands):
         .. code:: coffee
             :force:
 
-            /flip 1000
+            /flip amount:1000
         """
         profile = Profiles(message.author)
         amount = await self.__flip_input_handler(
-            message, args, profile,
+            message, amount, profile,
             min_chips=50, max_chips=9999
         )
         if amount is None:
@@ -312,16 +321,21 @@ class GambleCommands(Commands):
     @model(Matches)
     async def cmd_matches(
         self, message: Message,
-        args: Optional[List] = None,
+        quantity: Optional[int] = 10,
+        verbose: Optional[bool] = False,
         **kwargs
     ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param args: The list of arguments that were passed.
-        :type args: List[quantity: Optional[int]]
-        :param kwargs: Extra keyword arguments for the command.
-        :type kwargs: Dict[verbose: Optional[bool]]]
+        :param quantity: The number of matches to show.
+        :type quantity: Optional[int]
+        :default quantity: 10
+        :min_value quantity: 1
+        :max_value quantity: 50
+        :param verbose: Whether to show the full match details.
+        :type verbose: Optional[bool]
+        :default verbose: False
 
         .. meta::
             :description: Lists latest gamble matches.
@@ -329,13 +343,13 @@ class GambleCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /matches [quantity] [--verbose]
+            /matches [quantity:number] [verbose:True/False]
 
         .. rubric:: Description
 
         Lists out the results of latest gamble matches.
         If no quantity is given, defaults to 10.
-        If --verbose is used, lists the mode and if joker spawned.
+        If verbose option is used, lists the mode and if joker spawned.
 
         .. rubric:: Examples
 
@@ -351,17 +365,16 @@ class GambleCommands(Commands):
         .. code:: coffee
             :force:
 
-            /matches 5
+            /matches quantity:5
 
         * To see if Joker spawned in last 5 matches
 
         .. code:: coffee
             :force:
 
-            /matches 5 --verbose
+            /matches quantity:5 verbose:True
         """
-        limit = int(args[0]) if args else 10
-        matches = Matches.get_matches(limit=limit)
+        matches = Matches.get_matches(limit=quantity)
         embeds = []
         for match in matches:
             started_by = match["started_by"]["name"]
@@ -395,7 +408,7 @@ class GambleCommands(Commands):
                 value="\u200B",
                 inline=True
             )
-            if kwargs.get("verbose", False):
+            if verbose:
                 emb.add_field(
                     name="Lower Wins",
                     value=f"```py\n{match['lower_wins']}\n```",
@@ -420,12 +433,19 @@ class GambleCommands(Commands):
     @model([Moles, Profiles])
     @alias(["mole", "whack", "moles"])
     @check_completion
-    async def cmd_whackamole(self, message: Message, **kwargs):
+    async def cmd_whackamole(
+        self, message: Message,
+        difficulty: Optional[int] = None,
+        **kwargs
+    ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
-        :param kwargs: Extra keyword arguments for this command.
-        :type kwargs: Dict[difficulty: Optional[int]]
+        :param difficulty: The level at which you wanna play.
+        :type difficulty: Optional[int]
+        :default difficulty: None
+        :min_value difficulty: 1
+        :max_value difficulty: 5
 
         .. meta::
             :description: A minigame where you guess chip location.
@@ -434,7 +454,7 @@ class GambleCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /mole [--difficulty number]
+            /mole [difficulty:level]
 
         .. rubric:: Description
         .. code:: py
@@ -468,7 +488,7 @@ class GambleCommands(Commands):
         .. code:: coffee
             :force:
 
-            /mole --difficulty 5
+            /mole difficulty:5
         """
         boards = [
             f"{i + 3}x{i + 3}"
@@ -476,11 +496,7 @@ class GambleCommands(Commands):
         ]
         costs = [50, 100, 150, 200, 250]
         multipliers = [3, 4, 10, 50, 100]
-        level = kwargs.get("difficulty", kwargs.get("level", 1))
-        if level == 1 and all(
-            word not in kwargs
-            for word in ('difficulty', 'level')
-        ):
+        if not difficulty:
             choice_view = SelectView(
                 heading="Select the Level",
                 options={
@@ -501,6 +517,8 @@ class GambleCommands(Commands):
                 return
             await level_inp.delete()
             level = choice_view.result
+        else:
+            level = difficulty
         level -= 1
         letters, numbers = self.boardgen.get_valids(level)
         cost = costs[level]
@@ -605,19 +623,20 @@ class GambleCommands(Commands):
             )
 
     async def __flip_input_handler(
-        self, message, args,
+        self, message, amount,
         profile, min_chips, max_chips
     ):
-        amount = min_chips
-        if args:
+        if amount:
             proceed = await MinMaxValidator(
                 min_chips, max_chips,
                 message=message,
                 dm_user=True
-            ).validate(args[0])
+            ).validate(amount)
             if not proceed:
                 return None
-            amount = int(args[0])
+            amount = int(amount)
+        else:
+            amount = min_chips
         if profile.get("balance") < amount:
             await self.handle_low_bal(message.author, message.channel)
             await message.add_reaction("❌")
@@ -810,12 +829,12 @@ class GambleCommands(Commands):
         )
         bal += incr
         num_wins += 1
-        if num_wins in [25, 100]:
+        if num_wins == 25:
             loot_table = Loots(winner)
-            if num_wins == 25:
-                loot_table.update(tier=2)
-            else:
-                loot_table.update(tier=3)
+            loot_table.update(tier=2)
+        elif num_wins == 100:
+            loot_table = Loots(winner)
+            loot_table.update(tier=3)
         won_chips += incr
         profile.update(
             balance=bal,
