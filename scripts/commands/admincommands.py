@@ -19,12 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Administration Commands
 """
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument, too-many-lines
 
 from __future__ import annotations
 from dataclasses import MISSING, fields
 import os
 import json
+import re
 from typing import (
     Dict, Optional,
     Type, TYPE_CHECKING
@@ -33,18 +34,22 @@ from typing import (
 import discord
 from dotenv import load_dotenv
 
-from ..helpers.checks import user_check
 from ..helpers.utils import (
-    dedent, get_embed, is_admin,
-    is_owner, wait_for
+    dedent, get_embed,
+    is_admin, is_owner
 )
 from ..helpers.validators import (
-    ImageUrlValidator, ItemNameValidator, MinValidator
+    HexValidator, ImageUrlValidator, IntegerValidator,
+    ItemNameValidator, MinValidator
 )
+from ..base.modals import CallbackReplyModal
 from ..base.models import Blacklist, Inventory, Profiles
-from ..base.items import Item, Rewardbox, Tradable
+from ..base.items import Item, Tradable, Treasure
 from ..base.shop import Shop, PremiumShop
-from ..base.views import SelectView
+from ..base.views import (
+    BaseView, CallbackConfirmButton,
+    SelectConfirmView
+)
 from .basecommand import (
     Commands, admin_only, alias,
     check_completion, ensure_item,
@@ -66,11 +71,18 @@ class AdminCommands(Commands):
         Only Admins and Owners will have access to these.
     """
 
+    # pylint: disable=no-self-use
     @admin_only
-    async def cmd_announce(self, message: Message, **kwargs):
+    async def cmd_announce(
+        self, message: Message,
+        ping: Optional[discord.Role] = None,
+        **kwargs
+    ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
+        :param ping: The role to ping when the announcement is made.
+        :type ping: Optional[:class:`discord.Role`]
 
         .. meta::
             :description: Send an announcement.
@@ -84,25 +96,33 @@ class AdminCommands(Commands):
 
         ``🛡️ Admin Command``
         Make PokeGambler send an announcement in the announcement channel.
-       """
-        start_msg = await message.channel.send(
-            embed=get_embed(
-                'Enter your announcement message:\n>_'
+        """
+        async def callback(modal):
+            content = modal.results[0]
+            if ping:
+                content = f"Hey {ping.mention}\n{content}"
+            chan = message.guild.get_channel(
+                int(os.getenv("ANNOUNCEMENT_CHANNEL"))
             )
+            msg = await chan.send(content=content)
+            await msg.publish()
+            return {
+                "embed": get_embed(
+                    title="Sent Announcement"
+                )
+            }
+        modal = CallbackReplyModal(
+            title='Announcement',
+            callback=callback
         )
-        reply = await wait_for(
-            message.channel, self.ctx, init_msg=start_msg,
-            check=lambda msg: user_check(msg, message),
-            timeout="inf"
+        modal.add_long(
+            'Enter the message.',
+            placeholder="Markdown is supported."
         )
-        content = reply.content
-        chan = message.guild.get_channel(
-            int(os.getenv("ANNOUNCEMENT_CHANNEL"))
-        )
-        msg = await chan.send(content=content)
-        await msg.publish()
-        await reply.add_reaction("👍")
+        await message.response.send_modal(modal)
+        await modal.wait()
 
+    # pylint: disable=too-many-arguments
     @admin_only
     @model(Profiles)
     @alias("chips+")
@@ -110,6 +130,7 @@ class AdminCommands(Commands):
         self, message: Message,
         user: discord.User, amount: int,
         purchased: Optional[bool] = False,
+        deduct: Optional[bool] = False,
         **kwargs
     ):
         """
@@ -123,6 +144,9 @@ class AdminCommands(Commands):
         :param purchased: Whether Pokebonds were purchased instead of chips.
         :type purchased: Optional[bool]
         :default purchased: False
+        :param deduct: Whether to deduct the amount from the user's balance.
+        :type deduct: Optional[bool]
+        :default deduct: False
 
         .. meta::
             :description: Add chips to a user's balance.
@@ -131,7 +155,8 @@ class AdminCommands(Commands):
         .. rubric:: Syntax
         .. code:: coffee
 
-            /add_chips user:@user amount:chips [purchased:True/False]
+            /add_chips user:@user amount:chips
+            [purchased:True/False] [deduct:True/False]
 
         .. rubric:: Description
 
@@ -148,12 +173,19 @@ class AdminCommands(Commands):
 
             /add_chips user:@ABCD#1234 amount:50
 
-        * To add 500 exchanged {pokechip_emoji} to user 67890
+        * To add 50 exchanged {pokebond_emoji} to user ABCD#1234
 
         .. code:: coffee
             :force:
 
-            /add_chips user:@67890 amount:500 purchased:True
+            /add_chips user:ABCD#1234 amount:50 purchased:True
+
+        * To deduct 500 {pokechip_emoji} from user ABCD#1234
+
+        .. code:: coffee
+            :force:
+
+            /add_chips user:@ABCD#1234 amount:500 deduct:True
         """
         profile = await get_profile(self.ctx, message, user)
         if not profile:
@@ -168,7 +200,10 @@ class AdminCommands(Commands):
         if not valid:
             return
         bonds = purchased and is_owner(self.ctx, message.author)
-        profile.credit(amount, bonds=bonds)
+        if deduct:
+            profile.debit(amount, bonds=bonds)
+        else:
+            profile.credit(amount, bonds=bonds)
         await message.add_reaction("👍")
 
     @admin_only
@@ -434,57 +469,79 @@ class AdminCommands(Commands):
         profile = await get_profile(self.ctx, message, user)
         if not profile:
             return
-        try:
-            choice_view = SelectView(
-                heading="Choose the Field",
-                options={
-                    field: ""
-                    for field in profile.get()
-                    if field != "pokebonds" or is_owner(
-                        self.ctx, message.author
+
+        async def oneshotview(view, interaction):
+            chosen = None
+            for child in view.children:
+                if child.custom_id == interaction.data.get(
+                    'custom_id', None
+                ):
+                    chosen = child
+                child.disabled = True
+            await interaction.message.edit(view=view)
+            if chosen is None:
+                await interaction.response.send_message(
+                    embed=get_embed(
+                        "You need to choose an option.",
+                        embed_type="error",
+                        title="Invalid Choice"
                     )
-                },
-                no_response=True,
-                check=lambda x: x.user.id == message.author.id
-            )
-            await message.channel.send(
-                content="Which field would you like to edit?",
-                view=choice_view
-            )
-            await choice_view.dispatch(self)
-            if choice_view.result is None:
+                )
                 return
-            field = choice_view.result
-            await message.channel.send(
-                content=f"What would you like to set {field} to?",
-                embed=get_embed(
-                    "Enter a value",
-                    title=field,
-                    color=profile.get('embed_color')
+            modal = CallbackReplyModal(
+                title="Update User"
+            )
+            field_dict = self.__upd_usr_field_dict(message)
+            chosen_fields = field_dict[chosen.label]
+            for field_name in chosen_fields:
+                modal.add_short(
+                    text=field_name,
+                    required=False
                 )
-            )
-            reply = await self.ctx.wait_for(
-                "message",
-                check=lambda msg: user_check(msg, message),
-                timeout=None
-            )
-            profile.update(**{field: reply.content})
-            await message.add_reaction("👍")
-        except Exception as excp:  # pylint: disable=broad-except
-            await message.channel.send(
-                embed=get_embed(
-                    "Good try but bad luck.",
-                    embed_type="error",
-                    title="Invalid input"
-                )
-            )
-            self.logger.pprint(
-                f"{message.author} triggered cmd_update_user with {kwargs}.\n"
-                f"Error: {excp}",
-                color="red",
-                timestamp=True
-            )
+
+            async def modal_callback(modal):
+                to_update = {}
+                updates = []
+                for child in modal.children:
+                    if child.value:
+                        validator = chosen_fields[child.label][1]
+                        if validator is not None:
+                            validator.error_embed_title = \
+                                f"Invalid Value for {child.label}"
+                            cleaned = await validator.cleaned(
+                                child.value
+                            )
+                            if cleaned is None:
+                                continue
+                            to_update[chosen_fields[child.label][0]] = cleaned
+                        else:
+                            to_update[chosen_fields[child.label][0]] = child.value
+                        updates.append(f"**{child.label}**")
+                if chosen.label == "Currency":
+                    curr_bal = profile.balance
+                    increment = int(to_update.get("won_chips", 0)) + \
+                        (int(to_update.get("pokebonds", 0)) * 10)
+                    if increment:
+                        new_bal = curr_bal + increment
+                        to_update["balance"] = new_bal
+                profile.update(**to_update)
+                field_str = ", ".join(updates)
+                return {
+                    "embed": get_embed(
+                        f"Succesfully updated the fields: {field_str}.",
+                    ) if field_str else get_embed(
+                        "No fields were updated.",
+                        embed_type="warning"
+                    )
+                }
+
+            modal.add_callback(modal_callback)
+            await interaction.response.send_modal(modal)
             return
+
+        btn_view = await self.__upd_usr_send_buttons(message, oneshotview)
+        await btn_view.dispatch(self)
+        return
 
     @check_completion
     @admin_only
@@ -524,9 +581,8 @@ class AdminCommands(Commands):
         .. note::
 
             * Chests cannot be created using this.
-            * Owner(s) can create Premium items using the --premium kwarg.
-            * In case of Reward Boxes, the items should be a comma-separated \
-                list of IDs.
+            * RewardBoxes and Lootbags are yet to be implemented.
+            * Owner(s) can create Premium items using the Premium option.
 
         .. rubric:: Examples
 
@@ -544,115 +600,189 @@ class AdminCommands(Commands):
 
             /create_item premium:True
         """
-        # pylint: disable=no-member
+
+        def get_desc(cls):
+            cls_patt = re.compile(r':class:`(.+)`')
+            cleaned_doc = dedent(cls_patt.sub(r'\1', cls.__doc__))
+            first_sentence = cleaned_doc.split('.', maxsplit=1)[0]
+            return f"{first_sentence[:49]}."
+
+        if premium and not is_owner(self.ctx, message.author):
+            await message.reply(
+                embed=get_embed(
+                    "You need to be an owner to create a premium item.",
+                    embed_type="error",
+                    title="Premium Item Creation"
+                )
+            )
+            return
 
         categories = {}
         self.__create_item_populate_categories(Item, categories, curr_recc=0)
-        choice_view = SelectView(
-            heading="Choose the Item Category",
+
+        async def callback(view, interaction):
+            catogclass = categories[view.value]
+            labels = self.__item_get_labels(message, catogclass)
+            if premium and "price" in labels:
+                labels["price (pokebonds)"] = labels.pop("price")
+            elif "price" in labels:
+                labels["price (pokechips)"] = labels.pop("price")
+
+            async def modal_callback(modal):
+                details = await self.__item_get_details(modal, labels)
+                if details is None:
+                    return {
+                        "embed": get_embed(
+                            "All fields must be filled out correctly.",
+                            embed_type="error"
+                        )
+                    }
+                if premium:
+                    details["premium"] = True
+                    if "price (pokebonds)" in details:
+                        details["price"] = details.pop("price (pokebonds)")
+                if "price (pokechips)" in details:
+                    details["price"] = details.pop("price (pokechips)")
+                item = self.__create_item__item_factory(
+                    category=catogclass, **details
+                )
+                # pylint: disable=no-member
+                item.save()
+                return {
+                    "embed": get_embed(
+                        f"Item **{item.name}** with ID `{item.itemid}` has been "
+                        "created succesfully.",
+                        title="Succesfully Created"
+                    )
+                }
+
+            modal = CallbackReplyModal(
+                title="Create Item",
+                callback=modal_callback
+            )
+            for label in labels:
+                modal.add_short(
+                    text=label,
+                    required=True
+                )
+            await interaction.response.send_modal(modal)
+
+        choice_view = SelectConfirmView(
+            placeholder="Choose the Item Category",
             options={
-                catog: dedent(
-                    cls.__doc__
-                ).split(
-                    '.', maxsplit=1
-                )[0][:49] + '.'
+                catog: get_desc(cls)
                 for catog, cls in sorted(categories.items())
             },
-            no_response=True,
-            check=lambda x: x.user.id == message.author.id
+            check=lambda x: x.user.id == message.author.id,
+            callback=callback
         )
-        await message.channel.send(
+        await message.reply(
             content="What Item would you like to create?",
             view=choice_view
         )
         await choice_view.dispatch(self)
-        if choice_view.result is None:
+
+    @admin_only
+    @os_only
+    @ensure_item
+    @model([Item, Tradable])
+    @alias("upd_itm")
+    async def cmd_update_item(
+        self, message: Message,
+        itemid: str,
+        modify_all: Optional[bool] = False,
+        **kwargs
+    ):
+        """
+        :param message: The message which triggered the command.
+        :type message: :class:`discord.Message`
+        :param itemid: The ID of the item to update.
+        :type itemid: str
+        :param modify_all: Whether or not to modify all copies of the item.
+        :type modify_all: Optional[bool]
+        :default modify_all: False
+
+        .. meta::
+            :description: Updates an existing Item in the database.
+            :aliases: upd_itm
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            /update_item itemid:Id [modify_all:True/False]
+
+        .. rubric:: Description
+
+        ``🛡️ Admin Command``
+        Updates an existing Item/all copies of the Item in the database.
+
+        .. tip::
+
+            Check :class:`~scripts.base.items.Item` for available parameters.
+
+        .. note::
+
+            Category & Premium status change is not yet supported.
+
+        .. rubric:: Examples
+
+        * To update a Golden Cigar with ID 0000FFFF
+
+        .. code:: coffee
+            :force:
+
+            /update_item itemid:0000FFFF
+
+        * To update all copies of the item with ID 0000FFFF
+
+        .. code:: coffee
+            :force:
+
+            /update_item itemid:0000FFFF modify_all:True
+        """
+        item: Item = kwargs.get("item")
+        if not item:
             return
-        catogclass = categories[choice_view.result]
-        details = {}
-        labels = {
-            "name": {
-                "dtype": str,
-                "validator": ItemNameValidator(
-                    message=message
-                )
-            }
-        }
-        labels.update({
-            field.name: {
-                "dtype": field.type,
-                "validator": None
-            }
-            for field in fields(catogclass)
-            if all([
-                field.default is MISSING,
-                field.name != 'category'
-            ])
-        })
-        labels['asset_url']['validator'] = ImageUrlValidator(message=message)
-        if issubclass(catogclass, Tradable):
-            labels["price"] = {
-                "dtype": int,
-                "validator": MinValidator(
-                    message=message,
-                    min_value=1
-                )
-            }
-        if catogclass is Rewardbox:
-            labels.update({
-                "chips": {
-                    "dtype": int,
-                    "validator": MinValidator(
-                        message=message,
-                        min_value=1
+        labels = self.__item_get_labels(message, item.category_class)
+
+        async def modal_callback(modal):
+            details = await self.__item_get_details(modal, labels)
+            if details is None:
+                return {
+                    "embed": get_embed(
+                        "All fields must be filled out correctly.",
+                        embed_type="error"
                     )
-                },
-                "items": {
-                    "dtype": str,
-                    "validator": None
                 }
-            })
-        for col, params in labels.items():
-            inp_msg = await message.channel.send(
-                embed=get_embed(
-                    f"Please enter a value for `{col}`:\n>_",
-                    title="Input"
+            item.update(
+                **details,
+                modify_all=modify_all
+            )
+            if issubclass(item.__class__, Tradable):
+                Shop.refresh_tradables()
+                PremiumShop.refresh_tradables()
+            return {
+                "embed": get_embed(
+                    f"Item **{item.name}** with ID `{item.itemid}` has been "
+                    "updated succesfully.",
+                    title="Succesfully Updated"
                 )
-            )
-            reply = await wait_for(
-                message.channel, self.ctx, init_msg=inp_msg,
-                check=lambda msg: user_check(msg, message),
-                timeout="inf"
-            )
-            if params["validator"] is not None:
-                # pylint: disable=not-callable
-                proceed = await params["validator"].validate(reply.content)
-                if not proceed:
-                    return
-            if params["dtype"] == int:
-                details[col] = int(reply.content)
-            elif col == "items":
-                details[col] = [
-                    itemid.strip()
-                    for itemid in reply.content.split(',')
-                ]
-            else:
-                details[col] = reply.content
-            await inp_msg.delete()
-        if premium and is_owner(self.ctx, message.author):
-            details["premium"] = True
-        item = self.__create_item__item_factory(
-            category=catogclass, **details
+            }
+
+        modal = CallbackReplyModal(
+            title="Update Item",
+            callback=modal_callback
         )
-        item.save()
-        await message.channel.send(
-            embed=get_embed(
-                f"Item **{item.name}** with ID _{item.itemid}_ has been "
-                "created succesfully.",
-                title="Succesfully Created"
+        for label in labels:
+            placeholder = str(getattr(item, label, 'Enter a value...'))
+            if len(placeholder) > 100:
+                placeholder = 'Enter a value...'
+            modal.add_short(
+                text=label,
+                required=False,
+                placeholder=placeholder
             )
-        )
-        await reply.add_reaction("👍")
+        await message.response.send_modal(modal)
 
     @admin_only
     @os_only
@@ -846,91 +976,6 @@ class AdminCommands(Commands):
         inv.save(item.itemid)
         await message.add_reaction("👍")
 
-    @admin_only
-    @os_only
-    @ensure_item
-    @model([Item, Tradable])
-    @alias("upd_itm")
-    async def cmd_update_item(
-        self, message: Message,
-        itemid: str, **kwargs
-    ):
-        """
-        :param message: The message which triggered the command.
-        :type message: :class:`discord.Message`
-        :param itemid: The ID of the item to update.
-        :type itemid: str
-
-        .. meta::
-            :description: Updates an existing Item in the database.
-            :aliases: upd_itm
-
-        .. rubric:: Syntax
-        .. code:: coffee
-
-            /update_item itemid:Id
-
-        .. rubric:: Description
-
-        ``🛡️ Admin Command``
-        Updates an existing Item from the database.
-
-        .. tip::
-
-            Check :class:`~scripts.base.items.Item` for available parameters.
-
-        .. rubric:: Examples
-
-        * To update a Golden Cigar with ID 0000FFFF
-
-        .. code:: coffee
-            :force:
-
-            /update_item itemid:0000FFFF
-        """
-        item = kwargs.get("item")
-        if not item:
-            return
-        options = {
-            key.lower(): ""
-            for key in dict(item)
-        }
-        if not is_owner(self.ctx, message.author):
-            options.pop("premium")
-        choices_view = SelectView(
-            no_response=True,
-            heading="Choose an attribute",
-            options=options,
-            check=lambda x: x.user.id == message.author.id
-        )
-        await message.channel.send(
-            content="Which attribute do you want to edit?",
-            view=choices_view
-        )
-        await choices_view.dispatch(self)
-        if not choices_view.result:
-            return
-        attribute = choices_view.result
-        await message.channel.send(
-            embed=get_embed(
-                content=f"What do you want to change {attribute} to?",
-                title="Update Item",
-                color=Profiles(message.author).get("embed_color")
-            )
-        )
-        reply = await self.ctx.wait_for(
-            "message",
-            check=lambda msg: user_check(msg, message)
-        )
-        item.update(
-            **{attribute: reply.content},
-            modify_all=True
-        )
-        if issubclass(item.__class__, Tradable):
-            Shop.refresh_tradables()
-            PremiumShop.refresh_tradables()
-        await message.add_reaction("👍")
-
     @staticmethod
     def __create_item__item_factory(
         category: Type[Item],
@@ -949,7 +994,8 @@ class AdminCommands(Commands):
     ):
         for subcatog in catog.__subclasses__():
             if all([
-                subcatog.__name__ != 'Chest',
+                subcatog.__name__ != 'Treasure',
+                not issubclass(subcatog, Treasure),
                 getattr(
                     subcatog,
                     '__module__',
@@ -961,3 +1007,124 @@ class AdminCommands(Commands):
                 self.__create_item_populate_categories(
                     subcatog, categories, curr_recc
                 )
+
+    @staticmethod
+    def __item_get_labels(message, catogclass):
+        labels = {
+            "name": {
+                "validator": ItemNameValidator(
+                    message=message
+                )
+            }
+        }
+        labels.update({
+            field.name: {
+                "validator": None
+            }
+            for field in fields(catogclass)
+            if all([
+                field.default is MISSING,
+                field.name != 'category'
+            ])
+        })
+        labels['asset_url']['validator'] = ImageUrlValidator(message=message)
+        if issubclass(catogclass, Tradable):
+            labels["price"] = {
+                "validator": MinValidator(
+                    message=message,
+                    min_value=1
+                )
+            }
+        for key, value in labels.items():
+            if value['validator']:
+                value['validator'].error_embed_title = \
+                    f"Invalid Input for {key.title()}."
+        return labels
+
+    @staticmethod
+    async def __item_get_details(modal, labels):
+        details = {}
+        for child in modal.children:
+            validator = labels[child.label]['validator']
+            if validator and child.value:
+                value = await validator.cleaned(child.value)
+                if not value:
+                    return None
+                details[child.label] = value
+            elif child.value:
+                details[child.label] = child.value
+        return details
+
+    def __upd_usr_field_dict(self, message):
+        field_dict = {
+            "Currency": {
+                "Pokechips": (
+                    "won_chips",
+                    IntegerValidator(
+                        message=message,
+                    )
+                )
+            },
+            "Other": {
+                "Name": ("name", None),
+                "Matches Won": (
+                    "num_wins",
+                    IntegerValidator(
+                        message=message
+                    )
+                ),
+                "Matches Played": (
+                    "num_matches",
+                    IntegerValidator(
+                        message=message
+                    )
+                ),
+                "Background": (
+                    "background",
+                    ImageUrlValidator(
+                        message=message
+                    )
+                ),
+                "Embed Color": (
+                    "embed_color",
+                    HexValidator(
+                        message=message
+                    )
+                )
+            }
+        }
+        if is_owner(self.ctx, message.author):
+            field_dict["Currency"]["Pokebonds"] = (
+                "pokebonds",
+                IntegerValidator(
+                    message=message
+                )
+            )
+        return field_dict
+
+    async def __upd_usr_send_buttons(self, message, callback):
+        btn_view = BaseView(
+            check=lambda intcrn: intcrn.user.id == message.author.id
+        )
+        btn_view.add_item(
+            CallbackConfirmButton(
+                label='Currency',
+                style=discord.ButtonStyle.primary,
+                callback=callback
+            )
+        )
+        btn_view.add_item(
+            CallbackConfirmButton(
+                label="Other",
+                style=discord.ButtonStyle.secondary,
+                callback=callback
+            )
+        )
+        await message.reply(
+            embed=get_embed(
+                "Which field would you like to update?",
+                title="Update User"
+            ),
+            view=btn_view
+        )
+        return btn_view

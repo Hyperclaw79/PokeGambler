@@ -27,7 +27,7 @@ from __future__ import annotations
 from datetime import datetime
 import math
 from typing import (
-    Callable, Dict, List,
+    Callable, Coroutine, Dict, List,
     Optional, TYPE_CHECKING
 )
 
@@ -205,6 +205,146 @@ class Confirm(BaseView):
         self.value = True
         self.user = interaction.user
         self.stop()
+
+
+class ConfirmOrCancel(Confirm):
+    """
+    The :class:`~scripts.base.views.Confirm` view with a Cancel button.
+    """
+    @discord.ui.button(
+        label="❌",
+        style=discord.ButtonStyle.secondary
+    )
+    async def cancel(
+        self, button: discord.ui.Button,
+        interaction: discord.Interaction
+    ):
+        """When the cancel button is pressed, set the inner value to False.
+
+        :param button: The button that was pressed.
+        :type button: :class:`discord.ui.Button`
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
+        """
+        if (
+            self.check is not None
+            and not self.check(interaction)
+        ):
+            return
+        self.value = False
+        self.user = interaction.user
+        self.stop()
+
+
+class CallbackConfirmButton(discord.ui.Button):
+    """
+    A button that calls a callback function when pressed.
+    """
+    def __init__(
+        self, callback: Coroutine,
+        label: str, style: discord.ButtonStyle,
+        **kwargs
+    ):
+        super().__init__(label=label, style=style, **kwargs)
+        self.custom_callback = callback
+
+    async def callback(
+        self, interaction: discord.Interaction,
+        **kwargs
+    ):
+        """When the button is pressed, call the callback.
+
+        :param button: The button that was pressed.
+        :type button: :class:`discord.ui.Button`
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
+        """
+        if (
+            self.view.check is not None
+            and not self.view.check(interaction)
+        ):
+            return
+        self.view.callback_result = await self.custom_callback(
+            self.view, interaction
+        )
+        self.view.stop()
+
+
+class SimpleSelect(discord.ui.Select):
+    """
+    A simple Select that allows the user to choose an option.
+    Updates the view's result when the user selects an option.
+    """
+    def __init__(
+        self, orig_opts: Dict,
+        serializer: Callable = str,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.orig_opts = orig_opts
+        self.serializer = serializer
+
+    async def callback(
+        self, interaction: discord.Interaction
+    ):
+        """When the select is changed, set the inner value to the new value.
+
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
+        """
+        if (
+            self.view.check is not None
+            and not self.view.check(interaction)
+        ):
+            return
+        if not self.values:
+            return
+        res = [
+            opt
+            for opt in self.orig_opts
+            if self.serializer(opt) == self.values[0]
+        ]
+        self.view.value = res[0]
+
+
+class SelectConfirmView(BaseView):
+    """
+    A Select View with a Confirm button.
+    """
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self, placeholder: str,
+        options: Dict[str, str],
+        serializer: Optional[Callable] = str,
+        callback: Optional[Coroutine] = None,
+        check: Optional[Callable] = None,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.callback = callback
+        self.check = check
+        self.callback_result = None
+        self.value = None
+        self.add_item(
+            SimpleSelect(
+                placeholder=placeholder,
+                orig_opts=options,
+                options=[
+                    discord.SelectOption(
+                        label=serializer(label),
+                        description=str(description)
+                    )
+                    for label, description in options.items()
+                ]
+            )
+        )
+        self.add_item(
+            CallbackConfirmButton(
+                callback=self.callback,
+                label="✔️",
+                style=discord.ButtonStyle.green
+            )
+        )
 
 
 class LinkView(BaseView):

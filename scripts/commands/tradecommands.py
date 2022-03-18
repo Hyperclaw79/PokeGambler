@@ -35,6 +35,7 @@ import discord
 
 from ..base.enums import CurrencyExchange
 from ..base.items import Item, Chest, Lootbag, Rewardbox
+from ..base.modals import EmbedReplyModal
 from ..base.models import (
     Blacklist, Exchanges, Inventory, Loots,
     Profiles, Trades
@@ -43,7 +44,7 @@ from ..base.shop import (
     BoostItem, PremiumBoostItem,
     PremiumShop, Shop, Title
 )
-from ..base.views import Confirm, SelectView
+from ..base.views import Confirm, ConfirmOrCancel, SelectConfirmView
 
 from ..helpers.utils import (
     dedent, dm_send,
@@ -54,7 +55,7 @@ from ..helpers.validators import HexValidator, MinMaxValidator
 
 from .basecommand import (
     Commands, alias, check_completion,
-    dealer_only, ensure_item, model, os_only
+    dealer_only, defer, ensure_item, model, os_only
 )
 
 if TYPE_CHECKING:
@@ -72,6 +73,7 @@ class TradeCommands(Commands):
         'Giftbox': 'Gift Boxe'
     }
 
+    @defer
     @model([Profiles, Loots, Inventory])
     async def cmd_buy(
         self, message: Message,
@@ -778,6 +780,7 @@ class TradeCommands(Commands):
             )
         )
 
+    @defer
     @model([Item, Profiles])
     async def cmd_shop(
         self, message: Message,
@@ -1362,37 +1365,12 @@ class TradeCommands(Commands):
         def get_rate(bot: Member) -> int:
             rate = CurrencyExchange[bot.name].value
             return f"Exchange Rate: x{rate} Pokechips"
-        pokebots = discord.utils.get(
-            message.guild.roles,
-            name="Pokebot"
-        ).members
-        choices_view = SelectView(
-            heading="Choose the Pokebot from this list",
-            options={
-                bot: get_rate(bot)
-                for bot in pokebots
-            },
-            check=lambda x: x.user.id == message.author.id
-        )
-        opt_msg = await dm_send(
-            message, message.author,
-            content="Which pokemon themed bot's credits"
-            " do you want to exchange?",
-            view=choices_view
-        )
-        await choices_view.dispatch(self)
-        pokebot = choices_view.result
-        await opt_msg.delete()
-        if not pokebot:
-            return None, None
         already_exchanged = Exchanges(
             user=message.author
         ).get_daily_exchanges(mode.title())
         bounds = (1000, 2_500_000 - already_exchanged)
-        curr = f"({pokebot.name} credits)"
         if mode == "withdraw":
             bounds = (10000, 250_000 - already_exchanged)
-            curr = "Pokechips"
         if bounds[1] < bounds[0]:
             remaining = (
                 (datetime.now().replace(
@@ -1410,38 +1388,62 @@ class TradeCommands(Commands):
                 )
             )
             return None, None
-        opt_msg = await dm_send(
+
+        async def create_modal(view, interaction):
+            if view.result is None:
+                return
+            pokename = str(view.value).split('#', maxsplit=1)[0]
+            amount_modal = EmbedReplyModal(
+                title=f"Exchange Amount for {pokename} Credits",
+                timeout=120,
+                embed=get_embed(
+                    content="Our admins have been notified.\n"
+                    "Please wait till one of them accepts"
+                    " or retry after 10 minutes.",
+                    title="Request Registered."
+                )
+            )
+            amount_modal.add_short(
+                f"How much do you want to {mode}?",
+                placeholder=f"Min: {bounds[0]:,}, Max: {bounds[1]:,}"
+            )
+            await interaction.response.send_modal(
+                amount_modal
+            )
+            await amount_modal.wait()
+            return amount_modal.results[0]
+
+        pokebots = discord.utils.get(
+            message.guild.roles,
+            name="Pokebot"
+        ).members
+        choices_view = SelectConfirmView(
+            placeholder="Choose the Pokebot from this list",
+            options={
+                bot: get_rate(bot)
+                for bot in pokebots
+            },
+            check=lambda x: x.user.id == message.author.id,
+            callback=create_modal
+        )
+        await dm_send(
             message, message.author,
-            embed=get_embed(
-                content=f"```yaml\n>________ {curr}\n```",
-                title=f"How much do you want to {mode}?",
-                footer=f"Min: {bounds[0]:,}, Max: {bounds[1]:,}"
-            )
+            content="Which pokemon themed bot's credits"
+            " do you want to exchange?",
+            view=choices_view
         )
-        reply = await self.ctx.wait_for(
-            "message",
-            check=lambda msg: (
-                msg.channel.id == opt_msg.channel.id
-                and msg.author == message.author
-            )
-        )
+        await choices_view.dispatch(self)
+        pokebot = choices_view.value
+        if not pokebot or not choices_view.callback_result:
+            return None, None
         proceed = await MinMaxValidator(
             *bounds,
             message=message,
             dm_user=True
-        ).validate(reply.content)
+        ).validate(choices_view.callback_result)
         if not proceed:
-            await opt_msg.delete()
             return None, None
-        quantity = int(reply.content.replace(',', ''))
-        await opt_msg.edit(
-            embed=get_embed(
-                content="Our admins have been notified.\n"
-                "Please wait till one of them accepts"
-                " or retry after 10 minutes.",
-                title="Request Registered."
-            )
-        )
+        quantity = int(choices_view.callback_result.replace(',', ''))
         return pokebot, quantity
 
     @staticmethod
@@ -1462,25 +1464,17 @@ class TradeCommands(Commands):
         admin, pokebot, chips,
         mode="deposit"
     ):
+        confirm_or_cancel = ConfirmOrCancel(timeout=None)
         await thread.send(
             embed=get_embed(
                 title="Starting the transaction."
             ),
             content=f"**User**: {message.author.mention}\n"
-            f"**Admin**: {admin.mention}"
+            f"**Admin**: {admin.mention}",
+            view=confirm_or_cancel
         )
-        response = await self.ctx.wait_for(
-            "message",
-            check=lambda msg: (
-                msg.channel.id == thread.id
-                and msg.author == admin
-                and any(
-                    keyword in msg.content.lower()
-                    for keyword in ("complete", "cancel")
-                )
-            )
-        )
-        if response.content.lower() == "complete":
+        await confirm_or_cancel.dispatch(self)
+        if confirm_or_cancel.value:
             content = None
             if mode == "deposit":
                 content = f"{message.author.mention}, check your balance" + \

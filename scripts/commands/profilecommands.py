@@ -38,6 +38,7 @@ from ..base.models import (
 )
 from ..base.shop import BoostItem
 from ..base.views import LinkView, SelectView
+from ..base.modals import BaseModal
 
 from ..helpers.checks import user_check
 from ..helpers.imageclasses import (
@@ -53,7 +54,7 @@ from ..helpers.validators import HexValidator, ImageUrlValidator
 
 from .basecommand import (
     Commands, alias, check_completion, cache_images,
-    cooldown, model, get_profile, needs_ticket
+    cooldown, defer, model, get_profile, needs_ticket
 )
 
 if TYPE_CHECKING:
@@ -108,7 +109,8 @@ class ProfileCommands(Commands):
                 "Supported Extension: `PNG` and `JPEG`\n"
                 "> Will rollback to default background "
                 "if link is not accessible any time.\n"
-                "⚠️Using inappropriate images will get you blacklisted.",
+                "⚠️Using inappropriate images will get you blacklisted.\n"
+                "**Mention me in the message if you upload the image.**",
                 title="Enter the image url or upload it.",
                 color=profile.get('embed_color')
             )
@@ -116,7 +118,9 @@ class ProfileCommands(Commands):
         reply = await wait_for(
             inp_msg.channel, self.ctx,
             init_msg=inp_msg,
-            check=lambda msg: user_check(msg, message, inp_msg.channel),
+            check=lambda msg: user_check(
+                msg, message, inp_msg.channel
+            ) and msg.attachments,
             timeout="inf"
         )
         url = await self.__background_get_url(message, reply)
@@ -470,6 +474,7 @@ class ProfileCommands(Commands):
             embed=embed
         )
 
+    # pylint: disable=no-self-use
     @needs_ticket("Embed Color Change")
     @check_completion
     @model([Profiles, Inventory])
@@ -494,26 +499,20 @@ class ProfileCommands(Commands):
 
         .. note::
 
-            The Background Change ticket can be purchased
-            from the Consumables :class:`~scripts.base.shop.Shop`
+            The Embed Color Change ticket can be purchased
+            from the secret Consumables :class:`~scripts.base.shop.Shop`
         """
         profile = Profiles(message.author)
-        inp_msg = await dm_send(
-            message, message.author,
-            embed=get_embed(
-                "Enter the hexadecimal code for the color you want.\n"
-                "Should follow the pattern: #abcdef\n"
-                "> Eg: #000FFF",
-                title="Enter the color code",
-                color=profile.get('embed_color')
-            )
+        modal = BaseModal(
+            "Enter the Color Hexadecimal Code",
+            check=lambda x: x.user.id == message.author.id
         )
-        reply = await wait_for(
-            inp_msg.channel, self.ctx,
-            init_msg=inp_msg,
-            check=lambda msg: user_check(msg, message, inp_msg.channel),
-            timeout="inf"
-        )
+        modal.add_short("Enter Color Code")
+        await message.response.send_modal(modal)
+        await modal.wait()
+        if not modal.results:
+            return
+        color_hex = modal.results[0]
         proceed = await HexValidator(
             message=message,
             on_error={
@@ -521,10 +520,10 @@ class ProfileCommands(Commands):
                 "description": "You need to enter a valid hex code."
             },
             dm_user=True
-        ).validate(reply.content)
+        ).validate(color_hex)
         if not proceed:
             return
-        hexcode = reply.content.lstrip('#')
+        hexcode = color_hex.lstrip('#')
         profile.update(
             embed_color=int(hexcode, 16)
         )
@@ -539,6 +538,7 @@ class ProfileCommands(Commands):
             )
         )
 
+    @defer
     @model(Profiles)
     @alias("lb")
     async def cmd_leaderboard(
@@ -802,7 +802,7 @@ class ProfileCommands(Commands):
         badges = profile.get_badges()
         profile = profile.get()
         avatar_byio = BytesIO()
-        await user.avatar.with_size(512).save(avatar_byio)
+        await user.display_avatar.with_size(512).save(avatar_byio)
         avatar = Image.open(avatar_byio)
         name = profile["name"]
         balance = f'{profile["balance"]:,}'
@@ -824,6 +824,7 @@ class ProfileCommands(Commands):
             msg.attachments[0].proxy_url
         )
 
+    @defer
     @model(Profiles)
     @alias("#")
     @cache_images

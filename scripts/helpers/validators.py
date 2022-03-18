@@ -50,6 +50,7 @@ class Validator(ABC):
     null_embed_title = "No Value specified."
     null_embed_desc = "You need to provide a value."
     null_embed_kwargs = {}
+    cleaner = None
 
     def __init__(
         self, message: Message,
@@ -143,6 +144,18 @@ class Validator(ABC):
             return False
         return True
 
+    async def cleaned(self, value: Any) -> Any:
+        """
+        Cleans the given value after validation.
+        """
+        valid = await self.validate(value)
+        if not valid:
+            return None
+        if self.cleaner is not None:
+            # pylint: disable=not-callable
+            return self.cleaner(value)
+        return value
+
 
 class IntegerValidator(Validator):
     """
@@ -152,6 +165,7 @@ class IntegerValidator(Validator):
     error_embed_title = "Invalid input"
     #:
     error_embed_desc = "Please enter a valid integer."
+    cleaner = int
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -303,6 +317,17 @@ class HexValidator(RegexValidator):
 
     def __init__(self, **kwargs):
         super().__init__(r'#?[0-9a-fA-F]{6}', **kwargs)
+
+    @staticmethod
+    def cleaner(hex_str: str) -> int:
+        """
+        Converts a hexadecimal string to an integer.
+        :param hex_str: The hexadecimal string to convert.
+        :type hex_str: str
+        :return: The integer value of the hexadecimal string.
+        :rtype: int
+        """
+        return int(hex_str.lstrip('#'), 16)
 
 
 class ImageUrlValidator(RegexValidator):

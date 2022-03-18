@@ -19,16 +19,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Module which extends Discord.py to allow for custom application commands.
 """
 
-# pylint: disable=no-member
+# pylint: disable=no-member, too-many-lines
 
 from __future__ import annotations
+import inspect
+import itertools
 from typing import (
-    TYPE_CHECKING, Any, Callable,
+    TYPE_CHECKING, Any, Callable, Coroutine,
     Dict, List, Optional, Tuple, Type, Union
 )
 
+from cachetools import TTLCache
 import discord
 from discord.http import Route
+from discord.app_commands import Choice
 
 from scripts.base.enums import OptionTypes
 
@@ -72,11 +76,9 @@ class OverriddenChannel:
     async def send(self, *args, **kwargs):
         """
         :meth:`discord.TextChannel.send` like behavior for
-        :class:`discord.TextChannel`.
+        :class:`~scripts.base.handlers.OverriddenChannel`.
         """
         msg = await self.channel.send(*args, **kwargs)
-        # Hack to silence the stray deferred ephemeral message.
-        await self.parent.followup.send(content='\u200B')
         return msg
 
 
@@ -108,12 +110,20 @@ class CustomInteraction:
         """
         :meth:`discord.Message.reply` like behavior for Interactions.
         """
-        msg = await self.interaction.followup.send(*args, **kwargs)
+        try:
+            await self.interaction.response.send_message(
+                *args, **kwargs
+            )
+            msg = await self.interaction.original_message()
+        except discord.InteractionResponded:
+            msg = await self.interaction.followup.send(
+                *args, **kwargs
+            )
         return msg
 
     async def add_reaction(self, reaction: str):
-        """
-        :meth:`discord.Message.add_reaction` like behavior for Interactions.
+        """:meth:`discord.Message.add_reaction` like behavior for Interactions.
+
         :param reaction: The reaction to add.
         :type reaction: :class:`str`
         """
@@ -121,11 +131,19 @@ class CustomInteraction:
         from ..base.views import EmojiButton
 
         emoji_btn = EmojiButton(reaction)
-        await self.interaction.followup.send(
-            content='\u200B',
-            view=emoji_btn,
-            ephemeral=True
-        )
+        payload = {
+            "content": '\u200B',
+            "view": emoji_btn,
+            "ephemeral": True
+        }
+        try:
+            await self.interaction.response.send_message(
+                **payload
+            )
+        except discord.InteractionResponded:
+            await self.interaction.followup.send(
+                **payload
+            )
 
 
 class CommandListing(list):
@@ -226,9 +244,50 @@ class CommandListing(list):
         commands = await self.handler.http.request(route)
         for command in commands:
             if command['type'] in self.Component.types():
+                if 'options' in command:
+                    for option in command['options']:
+                        option['autocomplete'] = option.get(
+                            'autocomplete', False
+                        )
                 self.append(
                     self.handler.component_class.from_dict(command)
                 )
+
+
+def command_to_dict(
+    command: Callable,
+    local: Optional[bool] = False
+) -> Dict[str, Any]:
+    """Convert a command to a dictionary.
+
+    :param command: Command to convert.
+    :type command: Callable
+    :param local: Whether to use local or official server.
+    :type local: Optional[bool]
+    :return: Dictionary representation of the command.
+    :rtype: Dict[str, Any]
+    """
+    description = command.__doc__.split("\n")[0]
+    with CustomRstParser() as rst_parser:
+        rst_parser.parse(command.__doc__)
+        meta = rst_parser.meta
+        options = rst_parser.parsed_params
+    desc = meta.description
+    if len(desc) <= 100:
+        description = desc
+    options = sorted(options, key=lambda x: -x['required'])
+    # Fix for Discord API not supporting Default Option
+    for option in options:
+        option.pop('default', None)
+    cmd_name = command.__name__.replace("cmd_", "")
+    if local:
+        cmd_name += "_"
+    return {
+        "name": cmd_name,
+        "description": description,
+        "type": 1,
+        "options": options
+    }
 
 
 class SlashHandler:
@@ -274,7 +333,10 @@ class SlashHandler:
                     )
                 )
             )
-
+        current_commands = sorted(
+            list(set(current_commands)),
+            key=current_commands.index
+        )
         await self.__sync_commands(current_commands, **kwargs)
         for command in current_commands:
             await self.register_command(command, **kwargs)
@@ -363,7 +425,7 @@ class SlashHandler:
         :return: Parsed command method and additional details.
         :rtype: Tuple[Callable, Dict[str, Any]]
         """
-        await interaction.response.defer()
+        # await interaction.response.defer()
         interaction = CustomInteraction(interaction)
         data = interaction.data
         kwargs = {
@@ -394,6 +456,14 @@ class SlashHandler:
                 elif opt['type'] == OptionTypes.ROLE.value:
                     getter = interaction.guild.get_role
                     alt_getter = None
+                elif opt['type'] == OptionTypes.ATTACHMENT.value:
+                    getter = None
+                    alt_getter = None
+                    opt['value'] = discord.Attachment(
+                        data=data['resolved']['attachments'][opt['value']],
+                        # pylint: disable=protected-access
+                        state=interaction._state
+                    )
                 else:
                     getter = None
                 if getter:
@@ -576,27 +646,9 @@ class SlashHandler:
             return {}
         if not command.__doc__:
             return {}
-        description = command.__doc__.split("\n")[0]
-        with CustomRstParser() as rst_parser:
-            rst_parser.parse(command.__doc__)
-            meta = rst_parser.meta
-            options = rst_parser.parsed_params
-        desc = meta.description
-        if len(desc) <= 100:
-            description = desc
-        options = sorted(options, key=lambda x: -x['required'])
-        # Fix for Discord API not supporting Default Option
-        for option in options:
-            option.pop('default', None)
-        cmd_name = command.__name__.replace("cmd_", "")
-        if self.ctx.is_local:
-            cmd_name += "_"
-        return {
-            "name": cmd_name,
-            "description": description,
-            "type": 1,
-            "options": options
-        }
+        return command_to_dict(
+            command, local=self.ctx.is_local
+        )
 
     async def __sync_commands(self, current_commands, **kwargs):
         if not self.ctx.is_local:
@@ -765,6 +817,102 @@ class ContextHandler:
         if not self.update_counter:
             msg = "No new context menu commands found."
         self.ctx.logger.pprint(msg, color='green')
+
+
+class AutocompleteHandler:
+    """Autocomplete handler for commands.
+
+    :param ctx: The pokegambler client.
+    :type ctx: :class:`bot.PokeGambler`
+    """
+    def __init__(self, ctx: PokeGambler):
+        self.ctx = ctx
+        self.commands = {}
+        self.cache = TTLCache(maxsize=10, ttl=60)
+
+    def register(
+        self, cmd: Coroutine,
+        callback_dict: Dict[str, Callable[
+            [discord.Interaction], List[Any]
+        ]]
+    ):
+        """Register a command with its choices.
+
+        :param cmd: The command to register.
+        :param callback_dict: The callback dictionary.
+        """
+        cmd_dict = command_to_dict(cmd, local=self.ctx.is_local)
+        cmd = SlashCommand.from_dict(cmd_dict)
+        self.commands[cmd] = callback_dict
+
+    def unregister(self, cmd: SlashCommand):
+        """Unregister a command.
+
+        :param cmd: The command to unregister.
+        :type cmd: :class:`~scripts.base.components.SlashCommand`
+        """
+        self.commands.pop(cmd, None)
+
+    async def parse(
+        self, interaction: discord.Interaction
+    ) -> List[Choice]:
+        """Get the choices for a command.
+
+        :param interaction: The interaction to parse.
+        :type interaction: :class:`discord.Interaction`
+        :return: The choices for the command.
+        :rtype: List[:class:`discord.app_commands.Choice`]
+        """
+        cmd = SlashCommand.from_dict(
+            interaction.data
+        )
+        if cmd not in self.registered:
+            return []
+        focused_opt = [
+            opt
+            for opt in cmd.options
+            if opt.get('focused', False)
+        ]
+        if not focused_opt:
+            return []
+        # Reset on empty input
+        if focused_opt[0].get('value', '') == '':
+            self.cache.pop(
+                (cmd, focused_opt, interaction.user.id)
+            )
+        focused_opt = focused_opt[0].name
+        choices = self.cache.get(
+            (cmd, focused_opt, interaction.user.id)
+        )
+        if not choices:
+            callable_ = self.commands[cmd][focused_opt]
+            if inspect.iscoroutinefunction(callable_):
+                choices = await callable_(interaction)
+            else:
+                choices = callable_(interaction)
+            if len(choices) > 20:
+                choices = iter(choices)
+            self.cache[
+                (cmd, focused_opt, interaction.user.id)
+            ] = choices
+        choice_list = [
+            Choice(
+                name=elem['name'],
+                value=elem['value']
+            )
+            for elem in itertools.islice(choices, 20)
+        ]
+        await interaction.response.autocomplete(choice_list)
+        return choice_list
+
+    @property
+    def registered(self) -> List[SlashCommand]:
+        """Get the registered commands.
+
+        :return: The registered commands.
+        :rtype: List[:class:`~scripts.base.components.SlashCommand`]
+        """
+        return list(self.commands)
 
 
 class GuildEventHandler:

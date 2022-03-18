@@ -81,7 +81,7 @@ class CommandOptions(dict):
             setattr(self, key, value)
 
     def __getattr__(self, item: str) -> Any:
-        return super().get(item)
+        return super().get(item, None)
 
     def __setitem__(self, key: str, value: Any) -> None:
         setattr(self, key, value)
@@ -195,6 +195,20 @@ class SlashCommand(AppCommand):
     #: | The type of the command.
     #: | Always 1 because this is a slash command.
     type: int = 1
+
+    def __hash__(self) -> int:
+        return int(
+            ''.join(
+                str(ord(c))
+                for c in self.name
+            )
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, SlashCommand) and
+            self.name == other.name
+        )
 
     @property
     def parameters(self) -> Dict[str, Tuple[int, bool]]:

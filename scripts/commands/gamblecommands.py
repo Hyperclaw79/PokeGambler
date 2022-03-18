@@ -426,7 +426,9 @@ class GambleCommands(Commands):
                 )
             winner = self.ctx.get_user(winner['id'])
             if winner:
-                emb.set_image(url=winner.avatar.with_size(256))
+                emb.set_image(
+                    url=winner.display_avatar.with_size(256)
+                )
             embeds.append(emb)
         await self.paginate(message, embeds)
 

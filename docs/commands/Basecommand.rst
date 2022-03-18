@@ -30,6 +30,8 @@ Decorators
 
 .. autodecorator:: scripts.commands.basecommand.ctx_command
 
+.. autodecorator:: scripts.commands.basecommand.defer
+
 .. autodecorator:: scripts.commands.basecommand.ensure_item
 
 .. autodecorator:: scripts.commands.basecommand.ensure_user
@@ -42,6 +44,8 @@ Decorators
 
 .. rubric:: Decorators with arguments
 .. autodecorator:: scripts.commands.basecommand.alias
+
+.. autodecorator:: scripts.commands.basecommand.autocomplete
 
 .. autodecorator:: scripts.commands.basecommand.cooldown
 

@@ -199,6 +199,15 @@ class Item(ABC):
         self._name = value
 
     @property
+    def category_class(self) -> Type[Item]:
+        """Returns the class of the Item's category.
+
+        :return: The class of the Item's category.
+        :rtype: :class:`~scripts.base.items.Item`
+        """
+        return globals()[self.category.title()]
+
+    @property
     def details(self) -> Embed:
         """Returns a rich embed containing full details of an item.
 

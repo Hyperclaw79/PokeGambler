@@ -142,6 +142,7 @@ class Param:
         self.choices = None
         self.min_value = None
         self.max_value = None
+        self.autocomplete = False
         self._parse_pattern = re.compile(
             r'[ld]i[sc]t\[(.+)\]',
             re.IGNORECASE
@@ -188,8 +189,12 @@ class Param:
             return []
         parsed = {
             attr: getattr(self, attr)
-            for attr in ('name', 'description', 'type', 'default')
+            for attr in (
+                'name', 'description', 'type',
+                'default', 'autocomplete'
+            )
         }
+        parsed["autocomplete"] = parsed["autocomplete"] == 'True'
         self.__resolve_special_types(parsed)
         parsed['required'] = 'Optional' not in parsed['type']
         parsed['type'] = OptionTypes[
@@ -283,7 +288,8 @@ class CustomRstParser:
             )
             for attr in (
                 'param', 'type', 'default',
-                'choices', 'min_value', 'max_value'
+                'choices', 'min_value', 'max_value',
+                'autocomplete'
             )
         ]
         self._patterns = [

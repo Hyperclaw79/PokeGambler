@@ -611,7 +611,7 @@ def prettify_discord(
     func = getattr(ctx, f"get_{mode}")
     return '\n\t'.join(
         ', '.join(
-            f"{func(id=elem)} ({elem})"
+            f"{func(elem)} ({elem})"
             for elem in iterable[i: i + 2]
         )
         for i in range(0, len(iterable), 2)

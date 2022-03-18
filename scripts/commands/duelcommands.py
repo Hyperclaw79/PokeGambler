@@ -26,7 +26,8 @@ import asyncio
 from collections import namedtuple
 import random
 import re
-from typing import List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
+from cachetools import TTLCache, cached
 
 import discord
 
@@ -35,6 +36,7 @@ from ..base.models import (
     Blacklist, DuelActionsModel, Inventory, Profiles, Duels
 )
 from ..base.views import Confirm, SelectView
+from ..base.modals import CallbackReplyModal
 from ..helpers.checks import user_check
 from ..helpers.imageclasses import GladitorMatchHandler
 from ..helpers.utils import (
@@ -46,7 +48,7 @@ from ..helpers.validators import (
     RegexValidator
 )
 from .basecommand import (
-    Commands, alias, check_completion,
+    Commands, alias, autocomplete, check_completion,
     cooldown, model, needs_ticket
 )
 
@@ -114,6 +116,32 @@ class DuelActions:
                 self.normal.append(action["action"])
             else:
                 self.crit.append(action["action"])
+
+
+@cached(
+    cache=TTLCache(maxsize=10, ttl=360),
+    key=lambda intc: intc.user.id
+)
+def get_gladiators(
+    interaction: discord.Interaction
+) -> List[Dict[str, str]]:
+    """
+    Returns list of user owned Gladiator.
+
+    :param interaction: The interaction which triggered this command.
+    :type interaction: :class:`discord.Interaction`
+    :return: List of user owned Gladiator.
+    :rtype: List[Dict[str, str]]
+    """
+    author = interaction.user
+    glads, _ = Inventory(author).get(category='Gladiator')
+    return [
+        {
+            "name": glad['name'],
+            "value": glad['_id']
+        }
+        for glad in glads['Gladiator']
+    ]
 
 
 class DuelCommands(Commands):
@@ -206,6 +234,8 @@ class DuelCommands(Commands):
                         <g1> slams <g2> to the ground.
                         <g1> activates 🆅🅴🅽🅶🅴🅰🅽🅲🅴.
                         ```
+
+                    **Mention me in the message with your action.**
                     """
                 ),
                 title="Enter the action message",
@@ -218,9 +248,14 @@ class DuelCommands(Commands):
             check=lambda msg: user_check(
                 msg, message,
                 chan=action_inp_msg.channel
-            ),
+            ) and msg.content,
             timeout="inf"
         )
+        reply_msg = re.sub(
+            fr'<@!?{self.ctx.user.id}>',
+            '',
+            reply.content
+        ).strip()
         proceed = await RegexValidator(
             pattern=r"<g1>\s.+",
             message=message,
@@ -231,10 +266,10 @@ class DuelCommands(Commands):
                 "Please reuse the command."
             },
             dm_user=True
-        ).validate(reply.content)
+        ).validate(reply_msg)
         if not proceed:
             return
-        action = "\n".join(reply.content.splitlines()[:2])
+        action = "\n".join(reply_msg.splitlines()[:2])
         # Ensure there's only one placeholder for each gladiator.
         for placeholder in ["<g1>", "<g2>"]:
             action = action.replace(
@@ -390,13 +425,23 @@ class DuelCommands(Commands):
                 profiles, amount
             )
 
+    @autocomplete({
+        'gladiator': get_gladiators
+    })
     @needs_ticket("Gladiator Nickname Change")
     @check_completion
     @model(Inventory)
-    async def cmd_gladnick(self, message: Message, **kwargs):
+    # pylint: disable=no-self-use
+    async def cmd_gladnick(
+        self, message: Message,
+        gladiator: str, **kwargs
+    ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
+        :param gladiator: The ID of gladiator whose nickname should be changed.
+        :type gladiator: str
+        :autocomplete gladiator: True
 
         .. meta::
             :description: Rename your gladiator
@@ -421,57 +466,49 @@ class DuelCommands(Commands):
 
         """
         profile = Profiles(message.author)
-        glad = await self.__duel_get_gladiator(
-            message, message.author,
-            profile
+        glad = Item.from_id(gladiator)
+
+        async def callback(modal):
+            if not modal.results:
+                return
+            new_nick = modal.results[0]
+            proceed = await ItemNameValidator(
+                message=message,
+                on_error={
+                    "title": "Invalid Nickname",
+                    "description": "That name is not allowed, keep it simple."
+                },
+                dm_user=True
+            ).validate(new_nick)
+            if not proceed:
+                return
+            new_name = re.sub(
+                r"[^\x00-\x7F]+", "",
+                new_nick[:10].title()
+            ).strip()
+            # pylint: disable=no-member
+            glad.rename(new_name)
+            inv = Inventory(message.author)
+            tickets = kwargs["tickets"]
+            inv.delete(tickets[0], quantity=1)
+            return {
+                "embed": get_embed(
+                    f"Successfully renamed your Gladiator to **{glad}**.",
+                    title="Rename Complete",
+                    color=profile.get("embed_color")
+                )
+            }
+
+        modal = CallbackReplyModal(
+            callback=callback,
+            title="Gladiator Nickname Change",
         )
-        if not glad:
-            return
-        inp_msg = await dm_send(
-            message,
-            message.author,
-            embed=get_embed(
-                "Use a sensible name (Max 10 chars) for your gladiator.",
-                title="Enter New Nickname",
-                color=profile.get("embed_color")
-            )
+        modal.add_short(
+            "Enter new nickname.",
+            placeholder="Use a sensible name (Max 10 chars)"
         )
-        reply = await wait_for(
-            inp_msg.channel, self.ctx,
-            init_msg=inp_msg,
-            check=lambda msg: all([
-                msg.author.id == message.author.id,
-                msg.channel.id == inp_msg.channel.id
-            ]),
-            timeout="inf"
-        )
-        proceed = await ItemNameValidator(
-            message=message,
-            on_error={
-                "title": "Invalid Nickname",
-                "description": "That name is not allowed, keep it simple."
-            },
-            dm_user=True
-        ).validate(reply.content)
-        if not proceed:
-            return
-        new_name = re.sub(
-            r"[^\x00-\x7F]+", "",
-            reply.content[:10].title()
-        ).strip()
-        glad.rename(new_name)
-        inv = Inventory(message.author)
-        tickets = kwargs["tickets"]
-        inv.delete(tickets[0], quantity=1)
-        await dm_send(
-            message,
-            message.author,
-            embed=get_embed(
-                f"Successfully renamed your Gladiator to {new_name}.",
-                title="Rename Complete",
-                color=profile.get("embed_color")
-            )
-        )
+        await message.response.send_modal(modal)
+        await modal.wait()
 
     async def __duel_confirmation(
         self, message: Message,

@@ -1,4 +1,4 @@
-You will **not** be able to use text commands from April 2022.
+You will **not** be able to use text commands from April 15th, 2022.
 Please reinvite the bot using the link in the『Invite』command.
 Then switch to Slash Commands by pressing slash (`/`) on your keyboard.
 

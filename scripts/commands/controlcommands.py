@@ -38,10 +38,9 @@ from ..base.models import (
     Model, UnlockedModel
 )
 from ..base.views import SelectView
-from ..helpers.checks import user_check
 from ..helpers.utils import (
     get_embed, get_enum_embed,
-    get_modules, wait_for
+    get_modules
 )
 from .basecommand import (
     model, owner_only,
@@ -137,9 +136,9 @@ class ControlCommands(Commands):
         embeds = [self.__cmd_hist_parse(cmd) for cmd in history]
         await self.paginate(message, embeds)
 
+    # pylint: disable=no-self-use
     @owner_only
     @no_log
-    # pylint: disable=no-self-use
     async def cmd_export_items(
         self, message: Message,
         pretty: Optional[int] = 3,
@@ -200,12 +199,19 @@ class ControlCommands(Commands):
         export_fl = discord.File(byio, "items.json")
         await message.channel.send(file=export_fl)
 
+    # pylint: disable=no-self-use
     @owner_only
     @no_log
-    async def cmd_import_items(self, message: Message, **kwargs):
+    async def cmd_import_items(
+        self, message: Message,
+        items_json: discord.Attachment,
+        **kwargs
+    ):
         """
         :param message: The message which triggered this command.
         :type message: :class:`discord.Message`
+        :param items_json: The JSON file to import.
+        :type items_json: :class:`discord.Attachment`
 
         .. meta::
             :description: Imports the items from a JSON file.
@@ -224,26 +230,10 @@ class ControlCommands(Commands):
         .. warning::
             Do not import :class:`~scripts.base.items.Rewardbox` using this.
         """
-        info_msg = await message.channel.send(
-            embed=get_embed(
-                "Send an empty message with a JSON file attachment.",
-                title="Attach items.json"
-            )
-        )
-        user_inp = await wait_for(
-            message.channel, self.ctx,
-            init_msg=info_msg,
-            check=lambda msg: (
-                user_check(msg, message)
-                and len(msg.attachments) > 0
-                and msg.attachments[0].filename == "items.json"
-            ),
-            timeout="inf"
-        )
-        data_bytes = await user_inp.attachments[0].read()
+        data_bytes = await items_json.read()
         data = json.loads(data_bytes.decode())
         Item.insert_many(data)
-        await user_inp.add_reaction("👍")
+        await message.add_reaction("👍")
 
     @owner_only
     @no_log
@@ -416,11 +406,11 @@ class ControlCommands(Commands):
                 possible_modules,
                 title="List of reloadable modules"
             )
-            await message.channel.send(embed=embed)
+            await message.reply(embed=embed)
         else:
             self.ctx.load_commands(module, reload_module=True)
             await self.ctx.slash_sync()
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(f"Successfully reloaded {module}.")
             )
 

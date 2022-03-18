@@ -28,12 +28,14 @@ from datetime import datetime
 from functools import wraps
 import json
 from typing import (
-    Callable, List, Optional,
+    Callable, Coroutine, Dict, List, Optional,
     TYPE_CHECKING, Union
 )
 
 import discord
 from dotenv import load_dotenv
+
+from scripts.base.handlers import CustomInteraction
 
 from ..base.items import Item
 from ..base.models import Inventory, Model, Profiles
@@ -203,6 +205,24 @@ def alias(alt_names: Union[List[str], str]):
     return decorator
 
 
+def autocomplete(callback_dict: Dict[str, Coroutine]):
+    '''Add an autocomplete callback dictionary to the command.
+
+    :param callback_dict: The callback dictionary.
+    :type callback_dict: Dict[str, Coroutine]
+    :return: The decorated function.
+    :rtype: Callable
+    '''
+    def decorator(func: Callable):
+        func.__dict__["autocomplete"] = callback_dict
+
+        @wraps(func)
+        def wrapped(self, message, *args, **kwargs):
+            return func(self, *args, message=message, **kwargs)
+        return wrapped
+    return decorator
+
+
 def cache_images(func: Callable):
     '''Cache sent images for a particular user.
 
@@ -305,6 +325,25 @@ def ctx_command(func: Callable):
 
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
+        return func(self, *args, message=message, **kwargs)
+    return wrapped
+
+
+def defer(func: Callable):
+    '''Defers a function to be executed later.
+
+    :param func: The command to be decorated.
+    :type func: Callable
+    :return: The decorated function.
+    :rtype: Callable
+    '''
+    @wraps(func)
+    def wrapped(self, message, *args, **kwargs):
+        if isinstance(message, CustomInteraction):
+            async def deferred_exec():
+                await message.response.defer()
+                await func(self, *args, message=message, **kwargs)
+            return deferred_exec()
         return func(self, *args, message=message, **kwargs)
     return wrapped
 
@@ -462,21 +501,25 @@ def needs_ticket(name: str):
             inv = Inventory(message.author)
             tickets = inv.from_name(name)
             if not tickets:
-                Shop.refresh_tradables()
-                PremiumShop.refresh_tradables()
-                itemid = Shop.from_name(name) or PremiumShop.from_name(name)
-                embed_content = "You do not have any renaming tickets.\n" + \
-                    "You can buy one from the Consumables Shop."
-                if itemid:
-                    embed_content += "\nUse `/buy" + \
-                        f" {itemid}` to buy it."
-                return message.channel.send(
-                    embed=get_embed(
-                        embed_content,
-                        embed_type="error",
-                        title="Insufficient Tickets"
+                async def no_tix():
+                    await message.response.defer()
+                    Shop.refresh_tradables()
+                    PremiumShop.refresh_tradables()
+                    itemid = Shop.from_name(name) or PremiumShop.from_name(name)
+                    embed_content = f"You do not have any **{name}** tickets.\n" + \
+                        "You can buy one from the Consumables Shop."
+                    if itemid:
+                        embed_content += "\nUse `/buy" + \
+                            f" itemid:{itemid}` to buy it."
+                    await message.channel.send(
+                        embed=get_embed(
+                            embed_content,
+                            embed_type="error",
+                            title="Insufficient Tickets"
+                        ),
+                        ephemeral=True
                     )
-                )
+                return no_tix()
             kwargs["tickets"] = tickets
             return func(self, *args, message=message, **kwargs)
         return wrapped

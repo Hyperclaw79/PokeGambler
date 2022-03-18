@@ -33,8 +33,9 @@ from typing import Callable
 
 import aiohttp
 import discord
-from discord import Message, Interaction
+from discord import InteractionType, Message, Interaction
 from discord.ext import tasks
+from discord.http import _set_api_version
 from dotenv import load_dotenv
 import topgg
 
@@ -45,7 +46,7 @@ from scripts.base.models import (
 )
 from scripts.base.items import Item
 from scripts.base.shop import PremiumShop, Shop
-from scripts.base.handlers import ContextHandler, SlashHandler
+from scripts.base.handlers import AutocompleteHandler, ContextHandler, SlashHandler
 from scripts.base.views import MoreInfoView
 
 from scripts.helpers.logger import CustomLogger
@@ -81,8 +82,13 @@ class PokeGambler(discord.AutoShardedClient):
         intents = discord.Intents.all()
         # pylint: disable=assigning-non-slot
         intents.presences = False
+        # Use Gateway v9 until April 15th to allow text commands.
+        if datetime.today() > datetime(2022, 4, 15):
+            intents.message_content = False
+        else:
+            _set_api_version(9)
         super().__init__(intents=intents)
-        self.version = "v1.3.0"
+        self.version = "v1.4.0"
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
         self.__update_configs()
@@ -119,6 +125,9 @@ class PokeGambler(discord.AutoShardedClient):
         #: The :class:`~scripts.base.handlers.ContextHandler` for handling
         #:  context commands.
         self.ctx_cmds = ContextHandler(self)
+        #: The :class:`~scripts.base.handlers.AutocompleteHandler` for
+        #:  handling command option autocomplete.
+        self.autocompleter = AutocompleteHandler(self)
         # Commands
         for module in os.listdir("scripts/commands"):
             if module.endswith("commands.py"):
@@ -217,7 +226,13 @@ class PokeGambler(discord.AutoShardedClient):
         :param interaction: The interaction data.
         :type interaction: :class:`discord.Interaction`
         """
-        if not 1 <= interaction.data.get('type', 0) <= 2:
+        if interaction.type not in (
+            InteractionType.application_command,
+            InteractionType.autocomplete
+        ):
+            return
+        if interaction.type is InteractionType.autocomplete:
+            await self.autocompleter.parse(interaction)
             return
         if not interaction.guild or self.__bl_wl_check(interaction):
             return
@@ -427,6 +442,12 @@ class PokeGambler(discord.AutoShardedClient):
                 self.pending_cmds.pop(locked_cmd)
         cmd_obj = cmd_class(ctx=self)
         setattr(self, f"{module_type}commands", cmd_obj)
+        for attr in dir(cmd_obj):
+            attr_obj = getattr(cmd_obj, attr)
+            if 'autocomplete' in dir(attr_obj):
+                self.autocompleter.register(
+                    attr_obj, getattr(attr_obj, 'autocomplete')
+                )
         return cmd_obj
 
 # Private Methods
