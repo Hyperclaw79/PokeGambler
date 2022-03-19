@@ -371,7 +371,7 @@ class GladitorMatchHandler(AssetGenerator):
         """
         Returns corresponding blood image for the damage done.
         """
-        return self.bloods[int(damage / 50)]
+        return self.bloods[int(damage // 50)]
 
     @staticmethod
     def __get_damage():

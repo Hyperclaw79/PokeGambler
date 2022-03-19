@@ -135,11 +135,14 @@ class Listing(Queue):
             if not self.full():
                 super().put_nowait(item)
                 continue
-            removable = None
-            for existing_item in self.queue:
-                if not getattr(existing_item, "pinned", False):
-                    removable = existing_item
-                    break
+            removable = next(
+                (
+                    existing_item
+                    for existing_item in self.queue
+                    if not getattr(existing_item, "pinned", False)
+                ),
+                None,
+            )
             if not removable:
                 return
             self.queue.remove(removable)
@@ -214,9 +217,10 @@ class ShopItem:
     color: field(default_factory=int) = 0
 
     def __str__(self) -> str:
-        if not self.emoji:
-            return f"{self.name} "
-        return f"{self.name} 『{self.emoji}』"
+        return (
+            f"{self.name} " if not self.emoji
+            else f"{self.name} 『{self.emoji}』"
+        )
 
     @abstractmethod
     def buy(self, **kwargs) -> str:
@@ -356,20 +360,17 @@ class BoostItem(ShopItem):
         ]) > 5
 
     def _get_tempboosts(self, user: Member) -> Dict:
-        boost_dict = DB_CLIENT["tempboosts"].find_one({
+        return DB_CLIENT["tempboosts"].find_one({
             "user_id": str(user.id),
             "boost_id": self.itemid
-        })
-        if not boost_dict:
-            boost_dict = {
-                "user_id": str(user.id),
-                "boost_id": self.itemid,
-                "added_on": datetime.utcnow(),
-                "name": self.name,
-                "description": self.description,
-                "stack": 0,
-            }
-        return boost_dict
+        }) or {
+            "user_id": str(user.id),
+            "boost_id": self.itemid,
+            "added_on": datetime.utcnow(),
+            "name": self.name,
+            "description": self.description,
+            "stack": 0,
+        }
 
 
 class PremiumBoostItem(BoostItem):
@@ -462,10 +463,8 @@ class Title(ShopItem):
             role.name.title()
             for role in message.author.roles
         ):
-            return str(
-                "**You already have this title"
-                " bestowed upon you.**"
-            )
+            return "**You already have this title " + \
+                "bestowed upon you.**"
         roles = [
             role
             for role in message.guild.roles
@@ -481,10 +480,7 @@ class Title(ShopItem):
                     )
                 ]
             except Forbidden:
-                return str(
-                    "**Need [Manage Server] permission to "
-                    "create title roles.**"
-                )
+                return "**Need [Manage Server] permission to create title roles.**"
         role = roles[0]
         change_nick = True
         try:
@@ -512,10 +508,8 @@ class Title(ShopItem):
             self.debit_player(message.author)
             return "success"
         except Forbidden:
-            return str(
-                "**You're too OP for me to give you a role.**\n"
+            return "**You're too OP for me to give you a role.**\n" + \
                 "**Please ask an admin to give you the role.**\n"
-            )
 
 
 class Shop:
@@ -681,10 +675,14 @@ class Shop:
         :return: The itemid of the item.
         :rtype: str
         """
-        for catog in cls.categories.values():
-            if catog.items.name_id_map.get(name) is not None:
-                return catog.items.name_id_map[name]
-        return None
+        return next(
+            (
+                catog.items.name_id_map[name]
+                for catog in cls.categories.values()
+                if catog.items.name_id_map.get(name) is not None
+            ),
+            None,
+        )
 
     @classmethod
     def get_item(

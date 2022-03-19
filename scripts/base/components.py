@@ -46,12 +46,11 @@ def from_dict(cls: Any, data: Dict[str, Any]) -> Any:
     :return: The Dataclass instance.
     :rtype: Any
     """
-    new_fields = [
+    if new_fields := [
         (key, type(val), field(default=None))
         for key, val in data.items()
         if key not in (param.name for param in fields(cls))
-    ]
-    if new_fields:
+    ]:
         old_fields = [
             (
                 field_.name, field_.type, field(

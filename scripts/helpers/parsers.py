@@ -54,9 +54,10 @@ class Directive:
         self.children = []
 
     def __getattr__(self, name: str):
-        if name not in dir(self):
-            return self.options.get(name)
-        return self.__dict__[name]
+        return (
+            self.options.get(name) if name not in dir(self)
+            else self.__dict__[name]
+        )
 
     @property
     def line_string(self) -> str:

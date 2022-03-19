@@ -349,8 +349,7 @@ class TradeCommands(Commands):
 
             /give chips:500 user:ABCD#1234
         """
-        error_tuple = self.__give_santize(message, user, chips)
-        if error_tuple:
+        if error_tuple := self.__give_santize(message, user, chips):
             await message.reply(
                 embed=get_embed(
                     error_tuple[1],
@@ -1202,18 +1201,15 @@ class TradeCommands(Commands):
         content = f"You have recieved **{chips}** {self.chip_emoji}."
         items = []
         for openable in openables:
+            item = None
             if openable.name == "Legendary Chest":
                 item = openable.get_random_collectible()
-                if item:
-                    items.append(item)
             elif openable.category == 'Lootbag':
-                res = openable.get_random_items()
-                if res:
-                    items.extend(res)
+                item = openable.get_random_items()
             elif openable.category == 'Rewardbox':
-                res = Rewardbox.get_items(openable.itemid)
-                if res:
-                    items.extend(res)
+                item = Rewardbox.get_items(openable.itemid)
+            if item:
+                items.extend(item)
         if items:
             item_str = '\n'.join(
                 f"**『{item.emoji}』 {item} x{items.count(item)}**"

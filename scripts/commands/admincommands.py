@@ -519,9 +519,9 @@ class AdminCommands(Commands):
                         updates.append(f"**{child.label}**")
                 if chosen.label == "Currency":
                     curr_bal = profile.balance
-                    increment = int(to_update.get("won_chips", 0)) + \
-                        (int(to_update.get("pokebonds", 0)) * 10)
-                    if increment:
+                    if increment := int(to_update.get("won_chips", 0)) + (
+                        int(to_update.get("pokebonds", 0)) * 10
+                    ):
                         new_bal = curr_bal + increment
                         to_update["balance"] = new_bal
                 profile.update(**to_update)

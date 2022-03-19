@@ -258,12 +258,11 @@ class Blacklist(Model):
             for shop in [Shop, PremiumShop]
             for title in shop.categories["Titles"].items
         ]
-        need_to_remove = [
+        if need_to_remove := [
             role
             for role in self.user.roles
             if role.name.title() in titles
-        ]
-        if need_to_remove:
+        ]:
             await self.user.remove_roles(
                 *need_to_remove,
                 reason="Blacklisted"
@@ -585,11 +584,7 @@ class Exchanges(Model):
                 }
             }
         ]
-        result = next(
-            self.mongo.aggregate(pipeline),
-            None
-        )
-        if result:
+        if result := next(self.mongo.aggregate(pipeline), None):
             return result["total_chips"]
         return 0
 
@@ -1100,15 +1095,12 @@ class UnlockedModel(Model):
 
     def __init__(self, user: discord.Member):
         super().__init__(user)
-        existing = self.mongo.find_one(
-            {"user_id": str(self.user.id)}
-        )
-        if not existing:
-            self._default()
-            self.save()
-        else:
+        if existing := self.mongo.find_one({"user_id": str(self.user.id)}):
             for key, val in existing.items():
                 setattr(self, key, val)
+        else:
+            self._default()
+            self.save()
 
     @expire_cache
     def reset(self):

@@ -253,8 +253,7 @@ def cache_images(func: Callable):
             Commands.caches[user.id].append(
                 cache[user.id]
             )
-        existing = func.__dict__["image_cache"][user.id].cached
-        if existing:
+        if existing := func.__dict__["image_cache"][user.id].cached:
             return message.reply(content=existing)
         return func(self, *args, message=message, **kwargs)
     return wrapped

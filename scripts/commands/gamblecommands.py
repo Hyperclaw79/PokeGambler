@@ -424,8 +424,7 @@ class GambleCommands(Commands):
                     value="\u200B",
                     inline=True
                 )
-            winner = self.ctx.get_user(winner['id'])
-            if winner:
+            if winner := self.ctx.get_user(winner['id']):
                 emb.set_image(
                     url=winner.display_avatar.with_size(256)
                 )

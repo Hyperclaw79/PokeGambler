@@ -551,12 +551,11 @@ class DuelCommands(Commands):
         chips: int = None
     ) -> int:
         if chips:
-            proceed = await MinValidator(
+            amount = await MinValidator(
                 50, message=message
-            ).validate(chips)
-            if not proceed:
+            ).cleaned(chips)
+            if not amount:
                 return 0
-            amount = int(chips)
         else:
             amount = 50
             if user_profile.get('balance') >= 50:

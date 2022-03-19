@@ -22,6 +22,7 @@ The Main Module which serves as the brain of the code.
 # pylint: disable=no-member
 
 from collections import namedtuple
+from contextlib import suppress
 import difflib
 import importlib
 from io import BytesIO
@@ -176,8 +177,7 @@ class PokeGambler(discord.AutoShardedClient):
                     )
                 )
                 return
-            cmd_cd = getattr(method, "cooldown", None)
-            if cmd_cd:
+            if cmd_cd := getattr(method, "cooldown", None):
                 on_cmd_cd = await self.__handle_cmd_cd(message, method, cmd_cd)
                 if on_cmd_cd:
                     return
@@ -377,7 +377,8 @@ class PokeGambler(discord.AutoShardedClient):
         self.ready = True
         Shop.refresh_tradables()
         PremiumShop.refresh_tradables()
-        await self.topgg.post_guild_count()
+        with suppress(topgg.ServerError):
+            await self.topgg.post_guild_count()
         await self.slash_sync()
         await online_now(self)
         game = discord.Game(
@@ -493,9 +494,7 @@ class PokeGambler(discord.AutoShardedClient):
                     kwargs["args"], opts
                 )
                 cmd_data.save()
-            task = method(**kwargs)
-            # Decorators can return None
-            if task:
+            if task := method(**kwargs):
                 await task
         except Exception:  # pylint: disable=broad-except
             await self.__handle_error(
@@ -562,7 +561,7 @@ class PokeGambler(discord.AutoShardedClient):
         if message.content.lower().startswith(
             self.prefix.lower()
         ):
-            try:
+            with suppress(discord.Forbidden):
                 await message.channel.send(
                     embed=get_embed(
                         "I currently do not support commands in the DMs.\n"
@@ -571,8 +570,6 @@ class PokeGambler(discord.AutoShardedClient):
                         title="No Commands in DMs"
                     )
                 )
-            except discord.Forbidden:
-                pass
 
     async def __handle_cd(self, message: Message):
         if is_owner(self, message.author):
@@ -868,11 +865,10 @@ class PokeGambler(discord.AutoShardedClient):
         )
         await jq_log_channel.send(embed=emb)
         if event == "join":
-            chan = guild.system_channel or discord.utils.get(
+            if chan := guild.system_channel or discord.utils.get(
                 guild.text_channels, name="general"
-            )
-            if chan:
-                try:
+            ):
+                with suppress(discord.Forbidden, discord.HTTPException):
                     await chan.send(
                         embed=get_embed(
                             title="Thanks for adding me!",
@@ -882,8 +878,6 @@ class PokeGambler(discord.AutoShardedClient):
                             "?width=640&height=360"
                         )
                     )
-                except (discord.Forbidden, discord.HTTPException):
-                    pass
         else:
             count = CommandData.clean_guild(guild.id)
             self.logger.pprint(

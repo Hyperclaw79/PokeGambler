@@ -538,12 +538,11 @@ class NormalCommands(Commands):
         if top_command is None:
             return None
         command = top_command['_id']
-        modules = [
+        if modules := [
             module
             for module in get_modules(self.ctx)
             if f"cmd_{command}" in module.alias
-        ]
-        if modules:
+        ]:
             command = getattr(
                 modules[0], f"cmd_{command}"
             ).__name__.replace("cmd_", "")
