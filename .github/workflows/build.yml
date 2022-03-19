@@ -103,7 +103,7 @@ jobs:
         echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
         echo "SECRET_VERSION=latest" >> $GITHUB_ENV
         echo "FOLDER=prod" >> $GITHUB_ENV
-        echo "IS_PROD=true" >> $GITHUB_ENV
+        echo "IS_PROD=True" >> $GITHUB_ENV
 
     # - name: Set TAG to Beta
     #   if: "!(endsWith(github.ref, '/main'))"
@@ -111,7 +111,7 @@ jobs:
     #    echo "TAG=beta" >> $GITHUB_ENV
     #    echo "SECRET_VERSION=1" >> $GITHUB_ENV
     #    echo "FOLDER=beta" >> $GITHUB_ENV
-    #    echo "IS_PROD=false" >> $GITHUB_ENV
+    #    echo "IS_PROD=False" >> $GITHUB_ENV
 
     - name: Set TAG to Version
       if: github.event_name == 'release'
@@ -119,7 +119,7 @@ jobs:
         echo "TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
         echo "SECRET_VERSION=latest" >> $GITHUB_ENV
         echo "FOLDER=prod" >> $GITHUB_ENV
-        echo "IS_PROD=true" >> $GITHUB_ENV
+        echo "IS_PROD=True" >> $GITHUB_ENV
 
     - name: Checkout
       uses: actions/checkout@v2
