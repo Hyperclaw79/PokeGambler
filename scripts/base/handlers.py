@@ -249,9 +249,10 @@ class CommandListing(list):
                         option['autocomplete'] = option.get(
                             'autocomplete', False
                         )
-                self.append(
-                    self.handler.component_class.from_dict(command)
-                )
+                if command['name'] not in self.names:
+                    self.append(
+                        self.handler.component_class.from_dict(command)
+                    )
 
 
 def command_to_dict(
@@ -500,9 +501,12 @@ class SlashHandler:
         payload = self.__prep_payload(command)
         if not payload:
             return {}
-        route = self.get_route(**kwargs)
         if hasattr(command, "os_only") and self.ctx.is_prod:
             route = self.get_route(guild_id=self.ctx.official_server)
+        elif self.ctx.is_local:
+            route = self.get_route(**kwargs)
+        else:
+            route = self.get_route()
         need_perms = any(
             hasattr(command, perm)
             for perm in (
