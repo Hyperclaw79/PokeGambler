@@ -1,11 +1,10 @@
 # PokéGambler
-![Python Version](https://img.shields.io/badge/Python-v3.9-blue)
-[![Build](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build.yml/badge.svg)](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build.yml)
-[![Docs](https://readthedocs.org/projects/pokegambler/badge/?version=latest)](https://pokegambler.readthedocs.io/en/latest/?badge=latest)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/4ae74458ca5941d1884e669a4b3446c0)](https://www.codacy.com/gh/Hyperclaw79/PokeGambler/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Hyperclaw79/PokeGambler&amp;utm_campaign=Badge_Grade)
-[![Sourcery](https://img.shields.io/badge/Sourcery-enabled-brightgreen)](https://sourcery.ai)
-[![Discord](https://img.shields.io/discord/361522003355631617?logo=discord)](https://discord.gg/g4TmVyfwj4)
-[![GitNFT](https://img.shields.io/badge/%F0%9F%94%AE-Open%20in%20GitNFT-darkviolet?style=flat)](https://gitnft.quine.sh/app/commits/list/repo/PokeGambler)
+
+|Info|Build|Code Quality|Chat|
+|:--:|:---:|:----------:|:--:|
+|![Python Version](https://img.shields.io/badge/Python-v3.9-blue)|[![Build](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build.yml/badge.svg)](https://github.com/Hyperclaw79/PokeGambler/actions/workflows/build.yml)|[![Codacy Badge](https://app.codacy.com/project/badge/Grade/4ae74458ca5941d1884e669a4b3446c0)](https://www.codacy.com/gh/Hyperclaw79/PokeGambler/dashboard?utm_source=github.com&utm_medium=referral&utm_content=Hyperclaw79/PokeGambler&utm_campaign=Badge_Grade)|[![Discord](https://img.shields.io/discord/361522003355631617?logo=discord)](https://discord.gg/g4TmVyfwj4)|
+|[![GitNFT](https://img.shields.io/badge/%F0%9F%94%AE-Open%20in%20GitNFT-darkviolet?style=flat)](https://gitnft.quine.sh/app/commits/list/repo/PokeGambler)|[![Docs](https://readthedocs.org/projects/pokegambler/badge/?version=latest)](https://pokegambler.readthedocs.io/en/latest/?badge=latest)|[![Sourcery](https://img.shields.io/badge/Sourcery-enabled-brightgreen)](https://sourcery.ai)|[![Gitter](https://img.shields.io/badge/Gitter-PokeGambler-blue)](https://gitter.im/pokegambler)|
+
 
 PokeGambler uses pokemon themed playing cards for entertaining gambling matches.
 
@@ -91,7 +90,7 @@ Maximum Tier is T3 as of now.
       </tr>
       <tr>
          <td>2</td>
-         <td>10</td>
+         <td>25</td>
          <td>x10</td>
          <td><img aria-label=":gold:" src="https://cdn.discordapp.com/emojis/874626456993534042.png?v=1" alt=":gold:" draggable="false" class="emoji"></td>
       </tr>
