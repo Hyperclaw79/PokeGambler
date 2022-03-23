@@ -212,8 +212,7 @@ class NormalCommands(Commands):
                         showable_command(
                             self.ctx, getattr(module, attr),
                             message.author
-                        ),
-                        module.__class__.__name__ != 'TradeCommands'
+                        )
                     ]
                 )
             }
