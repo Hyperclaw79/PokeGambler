@@ -659,11 +659,10 @@ class Inventory(Model):
         :return: The Item object.
         :rtype: :class:`~.items.Item`
         """
-        item = self.mongo.find_one({
+        if self.mongo.find_one({
             "user_id": self.user_id,
             "itemid": itemid
-        })
-        if item:
+        }):
             return Item.from_id(itemid)
         return None
 
@@ -796,8 +795,7 @@ class Inventory(Model):
         :param itemid: The ItemID of the item.
         :type itemid: str
         """
-        item = self.from_id(itemid)
-        if item:
+        if self.from_id(itemid):
             new_item = Item.from_id(itemid, force_new=True)
             new_item.save()
             itemid = new_item.itemid

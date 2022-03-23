@@ -961,14 +961,13 @@ class ProfileCommands(Commands):
                 content += "\nYou've been given a bonus Chest!\n" + \
                     f"『{chest.emoji}』**{chest}** - **{chest.itemid}**"
                 cleared_cds = ["Loot"]
-                for cmd in self.ctx.cooldown_cmds:
-                    cleared = self.ctx.cooldown_cmds[cmd].pop(
+                cleared_cds.extend(
+                    cmd.__name__.replace("cmd_", "").title()
+                    for cmd in self.ctx.cooldown_cmds
+                    if self.ctx.cooldown_cmds[cmd].pop(
                         message.author, None
                     )
-                    if cleared:
-                        cleared_cds.append(
-                            cmd.__name__.replace("cmd_", "").title()
-                        )
+                )
                 self.ctx.loot_cd.pop(message.author, None)
                 cd_cmd_str = "\n".join(
                     f"{idx + 1}. {cmd}"

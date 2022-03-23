@@ -346,6 +346,7 @@ class GladitorMatchHandler(AssetGenerator):
         gladiator_sprite.paste(blood, pos, blood)
 
     def __fight(self, gladiator: Gladiator) -> Tuple[Image.Image, int]:
+        # sourcery skip: use-named-expression
         """
         Makes the provider gladiator take damage and returns
         a tuple of damaged gladiator image and remaining hitpoint.
