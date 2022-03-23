@@ -55,7 +55,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Cloud SDK
-      uses: google-github-actions/setup-gcloud@master
+      uses: google-github-actions/setup-gcloud@v0
       with:
         service_account_key: ${{ secrets.GCLOUD_AUTH }}
 
@@ -127,7 +127,7 @@ jobs:
         ref: ${{ github.ref }}
 
     - name: Setup Cloud SDK
-      uses: google-github-actions/setup-gcloud@master
+      uses: google-github-actions/setup-gcloud@v0
       with:
         service_account_key: ${{ secrets.GCLOUD_AUTH }}
         export_default_credentials: true
@@ -136,13 +136,13 @@ jobs:
       run: gcloud auth configure-docker
 
     - name: Get GKE Credentials
-      uses: google-github-actions/get-gke-credentials@main
+      uses: google-github-actions/get-gke-credentials@v0
       with:
         cluster_name: pokegambler-cluster
         location: us-central1-c
 
     # - name: Get Secrets from GSM
-    #   uses: google-github-actions/get-secretmanager-secrets@main
+    #   uses: google-github-actions/get-secretmanager-secrets@v0
     #   id: secrets
     #   with:
     #     secrets: |-
