@@ -35,6 +35,7 @@ from typing import (
 
 import discord
 from discord import Guild, Member, TextChannel, User, Role
+from pymongo import UpdateOne
 
 from ..base.items import Item, DB_CLIENT  # pylint: disable=cyclic-import
 
@@ -105,6 +106,7 @@ class NameSetter(type):
         new_cl.model_name = new_cl.__name__.lower()
         new_cl.mongo = DB_CLIENT[new_cl.model_name]
         new_cl.no_uinfo = dct.get('no_uinfo', False)
+        new_cl._uid_fields = dct.get('uid_fields', [])
         return new_cl
 
 
@@ -133,7 +135,8 @@ class Model(metaclass=NameSetter):
                 not attr.startswith("_"),
                 attr not in [
                     "model_name", "mongo",
-                    "excludes", "no_uinfo"
+                    "excludes", "no_uinfo",
+                    "uid_fields", "classes"
                 ],
                 not ismethod(getattr(self, attr)),
                 not isinstance(
@@ -147,6 +150,19 @@ class Model(metaclass=NameSetter):
                     res = to_dict(res)
                     res.pop('id')
                 yield (attr, res)
+
+    @classmethod
+    @property
+    def uid_fields(cls) -> List[str]:
+        """
+        List of fields containing user IDs.
+
+        :return: List of fields containing user IDs.
+        :rtype: List[str]
+        """
+        if ('user_id', str) not in cls._uid_fields:
+            cls._uid_fields.append(('user_id', str))
+        return cls._uid_fields
 
     def drop(self):
         """
@@ -205,6 +221,70 @@ class Model(metaclass=NameSetter):
         """
         cls.mongo.delete_many({})
 
+    @classmethod
+    @property
+    def classes(cls) -> List[Type[Model]]:
+        """
+        List of all subclasses of Model.
+
+        :return: List of all subclasses of Model.
+        :rtype: List[Type[Model]]
+        """
+        return [
+            cls
+            for cls in Model.__subclasses__()
+            if cls not in (UnlockedModel, Minigame)
+        ] + UnlockedModel.__subclasses__() + Minigame.__subclasses__()
+
+    @classmethod
+    def censor_uids(cls, user: discord.User) -> int:
+        """
+        Censors the user IDs in all the collections.
+
+        :param user: The user to censor.
+        :type user: :class:`discord.User`
+        :return: The number of documents censored.
+        :rtype: int
+        """
+        def get_filter(user, elem, type_):
+            if type_ in (list, dict):
+                return {f'{elem}.id': user.id}
+            return {elem: str(user.id)}
+
+        def replace_id(id_, record):
+            for key, value in record.items():
+                if str(value) == str(id_):
+                    record[key] = 'REDACTED'
+                elif isinstance(value, dict):
+                    replace_id(id_, value)
+                elif isinstance(value, list):
+                    for idx, value_ in enumerate(value):
+                        value[idx] = replace_id(id_, value_)
+            return record
+
+        num_deleted = 0
+        # pylint: disable=not-an-iterable
+        for model in cls.classes:
+            filter_ = {
+                "$or": [
+                    get_filter(user, name, type_)
+                    for name, type_ in model.uid_fields
+                ]
+            }
+            modified_records = [
+                UpdateOne(
+                    {'_id': record.pop('_id')},
+                    {'$set': replace_id(user.id, record)}
+                )
+                for record in model.mongo.find(filter_)
+            ]
+            if modified_records:
+                res = model.mongo.bulk_write(modified_records)
+                raw = res.bulk_api_result
+                if raw.get('nModified', 0) > 0:
+                    num_deleted += raw['nModified']
+        return num_deleted
+
 
 # region Models
 
@@ -218,6 +298,8 @@ class Blacklist(Model):
     :param reason: The reason for the blacklist.
     :type reason: Optional[str]
     """
+
+    uid_fields = [('blacklisted_by', dict)]
 
     def __init__(
         self, user: discord.Member,
@@ -493,6 +575,8 @@ class DuelActionsModel(Model):
     :type level: Optional[str]
     """
 
+    uid_fields = [("created_by", str)]
+
     def __init__(
         self, user: discord.Member,
         action: Optional[str] = None,
@@ -539,6 +623,8 @@ class Exchanges(Model):
     :param mode: The mode of the exchange., default is Deposit.
     :type mode: Optional[str]
     """
+
+    uid_fields = [("admin", dict)]
 
     def __init__(
         self, user: discord.Member,
@@ -929,6 +1015,11 @@ class Matches(Model):
     """
 
     no_uinfo = True
+    uid_fields = [
+        ('started_by', dict),
+        ('participants', list),
+        ('winner', dict)
+    ]
 
     def __init__(
         self, user: discord.Member,
@@ -1019,6 +1110,7 @@ class Nitro(Model):
     """
 
     no_uinfo = True
+    uid_fields = [('boosters', list)]
 
     def __init__(
         self, user: discord.Member,
@@ -1065,6 +1157,11 @@ class Trades(Model):
     :param taken_items: The list of items taken from user.
     :type taken_items: List[str]
     """
+
+    uid_fields = [
+        ('traded_by', str),
+        ('traded_to', dict)
+    ]
 
     def __init__(
         self, user: discord.Member,
@@ -1600,6 +1697,11 @@ class Duels(Minigame):
     :type cost: Optional[int]
     """
 
+    uid_fields = [
+        ("played_by", str),
+        ("opponent", dict)
+    ]
+
     def __init__(
         self, user: discord.Member,
         gladiator: Optional[str] = None,
@@ -1660,6 +1762,8 @@ class Flips(Minigame):
     :type won: bool
     """
 
+    uid_fields = [("played_by", str)]
+
     def __init__(
         self, user: discord.Member,
         cost: int = 50, won: bool = False
@@ -1669,6 +1773,7 @@ class Flips(Minigame):
         self.played_by = str(user.id)
         self.cost = cost
         self.won = won
+        self.uid_fields = ["played_by"]
 
 
 class Moles(Minigame):
@@ -1684,6 +1789,8 @@ class Moles(Minigame):
     :type won: bool
     """
 
+    uid_fields = [("played_by", str)]
+
     def __init__(
         self, user: discord.Member,
         cost: int = 50, level: int = 1,
@@ -1695,6 +1802,7 @@ class Moles(Minigame):
         self.cost = cost
         self.level = level
         self.won = won
+        self.uid_fields = ["played_by"]
 
     def _get_lb_group(self) -> Dict[str, Any]:
         return {

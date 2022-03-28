@@ -43,7 +43,7 @@ from ..helpers.validators import (
     ItemNameValidator, MinValidator
 )
 from ..base.modals import CallbackReplyModal
-from ..base.models import Blacklist, Inventory, Profiles
+from ..base.models import Blacklist, Inventory, Model, Profiles
 from ..base.items import Item, Tradable, Treasure
 from ..base.shop import Shop, PremiumShop
 from ..base.views import (
@@ -52,7 +52,7 @@ from ..base.views import (
 )
 from .basecommand import (
     Commands, admin_only, alias,
-    check_completion, ensure_item,
+    check_completion, defer, ensure_item,
     get_profile, model, os_only
 )
 
@@ -542,6 +542,59 @@ class AdminCommands(Commands):
         btn_view = await self.__upd_usr_send_buttons(message, oneshotview)
         await btn_view.dispatch(self)
         return
+
+    @admin_only
+    @os_only
+    @model(Model)
+    @defer
+    async def cmd_censor_uids(
+        self, message,
+        user: discord.User,
+        **kwargs
+    ):
+        """Censor the IDs of a user from the database.
+        Replaces the user ID with "REDACTED".
+
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param user: The user whose IDs need to be censord.
+        :type user: :class:`discord.User`
+
+        .. meta::
+            :description: Censor a user by their ID
+            :aliases: del_uids
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            /censor_uids user:@User
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
+        Censors the IDs of a user from the database.
+
+        .. rubric:: Examples
+
+        * To censor a user ABC#1234:
+
+        .. code:: coffee
+            :force:
+
+            /censor_uids user:@ABC#1234
+        """
+        if num_censored := Model.censor_uids(user):
+            await message.reply(
+                embed=get_embed(
+                    content=f"Censord {num_censored} IDs"
+                )
+            )
+        else:
+            await message.reply(
+                embed=get_embed(
+                    content="No IDs to censor"
+                )
+            )
 
     @check_completion
     @admin_only
