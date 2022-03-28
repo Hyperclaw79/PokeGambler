@@ -373,7 +373,7 @@ class TradeCommands(Commands):
         mention_prof.credit(chips)
         Trades(
             message.author,
-            str(user.id), chips
+            user, chips
         ).save()
         await message.channel.send(
             embed=get_embed(

@@ -527,9 +527,10 @@ class LeaderBoardGenerator(AssetGenerator):
                 pos["bbox"], 60
             )
         avatar_byio = BytesIO()
-        await ctx.get_user(
-            int(data["user_id"])
-        ).avatar.with_size(512).save(avatar_byio)
+        if user := ctx.get_user(int(data["user_id"])):
+            await user.avatar.with_size(512).save(avatar_byio)
+        else:
+            await ctx.user.default_avatar.with_size(512).save(avatar_byio)
         avatar = Image.open(avatar_byio).resize(
             (402, 402)
         ).convert('RGBA')
