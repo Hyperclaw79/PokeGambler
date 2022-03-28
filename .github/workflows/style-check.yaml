@@ -32,4 +32,4 @@ jobs:
         pycodestyle --max-line-length=85 scripts bot.py launcher.py
     - name: Run Linting
       run: |
-        pylint -f colorized scripts bot.py launcher.py
+        pylint -f colorized -d non-ascii-name scripts bot.py launcher.py
