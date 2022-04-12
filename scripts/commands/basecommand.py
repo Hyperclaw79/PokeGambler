@@ -510,7 +510,7 @@ def needs_ticket(name: str):
                     if itemid:
                         embed_content += "\nUse `/buy" + \
                             f" itemid:{itemid}` to buy it."
-                    await message.channel.send(
+                    await message.reply(
                         embed=get_embed(
                             embed_content,
                             embed_type="error",
