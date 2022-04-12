@@ -1065,12 +1065,9 @@ class AdminCommands(Commands):
     def __item_get_labels(message, catogclass):
         labels = {
             "name": {
-                "validator": ItemNameValidator(
-                    message=message
-                )
+                "validator": ItemNameValidator(message=message)
             }
-        }
-        labels.update({
+        } | {
             field.name: {
                 "validator": None
             }
@@ -1079,7 +1076,8 @@ class AdminCommands(Commands):
                 field.default is MISSING,
                 field.name != 'category'
             ])
-        })
+        }
+
         labels['asset_url']['validator'] = ImageUrlValidator(message=message)
         if issubclass(catogclass, Tradable):
             labels["price"] = {

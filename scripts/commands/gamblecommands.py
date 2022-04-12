@@ -63,15 +63,15 @@ class GambleCommands(Commands):
         self.conv_table = {
             f"{i}": i
             for i in range(2, 11)
-        }
-        self.conv_table.update({
+        } | {
             "0": 0,
             "A": 1,
             "J": 11,
             "Q": 12,
             "K": 13,
             "Joker": 100
-        })
+        }
+
         self.suits = [
             "joker", "spade", "heart", "club", "diamond"
         ]
