@@ -82,6 +82,9 @@ class CommandOptions(dict):
     def __getattr__(self, item: str) -> Any:
         return super().get(item, None)
 
+    def __hash__(self) -> int:
+        return hash(frozenset(self.to_dict().items()))
+
     def __setitem__(self, key: str, value: Any) -> None:
         setattr(self, key, value)
         super().__setitem__(key, value)

@@ -872,19 +872,23 @@ class AutocompleteHandler:
         )
         if cmd not in self.registered:
             return []
-        focused_opt = [
-            opt
-            for opt in cmd.options
-            if opt.get('focused', False)
-        ]
+        focused_opt = next(
+            (
+                opt
+                for opt in cmd.options
+                if opt.get('focused', False)
+            ),
+            None
+        )
         if not focused_opt:
             return []
         # Reset on empty input
-        if focused_opt[0].get('value', '') == '':
+        if focused_opt.get('value', '') == '':
             self.cache.pop(
-                (cmd, focused_opt, interaction.user.id)
+                (cmd, focused_opt, interaction.user.id),
+                None
             )
-        focused_opt = focused_opt[0].name
+        focused_opt = focused_opt.name
         choices = self.cache.get(
             (cmd, focused_opt, interaction.user.id)
         )
