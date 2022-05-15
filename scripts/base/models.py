@@ -30,14 +30,19 @@ from inspect import ismethod
 import os
 from typing import (
     Any, Callable, Dict, List,
-    Optional, Tuple, Type, Union
+    Optional, Tuple, Type, Union,
+    TYPE_CHECKING
 )
 
 import discord
 from discord import Guild, Member, TextChannel, User, Role
 from pymongo import UpdateOne
 
-from ..base.items import Item, DB_CLIENT  # pylint: disable=cyclic-import
+if TYPE_CHECKING:
+    from bot import PokeGambler
+
+# pylint: disable=cyclic-import, wrong-import-position
+from ..base.items import Item, DB_CLIENT
 
 
 def expire_cache(func: Callable):
@@ -92,6 +97,13 @@ def to_dict(
     return obj_dict
 
 
+class MethodNotAllowed(Exception):
+    """Exception raised when a method is not allowed.
+
+    :meta private:
+    """
+
+
 class NameSetter(type):
     """
     Metaclass to set the mongo collection for the model.
@@ -129,14 +141,18 @@ class Model(metaclass=NameSetter):
             # Patch for Full_Info being executed before Profile creation.
             if attr in getattr(self, "excludes", []):
                 continue
-            if attr == 'user' and self.no_uinfo:
+            if attr == 'user' and (
+                self.no_uinfo
+                or isinstance(self, TaskModel)
+            ):
                 continue
             if all([
                 not attr.startswith("_"),
                 attr not in [
                     "model_name", "mongo",
                     "excludes", "no_uinfo",
-                    "uid_fields", "classes"
+                    "uid_fields", "classes",
+                    "count"
                 ],
                 not ismethod(getattr(self, attr)),
                 not isinstance(
@@ -284,6 +300,16 @@ class Model(metaclass=NameSetter):
                 if raw.get('nModified', 0) > 0:
                     num_deleted += raw['nModified']
         return num_deleted
+
+    @classmethod
+    def count(cls) -> int:
+        """
+        The number of documents in the collection.
+
+        :return: The number of documents in the collection.
+        :rtype: int
+        """
+        return cls.mongo.estimated_document_count()
 
 
 # region Models
@@ -893,108 +919,6 @@ class Inventory(Model):
         })
 
 
-class Minigame(Model):
-    """
-    Base class for Minigames.
-    """
-
-    # pylint: disable=no-self-use
-
-    @property
-    def num_plays(self) -> int:
-        """Returns number of minigames (of specified type) played.
-
-        :return: Number of minigames played.
-        :rtype: int
-        """
-        return len(self.get_plays())
-
-    @property
-    def num_wins(self):
-        """Returns number of minigames (of specified type) won.
-
-        :return: Number of minigames won.
-        :rtype: int
-        """
-        return len(self.get_plays(wins=True))
-
-    def get_lb(self) -> List[Dict]:
-        """Returns leaderboard for the specified minigame.
-
-        :return: The leaderboard for the minigame.
-        :rtype: List[Dict]
-        """
-        return list(self.mongo.aggregate([
-            {
-                "$group": self._get_lb_group()
-            },
-            {
-                "$match": {
-                    "num_wins": {"$gte": 1}
-                }
-            },
-            {
-                "$addFields": {
-                    "earned": {
-                        "$toInt": {"$multiply": [
-                            "$num_wins", {
-                                "$divide": [
-                                    "$cumm_cost", "$num_matches"
-                                ]
-                            }
-                        ]}
-                    }
-                }
-            },
-            {"$sort": self._get_lb_sort()},
-            {"$limit": 20}
-        ]))
-
-    def get_plays(self, wins: bool = False) -> List[Dict]:
-        """Returns list of minigames (of specified type) played.
-
-        :param wins: Whether to include only wins or all plays.
-        :type wins: bool
-        :return: List of minigames played.
-        :rtype: List[Dict]
-        """
-        filter_ = {
-            "played_by": str(self.user.id)
-        }
-        if wins:
-            filter_["won"] = True
-        return list(self.mongo.aggregate([
-            {
-                "$match": filter_
-            }
-        ]))
-
-    @expire_cache
-    def save(self):
-        super().save()
-
-    def _get_lb_group(self):
-        return {
-            "_id": "$played_by",
-            "num_wins": {
-                "$sum": {
-                    "$toInt": "$won"
-                }
-            },
-            "num_matches": {"$sum": 1},
-            "cumm_cost": {"$sum": "$cost"}
-        }
-
-    def _get_lb_sort(self) -> Dict[str, Any]:
-        """
-        Override it for each Minigame.
-        """
-        return {
-            "num_wins": -1,
-            "earned": -1
-        }
-
-
 class Matches(Model):
     """Wrapper for Gamble matches based DB actions
 
@@ -1098,49 +1022,6 @@ class Matches(Model):
         return list(cls.mongo.aggregate(pipeline))
 
 
-class Nitro(Model):
-    """Wrapper for Nitro Reward records.
-
-    :param user: The user to map the collection to.
-    :type user: :class:`discord.Member`
-    :param boosters: The list of the nitro boosters.
-    :type boosters: List[:class:`discord.Member`]
-    :param rewardboxes: The list of IDs of nitro reward boxes.
-    :type rewardboxes: List[str]
-    """
-
-    no_uinfo = True
-    uid_fields = [('boosters', list)]
-
-    def __init__(
-        self, user: discord.Member,
-        boosters: List[discord.Member] = None,
-        rewardboxes: List[str] = None
-    ):
-        super().__init__(user)
-        self.last_rewarded = datetime.now()
-        self.boosters = [
-            to_dict(user)
-            for user in boosters
-        ] if boosters else None
-        self.rewardboxes = rewardboxes
-
-    @classmethod
-    def get_last_rewarded(cls) -> datetime:
-        """Returns the last time the users were rewarded.
-
-        :return: Last time the users were rewarded.
-        """
-        pipeline = [
-            {"$sort": {"last_rewarded": -1}},
-            {"$limit": 1}
-        ]
-        return next(
-            cls.mongo.aggregate(pipeline),
-            {'last_rewarded': datetime.utcnow() - timedelta(days=31)}
-        )['last_rewarded']
-
-
 class Trades(Model):
     """Wrapper for trades based DB actions.
 
@@ -1179,6 +1060,136 @@ class Trades(Model):
         self.taken_chips = taken_chips
         self.given_items = given_items
         self.taken_items = taken_items
+
+
+# region Submodels
+
+class Minigame(Model):
+    """
+    Base class for Minigames.
+    """
+
+    # pylint: disable=no-self-use
+
+    @property
+    def num_plays(self) -> int:
+        """Returns number of minigames (of specified type) played.
+
+        :return: Number of minigames played.
+        :rtype: int
+        """
+        return len(self.get_plays())
+
+    @property
+    def num_wins(self):
+        """Returns number of minigames (of specified type) won.
+
+        :return: Number of minigames won.
+        :rtype: int
+        """
+        return len(self.get_plays(wins=True))
+
+    def get_lb(self) -> List[Dict]:
+        """Returns leaderboard for the specified minigame.
+
+        :return: The leaderboard for the minigame.
+        :rtype: List[Dict]
+        """
+        return list(self.mongo.aggregate([
+            {
+                "$group": self._get_lb_group()
+            },
+            {
+                "$match": {
+                    "num_wins": {"$gte": 1}
+                }
+            },
+            {
+                "$addFields": {
+                    "earned": {
+                        "$toInt": {"$multiply": [
+                            "$num_wins", {
+                                "$divide": [
+                                    "$cumm_cost", "$num_matches"
+                                ]
+                            }
+                        ]}
+                    }
+                }
+            },
+            {"$sort": self._get_lb_sort()},
+            {"$limit": 20}
+        ]))
+
+    def get_plays(self, wins: bool = False) -> List[Dict]:
+        """Returns list of minigames (of specified type) played.
+
+        :param wins: Whether to include only wins or all plays.
+        :type wins: bool
+        :return: List of minigames played.
+        :rtype: List[Dict]
+        """
+        filter_ = {
+            "played_by": str(self.user.id)
+        }
+        if wins:
+            filter_["won"] = True
+        return list(self.mongo.aggregate([
+            {
+                "$match": filter_
+            }
+        ]))
+
+    @expire_cache
+    def save(self):
+        super().save()
+
+    def _get_lb_group(self):
+        return {
+            "_id": "$played_by",
+            "num_wins": {
+                "$sum": {
+                    "$toInt": "$won"
+                }
+            },
+            "num_matches": {"$sum": 1},
+            "cumm_cost": {"$sum": "$cost"}
+        }
+
+    def _get_lb_sort(self) -> Dict[str, Any]:
+        """
+        Override it for each Minigame.
+        """
+        return {
+            "num_wins": -1,
+            "earned": -1
+        }
+
+
+class TaskModel(Model):
+    """
+    A special subset of Models representing automated tasks.
+    They have no user associated with them.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(None, *args, **kwargs)
+
+    def drop(self):
+        """
+        Overriden Drop method to disable it.
+        """
+        raise MethodNotAllowed(
+            "Taks Models are not bound to a user."
+        )
+
+    def save(self):
+        """
+        Overriden Save method to pop the user field.
+        """
+        save_data = dict(self)
+        save_data.pop('user', None)
+        self.mongo.insert_one(save_data)
 
 
 class UnlockedModel(Model):
@@ -1675,6 +1686,21 @@ class Votes(UnlockedModel):
             }}
         )
 
+    @classmethod
+    @property
+    def votes_count(cls: Type[Votes]) -> int:
+        """Get the total number of votes.
+
+        :return: The total number of votes.
+        :rtype: int
+        """
+        return next(
+            cls.mongo.aggregate([
+                {"$group": {"_id": None, "count": {"$sum": "$total_votes"}}}
+            ]),
+            {"count": 0}
+        )["count"]
+
 # endregion
 
 
@@ -1815,5 +1841,113 @@ class Moles(Minigame):
             **super()._get_lb_sort(),
             "avg_lvl": -1
         }
+
+# endregion
+
+
+# region Tasks
+
+class Checkpoints(TaskModel):
+    """Wrapper for Daily Checkpoints Model.
+
+    :param ctx: The PokeGambler client.
+    :type ctx: :class:`bot.PokeGambler`
+    """
+
+    def __init__(self, ctx: PokeGambler):
+        super().__init__()
+        self.created_on = datetime.now()
+        #: The number of profiles created till this checkpoint.
+        self.num_profiles = Profiles.count()
+        #: The number of guilds the bot is in.
+        self.num_guilds = len(ctx.guilds)
+        #: The number of commands used till this checkpoint.
+        self.num_commands = CommandData.count()
+        #: The number of votes received till this checkpoint.
+        self.num_votes = Votes.votes_count
+
+    @classmethod
+    def get_checkpoints(
+        cls,
+        start_time: datetime = None,
+        end_time: datetime = None
+    ) -> List[Dict]:
+        """Get the checkpoints between the given times.
+
+        :param start_time: The start time of the checkpoints.
+        :type start_time: datetime
+        :param end_time: The end time of the checkpoints.
+        :type end_time: datetime
+        :return: The checkpoints.
+        :rtype: List[Dict]
+        """
+        if start_time is None:
+            start_time = datetime(2021, 1, 1)
+        if end_time is None:
+            end_time = datetime.now()
+        return list(cls.mongo.aggregate([
+            {
+                "$match": {
+                    "created_on": {
+                        "$gte": start_time,
+                        "$lte": end_time
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "created_on": 1,
+                    "num_profiles": 1,
+                    "num_guilds": 1,
+                    "num_commands": 1,
+                    "num_votes": 1
+                }
+            }
+        ]))
+
+
+class Nitro(TaskModel):
+    """Wrapper for Nitro Reward records.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param boosters: The list of the nitro boosters.
+    :type boosters: List[:class:`discord.Member`]
+    :param rewardboxes: The list of IDs of nitro reward boxes.
+    :type rewardboxes: List[str]
+    """
+
+    uid_fields = [('boosters', list)]
+
+    def __init__(
+        self,
+        boosters: List[discord.Member] = None,
+        rewardboxes: List[str] = None
+    ):
+        super().__init__()
+        self.last_rewarded = datetime.now()
+        self.boosters = [
+            to_dict(user)
+            for user in boosters
+        ] if boosters else None
+        self.rewardboxes = rewardboxes
+
+    @classmethod
+    def get_last_rewarded(cls) -> datetime:
+        """Returns the last time the users were rewarded.
+
+        :return: Last time the users were rewarded.
+        """
+        pipeline = [
+            {"$sort": {"last_rewarded": -1}},
+            {"$limit": 1}
+        ]
+        return next(
+            cls.mongo.aggregate(pipeline),
+            {'last_rewarded': datetime.utcnow() - timedelta(days=31)}
+        )['last_rewarded']
+
+# endregion
 
 # endregion

@@ -2,13 +2,15 @@ aiohttp==3.7.4
 cachetools==4.2.2
 colorama==0.4.4
 git+https://github.com/Rapptz/discord.py.git@d22a7fb793331257eebdad696087754659e5c511
-sphinx-hoverxref==0.8b1
+matplotlib==3.5.0
+pandas==1.3.4
 python-dotenv==0.12.0
 pychalk==2.0.1
 pymongo[srv]==4.0.1
 Pillow==9.0.1
 readthedocs-sphinx-search==0.1.0
 Sphinx==4.1.2
+sphinx-hoverxref==0.8b1
 sphinx-rtd-dark-mode==1.2.4
 sphinx-rtd-theme==0.5.2
 sphinx-tabs==3.2.0

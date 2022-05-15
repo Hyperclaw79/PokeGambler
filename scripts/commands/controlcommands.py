@@ -34,7 +34,7 @@ import discord
 
 from ..base.items import Item
 from ..base.models import (
-    CommandData, Minigame,
+    Checkpoints, CommandData, Minigame,
     Model, UnlockedModel
 )
 from ..base.views import SelectView
@@ -43,7 +43,7 @@ from ..helpers.utils import (
     get_modules
 )
 from .basecommand import (
-    model, owner_only,
+    defer, model, owner_only,
     no_log, alias, Commands
 )
 
@@ -59,6 +59,70 @@ class ControlCommands(Commands):
 
         Only the Owners have access to these commands.
     '''
+
+    @owner_only
+    @defer
+    @no_log
+    async def cmd_activity_trend(self, message: Message, **kwargs):
+        """Activity Trend command
+
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+
+        .. meta::
+            :description: Check the Activity Trend for PokeGambler.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+
+            /activity_trend
+
+        .. rubric:: Description
+
+        ``👑 Owner Command``
+        Tester command for the activity trend.
+
+        .. rubric:: Examples
+
+        * To check the activity trend:
+
+        .. code:: coffee
+            :force:
+
+            /activity_trend
+        """
+        import pandas as pd  # pylint: disable=import-outside-toplevel
+
+        records = Checkpoints.get_checkpoints()
+        if not records:
+            await message.reply(
+                embed=get_embed(
+                    title="0 Checkpoints",
+                    content="No checkpoints have been created yet.",
+                    embed_type="warning"
+                )
+            )
+            return
+        dframe = pd.DataFrame(records)
+        dframe.index = dframe.pop('created_on')
+        colors = ['r', 'g', 'b', 'y']
+        embeds = []
+        files = []
+        for column, color in zip(dframe.columns, colors):
+            axes = dframe[[column]].plot(color=color)
+            axes.xaxis.set_visible(False)
+            byio = BytesIO()
+            axes.figure.savefig(byio)
+            byio.seek(0)
+            d_fl = discord.File(byio, f"{column}.jpeg")
+            emb = discord.Embed(
+                title=f"{column.split('_')[1].title()} Activity Trend",
+                description="",
+                color=discord.Colour.dark_theme()
+            )
+            embeds.append(emb)
+            files.append(d_fl)
+        await self.paginate(message, embeds, files)
 
     # pylint: disable=too-many-arguments
     @owner_only

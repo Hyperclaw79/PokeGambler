@@ -43,7 +43,7 @@ import topgg
 from scripts.base.cardgen import CardGambler
 from scripts.base.models import (
     Blacklist, CommandData, Inventory,
-    Nitro, Profiles
+    Nitro, Profiles, Checkpoints
 )
 from scripts.base.items import Item
 from scripts.base.shop import PremiumShop, Shop
@@ -386,6 +386,7 @@ class PokeGambler(discord.AutoShardedClient):
         )
         await self.change_presence(activity=game)
         self.__reward_nitro_boosters.start()
+        self.__create_checkpoint.start()
 
     async def slash_sync(self):
         """Synchronizes the slash commands."""
@@ -610,6 +611,8 @@ class PokeGambler(discord.AutoShardedClient):
             self.cooldown_cmds[method].pop(message.author)
         return False
 
+    # region Tasks
+
     @tasks.loop(hours=24)
     async def __reward_nitro_boosters(self):
         if all([
@@ -617,15 +620,12 @@ class PokeGambler(discord.AutoShardedClient):
                 datetime.utcnow() - Nitro.get_last_rewarded()
             ).days >= 30,
             datetime.utcnow().day == 5,
-            not os.getenv("IS_LOCAL"),
+            not self.is_local,
             self.is_prod
         ]):
             DummyMessage = namedtuple('Message', ['channel'])
             official_server = self.get_guild(self.official_server)
             boosters = official_server.premium_subscribers
-            owner = official_server.get_member(
-                self.owner_id
-            )
             rewarded = []
             rewardboxes = []
             for booster in boosters:
@@ -655,7 +655,26 @@ class PokeGambler(discord.AutoShardedClient):
                 )
                 rewarded.append(booster)
                 rewardboxes.append(nitro_box.itemid)
-            Nitro(owner, rewarded, rewardboxes).save()
+            Nitro(rewarded, rewardboxes).save()
+
+    # pylint: disable=no-self-use
+    @tasks.loop(hours=24)
+    async def __create_checkpoint(self):
+        last_checkpoint = Checkpoints.latest()
+        checks = [self.is_prod]
+        if last_checkpoint:
+            checks.append(
+                (
+                    datetime.utcnow() - last_checkpoint[0]["created_on"]
+                ).days >= 1
+            )
+        else:
+            checks.append(True)
+        if not all(checks):
+            return
+        Checkpoints(self).save()
+
+    # endregion
 
     def __pprinter(self):
         pretty = {
