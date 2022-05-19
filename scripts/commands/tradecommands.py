@@ -1014,6 +1014,187 @@ class TradeCommands(Commands):
             mode="withdraw"
         )
 
+    async def __admin_accept(
+        self, message, pokebot,
+        quantity, mode="deposit"
+    ):
+        admins = discord.utils.get(message.guild.roles, name="Admins")
+        confirm_view = Confirm(
+            check=lambda intcn: any([
+                is_admin(intcn.user),
+                is_owner(self.ctx, intcn.user)
+            ]),
+            timeout=600
+        )
+        req_msg = await message.channel.send(
+            content=admins.mention,
+            embed=get_embed(
+                title=f"New {mode.title()} Request",
+                content=f"**{message.author}** has requested to {mode} "
+                f"**{quantity:,}**『{pokebot.name}』credits."
+            ),
+            view=confirm_view
+        )
+        await confirm_view.dispatch(self)
+        if confirm_view.value is None:
+            if confirm_view.notify:
+                await dm_send(
+                    message, message.author,
+                    embed=get_embed(
+                        "Looks like none of our Admins are free.\n"
+                        "Please try again later.",
+                        embed_type="warning",
+                        title="Unable to Start Transaction."
+                    )
+                )
+            return req_msg, None
+        return req_msg, confirm_view.user
+
+    async def __get_inputs(self, message, mode="deposit"):
+        def get_rate(bot: Member) -> int:
+            rate = CurrencyExchange[bot.name].value
+            return f"Exchange Rate: x{rate} Pokechips"
+        already_exchanged = Exchanges(
+            user=message.author
+        ).get_daily_exchanges(mode.title())
+        bounds = (1000, 2_500_000 - already_exchanged)
+        if mode == "withdraw":
+            bounds = (10000, 250_000 - already_exchanged)
+        if bounds[1] < bounds[0]:
+            remaining = (
+                (datetime.now().replace(
+                    hour=0, minute=0, second=0,
+                ) + timedelta(days=1)) - datetime.now()
+            ).total_seconds()
+            rem_str = get_formatted_time(remaining)
+            await dm_send(
+                message, message.author,
+                embed=get_embed(
+                    "You have maxed out for today.\n"
+                    f"Try again after {rem_str}.",
+                    embed_type="warning",
+                    title="Unable to Start Transaction."
+                )
+            )
+            return None, None
+
+        async def create_modal(view, interaction):
+            if view.result is None:
+                return
+            pokename = str(view.value).split('#', maxsplit=1)[0]
+            amount_modal = EmbedReplyModal(
+                title=f"Exchange Amount for {pokename} Credits",
+                timeout=120,
+                embed=get_embed(
+                    content="Our admins have been notified.\n"
+                    "Please wait till one of them accepts"
+                    " or retry after 10 minutes.",
+                    title="Request Registered."
+                )
+            )
+            amount_modal.add_short(
+                f"How much do you want to {mode}?",
+                placeholder=f"Min: {bounds[0]:,}, Max: {bounds[1]:,}"
+            )
+            await interaction.response.send_modal(
+                amount_modal
+            )
+            await amount_modal.wait()
+            return amount_modal.results[0]
+
+        pokebots = discord.utils.get(
+            message.guild.roles,
+            name="Pokebot"
+        ).members
+        choices_view = SelectConfirmView(
+            placeholder="Choose the Pokebot from this list",
+            options={
+                bot: get_rate(bot)
+                for bot in pokebots
+            },
+            check=lambda x: x.user.id == message.author.id,
+            callback=create_modal
+        )
+        await dm_send(
+            message, message.author,
+            content="Which pokemon themed bot's credits"
+            " do you want to exchange?",
+            view=choices_view
+        )
+        await choices_view.dispatch(self)
+        pokebot = choices_view.value
+        if not pokebot or not choices_view.callback_result:
+            return None, None
+        proceed = await MinMaxValidator(
+            *bounds,
+            message=message,
+            dm_user=True
+        ).validate(choices_view.callback_result)
+        if not proceed:
+            return None, None
+        quantity = int(choices_view.callback_result.replace(',', ''))
+        return pokebot, quantity
+
+    # pylint: disable=too-many-arguments
+    async def __handle_transaction(
+        self, message, thread,
+        admin, pokebot, chips,
+        mode="deposit"
+    ):
+        confirm_or_cancel = ConfirmOrCancel(timeout=None)
+        await thread.send(
+            embed=get_embed(
+                title="Starting the transaction."
+            ),
+            content=f"**User**: {message.author.mention}\n"
+            f"**Admin**: {admin.mention}",
+            view=confirm_or_cancel
+        )
+        await confirm_or_cancel.dispatch(self)
+        if confirm_or_cancel.value:
+            content = None
+            if mode == "deposit":
+                content = f"{message.author.mention}, check your balance" + \
+                    " using the `/balance` command."
+            await thread.send(
+                content=content,
+                embed=get_embed(
+                    title=f"Closing the transaction for {message.author}."
+                )
+            )
+            getattr(
+                Profiles(message.author),
+                "credit" if mode == "deposit" else "debit"
+            )(chips)
+            Profiles(admin).credit(int(chips * 0.1))
+            Exchanges(
+                message.author, admin,
+                pokebot, chips, mode.title()
+            ).save()
+            await dm_send(
+                message, admin,
+                embed=get_embed(
+                    title=f"Credited {int(chips * 0.1):,} chips to"
+                    " your account."
+                )
+            )
+        await thread.edit(
+            archived=True,
+            locked=True
+        )
+
+    @staticmethod
+    async def __get_thread(message, pokebot, req_msg):
+        tname = f"Transaction for {message.author.id}"
+        thread = await req_msg.channel.create_thread(
+            name=tname,
+            message=req_msg
+        )
+        await req_msg.delete()
+        await thread.add_user(message.author)
+        await thread.add_user(pokebot)
+        return thread
+
     async def __buy_get_item(
         self, message, itemid
     ) -> Tuple[Shop, Item]:
@@ -1320,184 +1501,3 @@ class TradeCommands(Commands):
             # pylint: disable=undefined-loop-variable
             emb.set_footer(text=f"Example:『/buy {itemid}』")
         return emb
-
-    async def __admin_accept(
-        self, message, pokebot,
-        quantity, mode="deposit"
-    ):
-        admins = discord.utils.get(message.guild.roles, name="Admins")
-        confirm_view = Confirm(
-            check=lambda intcn: any([
-                is_admin(intcn.user),
-                is_owner(self.ctx, intcn.user)
-            ]),
-            timeout=600
-        )
-        req_msg = await message.channel.send(
-            content=admins.mention,
-            embed=get_embed(
-                title=f"New {mode.title()} Request",
-                content=f"**{message.author}** has requested to {mode} "
-                f"**{quantity:,}**『{pokebot.name}』credits."
-            ),
-            view=confirm_view
-        )
-        await confirm_view.dispatch(self)
-        if confirm_view.value is None:
-            if confirm_view.notify:
-                await dm_send(
-                    message, message.author,
-                    embed=get_embed(
-                        "Looks like none of our Admins are free.\n"
-                        "Please try again later.",
-                        embed_type="warning",
-                        title="Unable to Start Transaction."
-                    )
-                )
-            return req_msg, None
-        return req_msg, confirm_view.user
-
-    async def __get_inputs(self, message, mode="deposit"):
-        def get_rate(bot: Member) -> int:
-            rate = CurrencyExchange[bot.name].value
-            return f"Exchange Rate: x{rate} Pokechips"
-        already_exchanged = Exchanges(
-            user=message.author
-        ).get_daily_exchanges(mode.title())
-        bounds = (1000, 2_500_000 - already_exchanged)
-        if mode == "withdraw":
-            bounds = (10000, 250_000 - already_exchanged)
-        if bounds[1] < bounds[0]:
-            remaining = (
-                (datetime.now().replace(
-                    hour=0, minute=0, second=0,
-                ) + timedelta(days=1)) - datetime.now()
-            ).total_seconds()
-            rem_str = get_formatted_time(remaining)
-            await dm_send(
-                message, message.author,
-                embed=get_embed(
-                    "You have maxed out for today.\n"
-                    f"Try again after {rem_str}.",
-                    embed_type="warning",
-                    title="Unable to Start Transaction."
-                )
-            )
-            return None, None
-
-        async def create_modal(view, interaction):
-            if view.result is None:
-                return
-            pokename = str(view.value).split('#', maxsplit=1)[0]
-            amount_modal = EmbedReplyModal(
-                title=f"Exchange Amount for {pokename} Credits",
-                timeout=120,
-                embed=get_embed(
-                    content="Our admins have been notified.\n"
-                    "Please wait till one of them accepts"
-                    " or retry after 10 minutes.",
-                    title="Request Registered."
-                )
-            )
-            amount_modal.add_short(
-                f"How much do you want to {mode}?",
-                placeholder=f"Min: {bounds[0]:,}, Max: {bounds[1]:,}"
-            )
-            await interaction.response.send_modal(
-                amount_modal
-            )
-            await amount_modal.wait()
-            return amount_modal.results[0]
-
-        pokebots = discord.utils.get(
-            message.guild.roles,
-            name="Pokebot"
-        ).members
-        choices_view = SelectConfirmView(
-            placeholder="Choose the Pokebot from this list",
-            options={
-                bot: get_rate(bot)
-                for bot in pokebots
-            },
-            check=lambda x: x.user.id == message.author.id,
-            callback=create_modal
-        )
-        await dm_send(
-            message, message.author,
-            content="Which pokemon themed bot's credits"
-            " do you want to exchange?",
-            view=choices_view
-        )
-        await choices_view.dispatch(self)
-        pokebot = choices_view.value
-        if not pokebot or not choices_view.callback_result:
-            return None, None
-        proceed = await MinMaxValidator(
-            *bounds,
-            message=message,
-            dm_user=True
-        ).validate(choices_view.callback_result)
-        if not proceed:
-            return None, None
-        quantity = int(choices_view.callback_result.replace(',', ''))
-        return pokebot, quantity
-
-    @staticmethod
-    async def __get_thread(message, pokebot, req_msg):
-        tname = f"Transaction for {message.author.id}"
-        thread = await req_msg.channel.create_thread(
-            name=tname,
-            message=req_msg
-        )
-        await req_msg.delete()
-        await thread.add_user(message.author)
-        await thread.add_user(pokebot)
-        return thread
-
-    # pylint: disable=too-many-arguments
-    async def __handle_transaction(
-        self, message, thread,
-        admin, pokebot, chips,
-        mode="deposit"
-    ):
-        confirm_or_cancel = ConfirmOrCancel(timeout=None)
-        await thread.send(
-            embed=get_embed(
-                title="Starting the transaction."
-            ),
-            content=f"**User**: {message.author.mention}\n"
-            f"**Admin**: {admin.mention}",
-            view=confirm_or_cancel
-        )
-        await confirm_or_cancel.dispatch(self)
-        if confirm_or_cancel.value:
-            content = None
-            if mode == "deposit":
-                content = f"{message.author.mention}, check your balance" + \
-                    " using the `/balance` command."
-            await thread.send(
-                content=content,
-                embed=get_embed(
-                    title=f"Closing the transaction for {message.author}."
-                )
-            )
-            getattr(
-                Profiles(message.author),
-                "credit" if mode == "deposit" else "debit"
-            )(chips)
-            Profiles(admin).credit(int(chips * 0.1))
-            Exchanges(
-                message.author, admin,
-                pokebot, chips, mode.title()
-            ).save()
-            await dm_send(
-                message, admin,
-                embed=get_embed(
-                    title=f"Credited {int(chips * 0.1):,} chips to"
-                    " your account."
-                )
-            )
-        await thread.edit(
-            archived=True,
-            locked=True
-        )

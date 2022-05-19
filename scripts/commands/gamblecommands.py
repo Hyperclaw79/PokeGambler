@@ -644,6 +644,54 @@ class GambleCommands(Commands):
             return None
         return amount
 
+    async def __gamble_announce_winner(
+        self, gamble_channel, dealed_deck,
+        winner, fee, profiles
+    ):
+        profile = profiles[winner]
+        data = profile.get()
+        bal = data["balance"]
+        num_wins = data["num_wins"]
+        won_chips = data["won_chips"]
+        transaction_rate = 0.1 + 0.05 * math.floor(
+            max(
+                0,
+                len(self.registered) - 12
+            ) / 3
+        )
+        incr = int(
+            (fee * len(dealed_deck.items())) * (1 - transaction_rate)
+        )
+        bal += incr
+        num_wins += 1
+        if num_wins == 25:
+            loot_table = Loots(winner)
+            loot_table.update(tier=2)
+        elif num_wins == 100:
+            loot_table = Loots(winner)
+            loot_table.update(tier=3)
+        won_chips += incr
+        profile.update(
+            balance=bal,
+            num_wins=num_wins,
+            won_chips=won_chips
+        )
+        title = f"The winner is {winner}!"
+        is_joker = [
+            player
+            for player, card in dealed_deck.items()
+            if card["card_num"] == "Joker"
+        ]
+        if is_joker:
+            title += " (by rolling a Joker)"
+        winner_embed = get_embed(
+            f"{incr} pokechips have been added to their balance.",
+            title=title,
+            footer="10% pokechips from the pot deducted as transaction fee."
+        )
+        await gamble_channel.send(embed=winner_embed)
+        return bool(is_joker)
+
     def __gamble_charge_player(self, dealed_deck, fee):
         profiles = {}
         for player, _ in dealed_deck.items():
@@ -697,6 +745,113 @@ class GambleCommands(Commands):
             for i in range(num_cards, 0, -1)
         ]
         return dealed_deck, closed_decks
+
+    async def __gamble_handle_roll(
+        self, message, deck, player,
+        card, gamble_channel, dealed_deck
+    ):
+        closed_fl = img2file(deck, "closed.png")
+        card_fl = img2file(
+            card["card_img"],
+            f"{card['card_num']}{card['suit']}.jpeg"
+        )
+        closed_msg = await gamble_channel.send(
+            content=f"{player.mention}, react with 👀 within 10 seconds.",
+            file=closed_fl
+        )
+        await closed_msg.add_reaction("👀")
+        try:
+            await self.ctx.wait_for(
+                "reaction_add",
+                check=lambda rctn, usr: user_rctn(
+                    message, player, rctn, usr,
+                    chan=gamble_channel, emoji="👀"
+                ),
+                timeout=10
+            )
+        except asyncio.TimeoutError:
+            await gamble_channel.send(
+                embed=get_embed(
+                    f"{player.mention}, you didn't react in time."
+                )
+            )
+            await closed_msg.delete()
+            dealed_deck[player].update({
+                "card_num": "0",
+                "card_img": self.ctx.dealer.closed_card.copy()
+            })
+            return
+        await closed_msg.delete()
+        await gamble_channel.send(
+            content=f"{player.mention}, here's your card:",
+            file=card_fl
+        )
+        if card["card_num"] == "Joker":
+            return "Joker"
+
+    async def __gamble_handle_winner(
+        self, dealed_deck,
+        gamble_channel, profiles,
+        lower_wins, fee
+    ):
+        embed = get_enum_embed(
+            [
+                f"{player} rolled a 『{card['card_num']} {card['suit']}』."
+                for player, card in dealed_deck.items()
+            ],
+            title="Roll Table"
+        )
+        players = sorted(
+            dealed_deck.items(),
+            key=lambda x: (
+                self.conv_table[
+                    x[1]["card_num"]
+                ],
+                -self.suits.index(
+                    x[1]["suit"]
+                )
+            ),
+            reverse=True
+        )
+        if lower_wins:
+            players = players[::-1]
+            idx = 0
+            # Push all non-reactors to the bottom.
+            while self.conv_table[players[0][1]['card_num']] == 0:
+                players.append(players.pop(0))
+                idx += 1
+                # Rare case where no one reacts
+                if idx == len(players):
+                    break
+        winner = next(
+            (
+                player[0]
+                for player in players
+                if player[1]["card_num"] == "Joker"
+            ), None
+        )
+
+        if winner is None:
+            winner = players[0][0]
+        rolled = [
+            dealed_deck[player]["card_img"]
+            for player in [
+                pl[0]
+                for pl in players
+            ]
+        ]
+        rolled_deck = self.ctx.dealer.get_deck(rolled, reverse=True)
+        rolled_fl = img2file(rolled_deck, "rolled.jpg")
+        embed.set_image(url="attachment://rolled.jpg")
+        await gamble_channel.send(embed=embed, file=rolled_fl)
+        # Return is_joker for saving into DB
+        return (
+            winner,
+            await self.__gamble_announce_winner(
+                gamble_channel, dealed_deck,
+                winner, fee, profiles
+            )
+        )
 
     async def __gamble_register(self, message: Message, **kwargs):
         fee = kwargs["fee"]
@@ -766,161 +921,6 @@ class GambleCommands(Commands):
         await cnt_msg.delete()
         await emb_msg.delete()
         return gamble_thread, hot_time
-
-    async def __gamble_handle_roll(
-        self, message, deck, player,
-        card, gamble_channel, dealed_deck
-    ):
-        closed_fl = img2file(deck, "closed.png")
-        card_fl = img2file(
-            card["card_img"],
-            f"{card['card_num']}{card['suit']}.jpeg"
-        )
-        closed_msg = await gamble_channel.send(
-            content=f"{player.mention}, react with 👀 within 10 seconds.",
-            file=closed_fl
-        )
-        await closed_msg.add_reaction("👀")
-        try:
-            await self.ctx.wait_for(
-                "reaction_add",
-                check=lambda rctn, usr: user_rctn(
-                    message, player, rctn, usr,
-                    chan=gamble_channel, emoji="👀"
-                ),
-                timeout=10
-            )
-        except asyncio.TimeoutError:
-            await gamble_channel.send(
-                embed=get_embed(
-                    f"{player.mention}, you didn't react in time."
-                )
-            )
-            await closed_msg.delete()
-            dealed_deck[player].update({
-                "card_num": "0",
-                "card_img": self.ctx.dealer.closed_card.copy()
-            })
-            return
-        await closed_msg.delete()
-        await gamble_channel.send(
-            content=f"{player.mention}, here's your card:",
-            file=card_fl
-        )
-        if card["card_num"] == "Joker":
-            return "Joker"
-
-    async def __gamble_announce_winner(
-        self, gamble_channel, dealed_deck,
-        winner, fee, profiles
-    ):
-        profile = profiles[winner]
-        data = profile.get()
-        bal = data["balance"]
-        num_wins = data["num_wins"]
-        won_chips = data["won_chips"]
-        transaction_rate = 0.1 + 0.05 * math.floor(
-            max(
-                0,
-                len(self.registered) - 12
-            ) / 3
-        )
-        incr = int(
-            (fee * len(dealed_deck.items())) * (1 - transaction_rate)
-        )
-        bal += incr
-        num_wins += 1
-        if num_wins == 25:
-            loot_table = Loots(winner)
-            loot_table.update(tier=2)
-        elif num_wins == 100:
-            loot_table = Loots(winner)
-            loot_table.update(tier=3)
-        won_chips += incr
-        profile.update(
-            balance=bal,
-            num_wins=num_wins,
-            won_chips=won_chips
-        )
-        title = f"The winner is {winner}!"
-        is_joker = [
-            player
-            for player, card in dealed_deck.items()
-            if card["card_num"] == "Joker"
-        ]
-        if is_joker:
-            title += " (by rolling a Joker)"
-        winner_embed = get_embed(
-            f"{incr} pokechips have been added to their balance.",
-            title=title,
-            footer="10% pokechips from the pot deducted as transaction fee."
-        )
-        await gamble_channel.send(embed=winner_embed)
-        return bool(is_joker)
-
-    async def __gamble_handle_winner(
-        self, dealed_deck,
-        gamble_channel, profiles,
-        lower_wins, fee
-    ):
-        embed = get_enum_embed(
-            [
-                f"{player} rolled a 『{card['card_num']} {card['suit']}』."
-                for player, card in dealed_deck.items()
-            ],
-            title="Roll Table"
-        )
-        players = sorted(
-            dealed_deck.items(),
-            key=lambda x: (
-                self.conv_table[
-                    x[1]["card_num"]
-                ],
-                -self.suits.index(
-                    x[1]["suit"]
-                )
-            ),
-            reverse=True
-        )
-        if lower_wins:
-            players = players[::-1]
-            idx = 0
-            # Push all non-reactors to the bottom.
-            while self.conv_table[players[0][1]['card_num']] == 0:
-                players.append(players.pop(0))
-                idx += 1
-                # Rare case where no one reacts
-                if idx == len(players):
-                    break
-        winner = next(
-            (
-                player[0]
-                for player in players
-                if player[1]["card_num"] == "Joker"
-            ), None
-        )
-
-        if winner is None:
-            winner = players[0][0]
-        rolled = [
-            dealed_deck[player]["card_img"]
-            for player in [
-                pl[0]
-                for pl in players
-            ]
-        ]
-        rolled_deck = self.ctx.dealer.get_deck(rolled, reverse=True)
-        rolled_fl = img2file(rolled_deck, "rolled.jpg")
-        embed.set_image(url="attachment://rolled.jpg")
-        await gamble_channel.send(embed=embed, file=rolled_fl)
-        # Return is_joker for saving into DB
-        return (
-            winner,
-            await self.__gamble_announce_winner(
-                gamble_channel, dealed_deck,
-                winner, fee, profiles
-            )
-        )
 
     @staticmethod
     def __get_gambler_role(channel):

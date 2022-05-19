@@ -1062,6 +1062,20 @@ class AdminCommands(Commands):
                 )
 
     @staticmethod
+    async def __item_get_details(modal, labels):
+        details = {}
+        for child in modal.children:
+            validator = labels[child.label]['validator']
+            if validator and child.value:
+                value = await validator.cleaned(child.value)
+                if not value:
+                    return None
+                details[child.label] = value
+            elif child.value:
+                details[child.label] = child.value
+        return details
+
+    @staticmethod
     def __item_get_labels(message, catogclass):
         labels = {
             "name": {
@@ -1091,20 +1105,6 @@ class AdminCommands(Commands):
                 value['validator'].error_embed_title = \
                     f"Invalid Input for {key.title()}."
         return labels
-
-    @staticmethod
-    async def __item_get_details(modal, labels):
-        details = {}
-        for child in modal.children:
-            validator = labels[child.label]['validator']
-            if validator and child.value:
-                value = await validator.cleaned(child.value)
-                if not value:
-                    return None
-                details[child.label] = value
-            elif child.value:
-                details[child.label] = child.value
-        return details
 
     def __upd_usr_field_dict(self, message):
         field_dict = {

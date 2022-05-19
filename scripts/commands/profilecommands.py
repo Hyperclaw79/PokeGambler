@@ -347,7 +347,7 @@ class ProfileCommands(Commands):
                 message = f"in {ts_fmt}.\n`{prog_bar}`"
             return f"You can use {key.title()} again {message}"
         emb_data = {}
-        loot_elapsed, loot_total = self._get_loot_cooldown(
+        loot_elapsed, loot_total = self.__loot_get_cooldown(
             message, Boosts(message.author),
             BoostItem.get_boosts(str(message.author.id))
         )
@@ -357,11 +357,11 @@ class ProfileCommands(Commands):
         )
         (
             daily_elapsed, daily_base_cd, *_
-        ) = self._get_daily_cooldown(
+        ) = self.__daily_get_cooldown(
             Loots(message.author)
         )
         emb_data['Daily'] = _get_message('daily', daily_elapsed, daily_base_cd)
-        _, vote_elapsed, vote_total = self._get_vote_cooldown(
+        _, vote_elapsed, vote_total = self.__vote_get_cooldown(
             Votes(message.author)
         )
         emb_data['Vote'] = _get_message('vote', vote_elapsed, vote_total)
@@ -425,7 +425,7 @@ class ProfileCommands(Commands):
         (
             elapsed_time, cd_time,
             time_remaining, last_claim
-        ) = self._get_daily_cooldown(loot_info)
+        ) = self.__daily_get_cooldown(loot_info)
         if elapsed_time < cd_time:
             await message.add_reaction("⌛")
             await message.reply(
@@ -679,7 +679,7 @@ class ProfileCommands(Commands):
         perm_boosts = Boosts(message.author).get()
         boosts = BoostItem.get_boosts(str(message.author.id))
         on_cooldown = self.ctx.loot_cd.get(message.author, None)
-        elapsed, total_cd = self._get_loot_cooldown(
+        elapsed, total_cd = self.__loot_get_cooldown(
             message, perm_boosts, boosts
         )
         on_cd = await self.__loot_handle_cd(
@@ -711,36 +711,6 @@ class ProfileCommands(Commands):
             "Added to your balance.**",
             embed=embed
         )
-
-    def _get_loot_cooldown(
-        self, message: Message,
-        perm_boosts: Union[Dict, Boosts],
-        temp_boosts: Dict
-    ) -> Tuple[int, int]:
-        """Get the loot cooldown for the user.
-
-        :param message: The message which triggered this command.
-        :type message: :class:`discord.Message`
-        :param perm_boosts: The permanent boosts for the user.
-        :type perm_boosts: Union[Dict, Boosts]
-        :param temp_boosts: The temporary boosts for the user.
-        :type temp_boosts: Dict
-        :return: The time remaining and total cd time in seconds.
-        :rtype: Tuple[int, int]
-        """
-        if isinstance(perm_boosts, Boosts):
-            perm_boosts = perm_boosts.get()
-        cd_reducer = perm_boosts["loot_lust"]
-        cd_reducer += temp_boosts['boost_lt_cd']['stack']
-        cd_time = 60 * (10 - cd_reducer)
-        loot_cd = self.ctx.loot_cd.get(
-            message.author,
-            datetime.now() - timedelta(minutes=10)
-        )
-        elapsed = (
-            datetime.now() - loot_cd
-        ).total_seconds()
-        return elapsed, cd_time
 
     @model([Profiles, Blacklist])
     @alias("pr")
@@ -1000,53 +970,6 @@ class ProfileCommands(Commands):
         await message.reply(**to_send)
 
     @staticmethod
-    def _get_daily_cooldown(
-        loot_info: Union[Dict, Loots]
-    ) -> Tuple[str, int, int, datetime]:
-        """Get a list of time counts for the daily cooldown.
-
-        :param loot_info: The Loot object for the User.
-        :type loot_info: :class:`~scripts.base.models.Loots`
-        :return: Time remaining till next daily, elapsed time, cd & last claim.
-        :rtype: Tuple[str, int, int, datetime]
-        """
-        if isinstance(loot_info, Loots):
-            loot_info = loot_info.get()
-        last_claim = loot_info["daily_claimed_on"]
-        if isinstance(last_claim, str):
-            last_claim = datetime.strptime(
-                last_claim,
-                "%Y-%m-%d %H:%M:%S"
-            )
-        cd_time = 24 * 60 * 60
-        elapsed_time = (datetime.now() - last_claim).total_seconds()
-        time_remaining = get_formatted_time(
-            cd_time - elapsed_time
-        )
-        return elapsed_time, cd_time, time_remaining, last_claim
-
-    @staticmethod
-    def _get_vote_cooldown(votes: Votes) -> Tuple[str, int, int]:
-        """Get the cooldown for the vote command.
-
-        :param votes: The votes object for the User.
-        :type votes: :class:`~scripts.base.models.Votes`
-        :return: The cooldown message, elapsed time, base cooldown(12hrs).
-        :rtype: Tuple[str, int, int]
-        """
-        last_voted = votes.last_voted
-        now = datetime.now()
-        elapsed = (now - last_voted).total_seconds()
-        base_cd = 12
-        if elapsed // 3600 >= base_cd:
-            cd_msg = "You can vote **now**!"
-        else:
-            ends_on = last_voted + timedelta(hours=base_cd)
-            tot_secs = (ends_on - now).total_seconds()
-            cd_msg = f"You can vote again in {get_formatted_time(tot_secs)}."
-        return cd_msg, elapsed, (base_cd * 3600)
-
-    @staticmethod
     async def __background_get_url(message, reply):
         if len(reply.attachments) > 0:
             if reply.attachments[0].content_type not in (
@@ -1073,6 +996,76 @@ class ProfileCommands(Commands):
         if not proceed:
             return None
         return reply.content
+
+    @staticmethod
+    def __daily_get_cooldown(
+        loot_info: Union[Dict, Loots]
+    ) -> Tuple[str, int, int, datetime]:
+        """Get a list of time counts for the daily cooldown.
+
+        :param loot_info: The Loot object for the User.
+        :type loot_info: :class:`~scripts.base.models.Loots`
+        :return: Time remaining till next daily, elapsed time, cd & last claim.
+        :rtype: Tuple[str, int, int, datetime]
+        """
+        if isinstance(loot_info, Loots):
+            loot_info = loot_info.get()
+        last_claim = loot_info["daily_claimed_on"]
+        if isinstance(last_claim, str):
+            last_claim = datetime.strptime(
+                last_claim,
+                "%Y-%m-%d %H:%M:%S"
+            )
+        cd_time = 24 * 60 * 60
+        elapsed_time = (datetime.now() - last_claim).total_seconds()
+        time_remaining = get_formatted_time(
+            cd_time - elapsed_time
+        )
+        return elapsed_time, cd_time, time_remaining, last_claim
+
+    def __lb_get_minigame_lb(self, mg_name: str, user: Member) -> List[Dict]:
+        def _commands(module):
+            return [
+                attr.replace("cmd_", "")
+                for attr in dir(module)
+                if all([
+                    attr.startswith("cmd_"),
+                    attr not in getattr(module, "alias", [])
+                ])
+            ]
+
+        def _aliases(module):
+            return [
+                alias.replace("cmd_", "")
+                for alias in getattr(module, "alias", [])
+            ]
+
+        def _get_lb(modules, mg_name, user):
+            leaderboard = None
+            for module in modules:
+                possibilities = _aliases(module) + _commands(module)
+                if any([
+                    mg_name in possibilities,
+                    mg_name.rstrip('s') in possibilities
+                ]):
+                    command = getattr(
+                        module,
+                        f"cmd_{mg_name}",
+                        getattr(module, f"cmd_{mg_name.rstrip('s')}")
+                    )
+                    models = getattr(command, "models", [])
+                    if not models:
+                        continue
+                    for model_ in models:
+                        if issubclass(model_, Minigame):
+                            leaderboard = model_(
+                                user
+                            ).get_lb()
+                            if leaderboard:
+                                return leaderboard
+            return leaderboard
+        modules = get_modules(self.ctx)
+        return _get_lb(modules, mg_name, user)
 
     async def __lb_handle_mg_input(self, message):
         mg_view = SelectView(
@@ -1129,49 +1122,35 @@ class ProfileCommands(Commands):
             })
         return leaderboard
 
-    def __lb_get_minigame_lb(self, mg_name: str, user: Member) -> List[Dict]:
-        def _commands(module):
-            return [
-                attr.replace("cmd_", "")
-                for attr in dir(module)
-                if all([
-                    attr.startswith("cmd_"),
-                    attr not in getattr(module, "alias", [])
-                ])
-            ]
+    def __loot_get_cooldown(
+        self, message: Message,
+        perm_boosts: Union[Dict, Boosts],
+        temp_boosts: Dict
+    ) -> Tuple[int, int]:
+        """Get the loot cooldown for the user.
 
-        def _aliases(module):
-            return [
-                alias.replace("cmd_", "")
-                for alias in getattr(module, "alias", [])
-            ]
-
-        def _get_lb(modules, mg_name, user):
-            leaderboard = None
-            for module in modules:
-                possibilities = _aliases(module) + _commands(module)
-                if any([
-                    mg_name in possibilities,
-                    mg_name.rstrip('s') in possibilities
-                ]):
-                    command = getattr(
-                        module,
-                        f"cmd_{mg_name}",
-                        getattr(module, f"cmd_{mg_name.rstrip('s')}")
-                    )
-                    models = getattr(command, "models", [])
-                    if not models:
-                        continue
-                    for model_ in models:
-                        if issubclass(model_, Minigame):
-                            leaderboard = model_(
-                                user
-                            ).get_lb()
-                            if leaderboard:
-                                return leaderboard
-            return leaderboard
-        modules = get_modules(self.ctx)
-        return _get_lb(modules, mg_name, user)
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param perm_boosts: The permanent boosts for the user.
+        :type perm_boosts: Union[Dict, Boosts]
+        :param temp_boosts: The temporary boosts for the user.
+        :type temp_boosts: Dict
+        :return: The time remaining and total cd time in seconds.
+        :rtype: Tuple[int, int]
+        """
+        if isinstance(perm_boosts, Boosts):
+            perm_boosts = perm_boosts.get()
+        cd_reducer = perm_boosts["loot_lust"]
+        cd_reducer += temp_boosts['boost_lt_cd']['stack']
+        cd_time = 60 * (10 - cd_reducer)
+        loot_cd = self.ctx.loot_cd.get(
+            message.author,
+            datetime.now() - timedelta(minutes=10)
+        )
+        elapsed = (
+            datetime.now() - loot_cd
+        ).total_seconds()
+        return elapsed, cd_time
 
     async def __loot_handle_cd(self, message, on_cooldown, time_remaining):
         if on_cooldown and time_remaining > 0:
@@ -1214,6 +1193,27 @@ class ProfileCommands(Commands):
             background = None
         return background
 
+    @staticmethod
+    def __vote_get_cooldown(votes: Votes) -> Tuple[str, int, int]:
+        """Get the cooldown for the vote command.
+
+        :param votes: The votes object for the User.
+        :type votes: :class:`~scripts.base.models.Votes`
+        :return: The cooldown message, elapsed time, base cooldown(12hrs).
+        :rtype: Tuple[str, int, int]
+        """
+        last_voted = votes.last_voted
+        now = datetime.now()
+        elapsed = (now - last_voted).total_seconds()
+        base_cd = 12
+        if elapsed // 3600 >= base_cd:
+            cd_msg = "You can vote **now**!"
+        else:
+            ends_on = last_voted + timedelta(hours=base_cd)
+            tot_secs = (ends_on - now).total_seconds()
+            cd_msg = f"You can vote again in {get_formatted_time(tot_secs)}."
+        return cd_msg, elapsed, (base_cd * 3600)
+
     def __vote_prep_embed(self, votes, streak, profile):
         emb = get_embed(
             title="Vote",
@@ -1234,7 +1234,7 @@ class ProfileCommands(Commands):
             name=stk_name,
             value=stk_val
         )
-        cd_msg, elapsed, _ = self._get_vote_cooldown(votes)
+        cd_msg, elapsed, _ = self.__vote_get_cooldown(votes)
         emb.add_field(
             name="Vote Cooldown",
             value=cd_msg,
