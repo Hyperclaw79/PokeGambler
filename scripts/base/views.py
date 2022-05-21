@@ -25,6 +25,7 @@ Compilation of Discord UI Views
 
 from __future__ import annotations
 from datetime import datetime
+from functools import wraps
 import math
 from typing import (
     Callable, Coroutine, Dict, List,
@@ -36,6 +37,35 @@ import discord
 if TYPE_CHECKING:
     from ..commands.basecommand import Commands
     from ..commands.gamblecommands import GambleCommands
+
+
+def validate(in_view=False):
+    """
+    Validate a function.
+
+    :param in_view: Whether the check is in a view.
+    :type in_view: bool
+    :return: The decorated function.
+    :rtype: Callable
+    """
+    def decorator(func: Callable):
+        @wraps(func)
+        def wrapper(self, interaction, *args, **kwargs):
+            """
+            Wrapper function.
+            """
+            checker = (
+                self.view.check if in_view
+                else self.check
+            )
+            if (
+                checker is not None
+                and not checker(interaction)
+            ):
+                return None
+            return func(self, interaction, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class BaseView(discord.ui.View):
@@ -99,17 +129,13 @@ class SelectComponent(discord.ui.Select):
         )
         self.opts = options
 
+    @validate(in_view=True)
     async def callback(self, interaction: discord.Interaction):
         """On Selecting a choice, execute the required function.
 
         :param interaction: The interaction that triggered the callback.
         :type interaction: :class:`discord.Interaction`
         """
-        if (
-            self.view.check is not None
-            and not self.view.check(interaction)
-        ):
-            return
         value = [
             key
             for key in self.opts
@@ -182,6 +208,7 @@ class Confirm(BaseView):
         self.value = None
         self.user = None
 
+    @validate
     @discord.ui.button(
         label="️️️️✔️",
         style=discord.ButtonStyle.green
@@ -197,12 +224,17 @@ class Confirm(BaseView):
         :param interaction: The interaction that triggered the callback.
         :type interaction: :class:`discord.Interaction`
         """
-        if (
-            self.check is not None
-            and not self.check(interaction)
-        ):
-            return
-        self.value = True
+        self.perform_action(interaction, value=True)
+
+    def perform_action(self, interaction, value):
+        """Perform the action.
+
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
+        :param value: The value to be set.
+        :type value: bool
+        """
+        self.value = value
         self.user = interaction.user
         self.stop()
 
@@ -211,6 +243,7 @@ class ConfirmOrCancel(Confirm):
     """
     The :class:`~scripts.base.views.Confirm` view with a Cancel button.
     """
+    @validate
     @discord.ui.button(
         label="❌",
         style=discord.ButtonStyle.secondary
@@ -226,14 +259,7 @@ class ConfirmOrCancel(Confirm):
         :param interaction: The interaction that triggered the callback.
         :type interaction: :class:`discord.Interaction`
         """
-        if (
-            self.check is not None
-            and not self.check(interaction)
-        ):
-            return
-        self.value = False
-        self.user = interaction.user
-        self.stop()
+        self.perform_action(interaction, value=False)
 
 
 class CallbackConfirmButton(discord.ui.Button):
@@ -241,13 +267,14 @@ class CallbackConfirmButton(discord.ui.Button):
     A button that calls a callback function when pressed.
     """
     def __init__(
-        self, callback: Coroutine,
-        label: str, style: discord.ButtonStyle,
+        self, callback: Coroutine, label: str,
+        style: discord.ButtonStyle = discord.ButtonStyle.primary,
         **kwargs
     ):
         super().__init__(label=label, style=style, **kwargs)
         self.custom_callback = callback
 
+    @validate(in_view=True)
     async def callback(
         self, interaction: discord.Interaction,
         **kwargs
@@ -259,11 +286,6 @@ class CallbackConfirmButton(discord.ui.Button):
         :param interaction: The interaction that triggered the callback.
         :type interaction: :class:`discord.Interaction`
         """
-        if (
-            self.view.check is not None
-            and not self.view.check(interaction)
-        ):
-            return
         self.view.callback_result = await self.custom_callback(
             self.view, interaction
         )
@@ -284,6 +306,7 @@ class SimpleSelect(discord.ui.Select):
         self.orig_opts = orig_opts
         self.serializer = serializer
 
+    @validate(in_view=True)
     async def callback(
         self, interaction: discord.Interaction
     ):
@@ -292,11 +315,6 @@ class SimpleSelect(discord.ui.Select):
         :param interaction: The interaction that triggered the callback.
         :type interaction: :class:`discord.Interaction`
         """
-        if (
-            self.view.check is not None
-            and not self.view.check(interaction)
-        ):
-            return
         if not self.values:
             return
         res = [

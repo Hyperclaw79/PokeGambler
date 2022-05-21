@@ -37,7 +37,7 @@ from ..base.models import (
     Matches, Minigame, Profiles, Votes
 )
 from ..base.shop import BoostItem
-from ..base.views import LinkView, SelectView
+from ..base.views import CallbackConfirmButton, LinkView, SelectView
 from ..base.modals import BaseModal
 
 from ..helpers.checks import user_check
@@ -915,19 +915,20 @@ class ProfileCommands(Commands):
 
             Bonus rewards on every 5 streak.
         """
-        votes = Votes(message.author)
+        user = getattr(message, "author", message.user)
+        votes = Votes(user)
         streak = votes.vote_streak
-        profile = Profiles(message.author)
+        profile = Profiles(user)
         emb, elapsed = self.__vote_prep_embed(votes, streak, profile)
         if not votes.reward_claimed:
             profile.credit(100)
             content = "Thanks for voting, you've been given " + \
                 f"100 {self.chip_emoji}."
             if streak % 5 == 0 and votes.vote_streak > 0:
-                tier = Loots(message.author).tier
+                tier = Loots(user).tier
                 chest = Chest.get_chest(tier=tier)
                 chest.save()
-                Inventory(message.author).save(chest.itemid)
+                Inventory(user).save(chest.itemid)
                 content += "\nYou've been given a bonus Chest!\n" + \
                     f"『{chest.emoji}』**{chest}** - **{chest.itemid}**"
                 cleared_cds = ["Loot"]
@@ -935,10 +936,10 @@ class ProfileCommands(Commands):
                     cmd.__name__.replace("cmd_", "").title()
                     for cmd in self.ctx.cooldown_cmds
                     if self.ctx.cooldown_cmds[cmd].pop(
-                        message.author, None
+                        user, None
                     )
                 )
-                self.ctx.loot_cd.pop(message.author, None)
+                self.ctx.loot_cd.pop(user, None)
                 cd_cmd_str = "\n".join(
                     f"{idx + 1}. {cmd}"
                     for idx, cmd in enumerate(cleared_cds)
@@ -958,10 +959,26 @@ class ProfileCommands(Commands):
                 "2. Clears all cooldowns (except daily)\n```",
                 inline=False
             )
+
+        async def retrigger_command(view, interaction):
+            # pylint: disable=import-outside-toplevel
+            from ..base.handlers import CustomInteraction
+
+            custom_interaction = CustomInteraction(interaction)
+            await self.cmd_vote(custom_interaction)
+
         vote_button = LinkView(
             url=f"https://top.gg/bot/{self.ctx.user.id}/vote",
-            label="Vote Now!"
+            label="Vote Now!",
+            check=lambda inctn: inctn.user.id == user.id
         )
+        if votes.reward_claimed:
+            vote_button.add_item(
+                CallbackConfirmButton(
+                    callback=retrigger_command,
+                    label="Check"
+                )
+            )
         to_send = {
             "embed": emb
         }
