@@ -127,8 +127,6 @@ class AppCommand:
     options: List[CommandOptions] = field(
         default_factory=list
     )
-    #: Whether the command is enabled by default for everyone
-    default_permission: bool = True
     version: int = None
 
     def __post_init__(self):
@@ -183,8 +181,7 @@ class AppCommand:
             "options": [
                 opts.to_dict()
                 for opts in self.options
-            ],
-            "default_permission": self.default_permission,
+            ]
         }
 
 

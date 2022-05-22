@@ -510,19 +510,17 @@ class SlashHandler:
         need_perms = any(
             hasattr(command, perm)
             for perm in (
-                'admin_only', 'owner_only',
-                'dealer_only'
+                'admin_only',
+                'owner_only'
             )
         ) and self.ctx.is_prod
         if need_perms:
             route = self.get_route(guild_id=self.ctx.official_server)
-            payload["default_permission"] = False
+            payload["default_member_permission"] = "0"
         try:
             resp = await self.http.request(route, json=payload)
             self.registered.remove(cmd_name)
             self.registered.append(resp)
-            if need_perms:
-                await self.__add_permissions(command, resp['id'])
             return resp
         except discord.HTTPException as excp:
             self.ctx.logger.pprint(
@@ -534,38 +532,6 @@ class SlashHandler:
                 color='red'
             )
             return {}
-
-    async def sync_permissions(
-        self, commands: List[Callable],
-        user: discord.Member, allow: bool = True
-    ):
-        """Sync permissions for a list of commands for a user.
-
-        :param commands: List of commands to sync permissions for.
-        :type commands: List[Callable]
-        :param user: User to sync permissions for.
-        :type user: :class:`discord.Member`
-        :param allow: Whether to allow or deny the user for the commands.
-        :type allow: bool
-        """
-        for command in commands:
-            cmd_name = command.__name__.replace('cmd_', '')
-            if self.ctx.is_local:
-                cmd_name += '_'
-            cmd_obj = self.registered[cmd_name]
-            perms = [{
-                'id': user.id,
-                'type': 1,
-                'permission': allow
-            }]
-            success = await self.__update_permissions(cmd_obj.id, perms)
-            if success:
-                state = 'allowed' if allow else 'denied'
-                self.ctx.logger.pprint(
-                    f"{user.mention} is now {state} "
-                    f"to use {cmd_name}",
-                    color='blue'
-                )
 
     def __params_matched(self, command, cmd_name):
         params = {}
@@ -587,56 +553,6 @@ class SlashHandler:
                 }
         registered_cmd_params = self.registered[cmd_name].parameters
         return params == registered_cmd_params
-
-    async def __add_permissions(self, command: Callable, command_id: int):
-        """Add permissions to a command.
-
-        :param command: Command to add permissions to.
-        :type command: Callable
-        :param command_id: Command ID to add permissions to.
-        :type command_id: int
-        """
-        perms = [
-            {
-                "id": uid,
-                "type": 2,
-                "permission": True
-            }
-            for uid in set(
-                self.ctx.allowed_users + [self.ctx.owner.id]
-            )
-        ]
-        if hasattr(command, "admin_only"):
-            perms.append({
-                "id": self.official_roles["Admins"],
-                "type": 1,
-                "permission": True
-            })
-        elif hasattr(command, "dealer_only"):
-            perms.append({
-                "id": self.official_roles["Dealers"],
-                "type": 1,
-                "permission": True
-            })
-        await self.__update_permissions(command_id, perms)
-
-    async def __update_permissions(self, command_id, perms):
-        route_kwargs = {
-            "method": "PUT",
-            "endpoint": f"{command_id}/permissions"
-        }
-        if self.ctx.is_prod:
-            route_kwargs["guild_id"] = self.ctx.official_server
-        route = self.get_route(**route_kwargs)
-        payload = {"permissions": perms}
-        try:
-            await self.http.request(route, json=payload)
-            return True
-        except discord.HTTPException as excp:
-            self.ctx.logger.pprint(
-                excp, color='red'
-            )
-            return False
 
     def __prep_payload(self, command: Callable) -> Dict:
         """Prepare payload for slash command registration.

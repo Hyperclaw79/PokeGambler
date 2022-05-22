@@ -103,7 +103,7 @@ def admin_only(func: Callable):
                 )
             return func_with_callback(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", "/")
-        return message.channel.send(
+        return message.reply(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by '
                 'Pokegambler Admins.\n'
@@ -134,7 +134,7 @@ def dealer_only(func: Callable):
         ]):
             return func(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", "/")
-        return message.channel.send(
+        return message.reply(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by '
                 'Pokegambler Dealers.\n'
@@ -166,7 +166,7 @@ def owner_only(func: Callable):
             color="red",
             wrapped_func=func.__name__
         )
-        return message.channel.send(
+        return message.reply(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by '
                 'the owners of PokeGambler.',
@@ -279,7 +279,7 @@ def check_completion(func: Callable):
                     ].remove(message.author.id)
         if self.ctx.pending_cmds.get(func.__name__, None):
             if message.author.id in self.ctx.pending_cmds[func.__name__]:
-                return message.channel.send(
+                return message.reply(
                     embed=get_embed(
                         "You already triggered this command once.\n"
                         "Please complete it before using it again.",
@@ -358,7 +358,7 @@ def ensure_item(func: Callable):
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
         if not kwargs.get("itemid", None):
-            return message.channel.send(
+            return message.reply(
                 embed=get_embed(
                     "You need to provide am Item ID.",
                     embed_type="error",
@@ -368,7 +368,7 @@ def ensure_item(func: Callable):
         if not HexValidator(
             message=message
         ).check(kwargs["itemid"]):
-            return message.channel.send(
+            return message.reply(
                 embed=get_embed(
                     "You need to provide a valid item ID.",
                     embed_type="error",
@@ -377,7 +377,7 @@ def ensure_item(func: Callable):
             )
         item = Item.from_id(kwargs["itemid"])
         if not item:
-            return message.channel.send(
+            return message.reply(
                 embed=get_embed(
                     "Could not find any item with the given ID.",
                     embed_type="error",
@@ -400,7 +400,7 @@ def ensure_user(func: Callable):
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
         if not kwargs.get("user_id", None):
-            return message.channel.send(
+            return message.reply(
                 embed=get_embed(
                     "You need to provide a user ID.",
                     embed_type="error",
@@ -410,7 +410,7 @@ def ensure_user(func: Callable):
         if not IntegerValidator(
             message=message
         ).check(kwargs["user_id"]):
-            return message.channel.send(
+            return message.reply(
                 embed=get_embed(
                     "You need to provide a valid user ID.",
                     embed_type="error",
@@ -418,7 +418,7 @@ def ensure_user(func: Callable):
                 )
             )
         if not message.guild.get_member(int(kwargs["user_id"])):
-            return message.channel.send(
+            return message.reply(
                 embed=get_embed(
                     "Unable to fetch this user.\n"
                     "Make sure they're still in the server.",
@@ -474,7 +474,7 @@ def maintenance(func: Callable):
             timestamp=True,
             color="red"
         )
-        return message.channel.send(
+        return message.reply(
             embed=get_embed(
                 f"The command {func_name} is under maintenance.\n"
                 "Wait for a future update to see changes.",
@@ -574,7 +574,7 @@ def os_only(func: Callable):
             message.guild.id != self.ctx.official_server,
             not self.ctx.is_local
         ]):
-            return message.channel.send(
+            return message.reply(
                 embed=get_embed(
                     "This command can only be used in the official server.",
                     embed_type="error",
@@ -613,7 +613,7 @@ async def get_profile(
                 )
                 user = official_guild.get_member(int(user))
             if not user:
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         "Could not retrieve the user.",
                         embed_type="error",
@@ -622,7 +622,7 @@ async def get_profile(
                 )
                 return None
         if user.bot:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "Bot accounts cannot have profiles.",
                     embed_type="error",
@@ -632,7 +632,7 @@ async def get_profile(
             return None
         return Profiles(user)
     except discord.HTTPException:
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 "Could not retrieve the user.",
                 embed_type="error",
