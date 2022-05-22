@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      # - wip
     paths-ignore:
       - README.MD
       - LICENSE.md
@@ -29,12 +28,6 @@ jobs:
       run: |
         echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
         echo "SECRET_VERSION=latest" >> $GITHUB_ENV
-
-    # - name: Set TAG to Beta
-    #   if: "!(endsWith(github.ref, '/main'))"
-    #   run: |
-    #    echo "TAG=beta" >> $GITHUB_ENV
-    #    echo "SECRET_VERSION=1" >> $GITHUB_ENV
 
     - name: Set TAG to Version
       if: github.event_name == 'release'
@@ -105,14 +98,6 @@ jobs:
         echo "FOLDER=prod" >> $GITHUB_ENV
         echo "IS_PROD=True" >> $GITHUB_ENV
 
-    # - name: Set TAG to Beta
-    #   if: "!(endsWith(github.ref, '/main'))"
-    #   run: |
-    #    echo "TAG=beta" >> $GITHUB_ENV
-    #    echo "SECRET_VERSION=1" >> $GITHUB_ENV
-    #    echo "FOLDER=beta" >> $GITHUB_ENV
-    #    echo "IS_PROD=False" >> $GITHUB_ENV
-
     - name: Set TAG to Version
       if: github.event_name == 'release'
       run: |
@@ -140,28 +125,6 @@ jobs:
       with:
         cluster_name: pokegambler-cluster
         location: us-central1-c
-
-    # - name: Get Secrets from GSM
-    #   uses: google-github-actions/get-secretmanager-secrets@v0
-    #   id: secrets
-    #   with:
-    #     secrets: |-
-    #       TOKEN:pokegambler/TOKEN/${{ env.SECRET_VERSION }}
-    #       IS_PROD:pokegambler/IS_PROD/${{ env.SECRET_VERSION }}
-    #       MONGO_CLUSTER_STRING:pokegambler/MONGO_CLUSTER_STRING/${{ env.SECRET_VERSION }}
-    #       DISCORD_WEBHOOK_CHANNEL:pokegambler/DISCORD_WEBHOOK_CHANNEL/${{ env.SECRET_VERSION }}
-    #       DISCORD_WEBHOOK_TOKEN:pokegambler/DISCORD_WEBHOOK_TOKEN/${{ env.SECRET_VERSION }}
-    #       OFFICIAL_SERVER:pokegambler/OFFICIAL_SERVER/${{ env.SECRET_VERSION }}
-    #       TOPGG_TOKEN:pokegambler/TOPGG_TOKEN/${{ env.SECRET_VERSION }}
-    #       ADMIN_CMD_LOG_CHANNEL:pokegambler/ADMIN_CMD_LOG_CHANNEL/${{ env.SECRET_VERSION }}
-    #       ANNOUNCEMENT_CHANNEL:pokegambler/ANNOUNCEMENT_CHANNEL/${{ env.SECRET_VERSION }}
-    #       ERROR_LOG_CHANNEL:pokegambler/ERROR_LOG_CHANNEL/${{ env.SECRET_VERSION }}
-    #       IMG_UPLOAD_CHANNEL:pokegambler/IMG_UPLOAD_CHANNEL/${{ env.SECRET_VERSION }}
-    #       OWNER_ID:pokegambler/OWNER_ID/${{ env.SECRET_VERSION }}
-    #       ALLOWED_USERS:pokegambler/ALLOWED_USERS/${{ env.SECRET_VERSION }}
-    #       DEFAULT_GUILDMODE:pokegambler/DEFAULT_GUILDMODE/${{ env.SECRET_VERSION }}
-    #       BLACKLIST_GUILDS:pokegambler/BLACKLIST_GUILDS/${{ env.SECRET_VERSION }}
-    #       WHITELIST_GUILDS:pokegambler/WHITELIST_GUILDS/${{ env.SECRET_VERSION }}
 
     - name: Set up Kustomize
       run: |-
@@ -191,6 +154,7 @@ jobs:
           --from-literal=MONGO_CLUSTER_STRING='${{ secrets.MONGO_CLUSTER_STRING }}'
 
     - name: Send Restart Webhook to Discord
+      continue-on-error: true
       run: |-
         changes=$(
           echo '${{ toJson(github.event.commits) }}' \
