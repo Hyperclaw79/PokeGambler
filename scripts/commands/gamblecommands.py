@@ -855,7 +855,7 @@ class GambleCommands(Commands):
 
     async def __gamble_register(self, message: Message, **kwargs):
         fee = kwargs["fee"]
-        max_players = max(2, int(kwargs.pop("max_players", 12)))
+        max_players = max(2, int(kwargs.pop("max_players", 12) or 12))
         gamblers = self.__get_gambler_role(message.channel)
         await message.channel.set_permissions(
             gamblers, send_messages=False
