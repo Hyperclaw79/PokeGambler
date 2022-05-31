@@ -47,7 +47,7 @@ from ..base.models import Blacklist, Inventory, Model, Profiles
 from ..base.items import Item, Tradable, Treasure
 from ..base.shop import Shop, PremiumShop
 from ..base.views import (
-    BaseView, CallbackConfirmButton,
+    BaseView, CallbackButton,
     SelectConfirmView
 )
 from .basecommand import (
@@ -1158,14 +1158,14 @@ class AdminCommands(Commands):
             check=lambda intcrn: intcrn.user.id == message.author.id
         )
         btn_view.add_item(
-            CallbackConfirmButton(
+            CallbackButton(
                 label='Currency',
                 style=discord.ButtonStyle.primary,
                 callback=callback
             )
         )
         btn_view.add_item(
-            CallbackConfirmButton(
+            CallbackButton(
                 label="Other",
                 style=discord.ButtonStyle.secondary,
                 callback=callback

@@ -50,10 +50,13 @@ def validate(in_view=False):
     """
     def decorator(func: Callable):
         @wraps(func)
-        def wrapper(self, interaction, *args, **kwargs):
+        def wrapper(self, *args, **kwargs):
             """
             Wrapper function.
             """
+            if not args:
+                return None
+            interaction = args[0]
             checker = (
                 self.view.check if in_view
                 else self.check
@@ -63,7 +66,7 @@ def validate(in_view=False):
                 and not checker(interaction)
             ):
                 return None
-            return func(self, interaction, *args, **kwargs)
+            return func(self, *args, **kwargs)
         return wrapper
     return decorator
 
@@ -199,70 +202,45 @@ class MultiSelectView(BaseView):
             self.add_item(SelectComponent(**kwargs))
 
 
-class Confirm(BaseView):
+class Button(discord.ui.Button):
     """
-    A simple View that gives us a confirmation menu.
+    Overridden discord button to accomodate custom checks.
     """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.value = None
-        self.user = None
-
-    @validate
-    @discord.ui.button(
-        label="️️️️✔️",
-        style=discord.ButtonStyle.green
-    )
-    async def confirm(
-        self, button: discord.ui.Button,
-        interaction: discord.Interaction
-    ):
-        """When the confirm button is pressed, set the inner value to True.
-
-        :param button: The button that was pressed.
-        :type button: :class:`discord.ui.Button`
-        :param interaction: The interaction that triggered the callback.
-        :type interaction: :class:`discord.Interaction`
+    @validate(in_view=True)
+    async def callback(self, interaction: discord.Interaction):
         """
-        self.perform_action(interaction, value=True)
-
-    def perform_action(self, interaction, value):
-        """Perform the action.
-
-        :param interaction: The interaction that triggered the callback.
-        :type interaction: :class:`discord.Interaction`
-        :param value: The value to be set.
-        :type value: bool
+        Overridden callback to check if the check passes.
         """
-        self.value = value
-        self.user = interaction.user
-        self.stop()
+        self.view.perform_action(interaction, value=None)
 
 
-class ConfirmOrCancel(Confirm):
+class ConfirmButton(Button):
     """
-    The :class:`~scripts.base.views.Confirm` view with a Cancel button.
+    A button that confirms the action.
     """
-    @validate
-    @discord.ui.button(
-        label="❌",
-        style=discord.ButtonStyle.secondary
-    )
-    async def cancel(
-        self, button: discord.ui.Button,
-        interaction: discord.Interaction
-    ):
-        """When the cancel button is pressed, set the inner value to False.
-
-        :param button: The button that was pressed.
-        :type button: :class:`discord.ui.Button`
-        :param interaction: The interaction that triggered the callback.
-        :type interaction: :class:`discord.Interaction`
+    @validate(in_view=True)
+    async def callback(self, interaction: discord.Interaction):
         """
-        self.perform_action(interaction, value=False)
+        Overridden callback to check if the check passes.
+        Sets value to True.
+        """
+        self.view.perform_action(interaction, value=True)
 
 
-class CallbackConfirmButton(discord.ui.Button):
+class CancelButton(Button):
+    """
+    A button that cancels the action.
+    """
+    @validate(in_view=True)
+    async def callback(self, interaction: discord.Interaction):
+        """
+        Overridden callback to check if the check passes.
+        Sets value to False.
+        """
+        self.view.perform_action(interaction, value=False)
+
+
+class CallbackButton(discord.ui.Button):
     """
     A button that calls a callback function when pressed.
     """
@@ -290,6 +268,48 @@ class CallbackConfirmButton(discord.ui.Button):
             self.view, interaction
         )
         self.view.stop()
+
+
+class ConfirmView(BaseView):
+    """
+    A simple View that gives us a confirmation menu.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.value = None
+        self.user = None
+        self.add_item(
+            ConfirmButton(
+                label='✔️',
+                style=discord.ButtonStyle.green
+            )
+        )
+
+    def perform_action(self, interaction, value):
+        """Perform the action.
+
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
+        :param value: The value to be set.
+        :type value: bool
+        """
+        self.value = value
+        self.user = interaction.user
+        self.stop()
+
+
+class ConfirmOrCancelView(ConfirmView):
+    """
+    The :class:`~scripts.base.views.Confirm` view with a Cancel button.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.add_item(
+            CancelButton(
+                label='❌',
+                style=discord.ButtonStyle.secondary
+            )
+        )
 
 
 class SimpleSelect(discord.ui.Select):
@@ -357,7 +377,7 @@ class SelectConfirmView(BaseView):
             )
         )
         self.add_item(
-            CallbackConfirmButton(
+            CallbackButton(
                 callback=self.callback,
                 label="✔️",
                 style=discord.ButtonStyle.green

@@ -37,7 +37,7 @@ from ..base.models import (
     Matches, Minigame, Profiles, Votes
 )
 from ..base.shop import BoostItem
-from ..base.views import CallbackConfirmButton, LinkView, SelectView
+from ..base.views import CallbackButton, LinkView, SelectView
 from ..base.modals import BaseModal
 
 from ..helpers.checks import user_check
@@ -974,7 +974,7 @@ class ProfileCommands(Commands):
         )
         if votes.reward_claimed:
             vote_button.add_item(
-                CallbackConfirmButton(
+                CallbackButton(
                     callback=retrigger_command,
                     label="Check"
                 )

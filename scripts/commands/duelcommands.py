@@ -35,7 +35,7 @@ from ..base.items import Gladiator, Item
 from ..base.models import (
     Blacklist, DuelActionsModel, Inventory, Profiles, Duels
 )
-from ..base.views import Confirm, SelectView
+from ..base.views import ConfirmView, SelectView
 from ..base.modals import CallbackReplyModal
 from ..helpers.checks import user_check
 from ..helpers.imageclasses import GladitorMatchHandler
@@ -515,7 +515,7 @@ class DuelCommands(Commands):
         user: Member, amount: int,
         user_profile: Profiles
     ) -> bool:
-        confirm_view = Confirm(
+        confirm_view = ConfirmView(
             check=lambda intcn: intcn.user.id == user.id,
             timeout=60
         )

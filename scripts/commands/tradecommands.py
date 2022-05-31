@@ -44,7 +44,7 @@ from ..base.shop import (
     BoostItem, PremiumBoostItem,
     PremiumShop, Shop, Title
 )
-from ..base.views import Confirm, ConfirmOrCancel, SelectConfirmView
+from ..base.views import ConfirmView, ConfirmOrCancelView, SelectConfirmView
 
 from ..helpers.utils import (
     dedent, dm_send,
@@ -1019,7 +1019,7 @@ class TradeCommands(Commands):
         quantity, mode="deposit"
     ):
         admins = discord.utils.get(message.guild.roles, name="Admins")
-        confirm_view = Confirm(
+        confirm_view = ConfirmView(
             check=lambda intcn: any([
                 is_admin(intcn.user),
                 is_owner(self.ctx, intcn.user)
@@ -1079,7 +1079,7 @@ class TradeCommands(Commands):
             return None, None
 
         async def create_modal(view, interaction):
-            if view.result is None:
+            if view.value is None:
                 return
             pokename = str(view.value).split('#', maxsplit=1)[0]
             amount_modal = EmbedReplyModal(
@@ -1141,7 +1141,7 @@ class TradeCommands(Commands):
         admin, pokebot, chips,
         mode="deposit"
     ):
-        confirm_or_cancel = ConfirmOrCancel(timeout=None)
+        confirm_or_cancel = ConfirmOrCancelView(timeout=None)
         await thread.send(
             embed=get_embed(
                 title="Starting the transaction."
@@ -1156,12 +1156,6 @@ class TradeCommands(Commands):
             if mode == "deposit":
                 content = f"{message.author.mention}, check your balance" + \
                     " using the `/balance` command."
-            await thread.send(
-                content=content,
-                embed=get_embed(
-                    title=f"Closing the transaction for {message.author}."
-                )
-            )
             getattr(
                 Profiles(message.author),
                 "credit" if mode == "deposit" else "debit"
@@ -1178,6 +1172,14 @@ class TradeCommands(Commands):
                     " your account."
                 )
             )
+        else:
+            content = "Transaction cancelled."
+        await thread.send(
+            content=content,
+            embed=get_embed(
+                title=f"Closing the transaction for {message.author}."
+            )
+        )
         await thread.edit(
             archived=True,
             locked=True
