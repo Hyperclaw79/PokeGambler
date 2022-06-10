@@ -528,7 +528,9 @@ class LeaderBoardGenerator(AssetGenerator):
             )
         avatar_byio = BytesIO()
         if user := ctx.get_user(int(data["user_id"])):
-            await user.avatar.with_size(512).save(avatar_byio)
+            await (
+                user.avatar or user.default_avatar
+            ).with_size(512).save(avatar_byio)
         else:
             await ctx.user.default_avatar.with_size(512).save(avatar_byio)
         avatar = Image.open(avatar_byio).resize(
