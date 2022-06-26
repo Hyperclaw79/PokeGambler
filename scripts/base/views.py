@@ -300,7 +300,7 @@ class ConfirmView(BaseView):
 
 class ConfirmOrCancelView(ConfirmView):
     """
-    The :class:`~scripts.base.views.Confirm` view with a Cancel button.
+    The :class:`~scripts.base.views.ConfirmView` view with a Cancel button.
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

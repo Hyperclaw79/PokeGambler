@@ -98,10 +98,7 @@ def to_dict(
 
 
 class MethodNotAllowed(Exception):
-    """Exception raised when a method is not allowed.
-
-    :meta private:
-    """
+    """Exception raised when a method is not allowed."""
 
 
 class NameSetter(type):

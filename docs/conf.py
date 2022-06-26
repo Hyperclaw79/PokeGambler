@@ -76,7 +76,7 @@ hoverxref_role_types = {
 
 intersphinx_mapping = {
     'aiohttp': ('https://docs.aiohttp.org/en/stable/', None),
-    'discord': ('https://discordpy.readthedocs.io/en/master/', None),
+    'discord': ('https://discordpy.readthedocs.io/en/latest/', None),
     'Pillow': ('https://pillow.readthedocs.io/en/latest/', None),
     'topgg': ('https://topggpy.readthedocs.io/en/latest/', None)
 }
