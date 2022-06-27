@@ -526,8 +526,12 @@ class GambleCommands(Commands):
         multiplier = multipliers[level]
         profile = Profiles(message.author)
         if profile.get("balance") < cost:
-            await self.handle_low_bal(message.author, message.channel)
-            await message.add_reaction("❌")
+            await message.reply("\u200B")
+            await self.handle_low_balance(
+                message, message.author,
+                private=False,
+                channel=message.channel
+            )
             return
         board, board_img = self.boardgen.get_board(level)
         multi_select_view = MultiSelectView(
@@ -602,27 +606,6 @@ class GambleCommands(Commands):
             view=multi_select_view
         )
 
-    @staticmethod
-    async def handle_low_bal(usr, gamble_channel):
-        """Handle low balance.
-
-        :meta private:
-        """
-        low_bal_embed = get_embed(
-            "Every user gets 100 chips as a starting bonus.\n"
-            "You can buy more or exchange for other bot credits.",
-            embed_type="error",
-            title="Not enough Pokechips!",
-            footer="Contact an admin for details."
-        )
-        try:
-            await usr.send(embed=low_bal_embed)
-        except discord.Forbidden:
-            await gamble_channel.send(
-                content=usr.mention,
-                embed=low_bal_embed
-            )
-
     async def __flip_input_handler(
         self, message, amount,
         profile, min_chips, max_chips
@@ -639,8 +622,12 @@ class GambleCommands(Commands):
         else:
             amount = min_chips
         if profile.get("balance") < amount:
-            await self.handle_low_bal(message.author, message.channel)
-            await message.add_reaction("❌")
+            await message.reply("\u200B")
+            await self.handle_low_balance(
+                message, message.author,
+                private=False,
+                channel=message.channel
+            )
             return None
         return amount
 

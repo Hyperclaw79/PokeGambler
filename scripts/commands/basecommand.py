@@ -28,30 +28,62 @@ from datetime import datetime
 from functools import wraps
 import json
 from typing import (
-    Callable, Coroutine, Dict, List, Optional,
+    Any, Callable, Coroutine, Dict, List, Optional,
     TYPE_CHECKING, Union
 )
 
 import discord
 from dotenv import load_dotenv
 
-from scripts.base.handlers import CustomInteraction
-
+from ..base.handlers import CustomInteraction
 from ..base.items import Item
 from ..base.models import Inventory, Model, Profiles
 from ..base.shop import PremiumShop, Shop
+from ..base.views import CallbackButton, CallbackButtonView, LinkView
+
 from ..helpers.paginator import Paginator
 from ..helpers.utils import (
-    ImageCacher, get_embed, is_admin,
+    ImageCacher, dedent, dm_send, get_embed, is_admin,
     is_dealer, is_owner
 )
 from ..helpers.validators import HexValidator, IntegerValidator
 
 if TYPE_CHECKING:
-    from discord import Embed, Message, Member, File
+    from discord import Embed, Message, Member, File, TextChannel
     from bot import PokeGambler
 
 load_dotenv()
+
+
+def get_commands_btn_view(
+    message: Union[Message, CustomInteraction],
+    cmds: List[Coroutine],
+    cmd_kwargs: Optional[List[Dict[str, Any]]] = None
+) -> CallbackButtonView:
+    """Get a CallbackButtonView for a list of commands.
+
+    :param message: The message to be used for the CallbackButtonView.
+    :type message: Union[Message, CustomInteraction]
+    :param cmds: The list of commands to be used for the CallbackButtonView.
+    :type cmds: List[Coroutine]
+    :param cmd_kwargs: The kwargs to be used for the Commands.
+    :type cmd_kwargs: Optional[List[Dict[str, Any]]]
+    :return: The CallbackButtonView.
+    """
+    def cb_wrapper(cmd, **kwargs):
+        # pylint: disable=unused-argument
+        async def callback(view, interaction):
+            await cmd(message=CustomInteraction(interaction), **kwargs)
+        return callback
+
+    btns = [
+        CallbackButton(
+            callback=cb_wrapper(cmd, **kwargs),
+            label=cmd.__name__.removeprefix("cmd_").title(),
+            oneshot=False
+        ) for cmd, kwargs in zip(cmds, (cmd_kwargs or [{} for _ in cmds]))
+    ]
+    return CallbackButtonView(buttons=btns)
 
 
 # region Decoarators
@@ -739,6 +771,75 @@ class Commands(ABC):
         )
         await message.reply(**sendables)
         await sendables["view"].wait()
+
+    # pylint: disable=too-many-arguments
+    async def handle_low_balance(
+        self, message: Union[Message, CustomInteraction],
+        user: Member, private: Optional[bool] = True,
+        channel: Optional[TextChannel] = None,
+        embed_content: Optional[str] = None,
+        is_pokebonds: Optional[bool] = False
+    ):
+        """Handles a user with a low balance.
+
+        :param message: The message that triggered the command.
+        :type message: :class:`discord.Message`
+        :param user: The user with a low balance.
+        :type user: :class:`discord.Member`
+        :param private: Whether to send the message in a DM.
+        :type private: Optional[bool]
+        :default private: True
+        :param channel: The channel to send the message in.
+        :type channel: Optional[:class:`discord.TextChannel`]
+        :param embed_content: The content to include in the embed.
+        :type embed_content: Optional[str]
+        :param is_pokebonds: Whether the user has PokeBonds.
+        :type is_pokebonds: Optional[bool]
+        :default is_pokebonds: False
+        """
+        if not is_pokebonds:
+            action_view = get_commands_btn_view(
+                message, [
+                    self.ctx.profilecommands.cmd_loot,
+                    self.ctx.profilecommands.cmd_daily
+                ]
+            )
+        else:
+            action_view = LinkView(
+                url="https://pokegambler.vercel.app/store",
+                label="Buy Pokebonds",
+                emoji=self.bond_emoji
+            )
+
+        emb_points = "\n🔶 ".join([
+            "🔶 Every user gets 100 Pokechips as a starting bonus.",
+            "You can earn more Pokechips from Loot, Daily or Gambling Minigames.",
+            "You can buy more or exchange for other bot credits."
+        ])
+        curr = self.bond_emoji if is_pokebonds else self.chip_emoji
+        emb = get_embed(
+            embed_content or f"You do not have enough {curr} to do that.",
+            embed_type="error",
+            title="Insufficient Balance",
+            fields={
+                f"How to get more  {self.chip_emoji}": dedent(
+                    f"```md\n{emb_points}\n```"
+                )
+            } if not is_pokebonds else None
+        )
+        if private:
+            await dm_send(
+                message, user, embed=emb,
+                view=action_view
+            )
+        elif channel is None:
+            raise ValueError("Channel is required for non-private messages.")
+        else:
+            await channel.send(
+                content=user.mention,
+                embed=emb,
+                view=action_view
+            )
 
     async def __handle_files(self, message, embeds, files):
         asset_chan = message.guild.get_channel(

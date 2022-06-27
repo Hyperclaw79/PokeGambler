@@ -249,8 +249,10 @@ class CallbackButton(discord.ui.Button):
         style: discord.ButtonStyle = discord.ButtonStyle.primary,
         **kwargs
     ):
+        oneshot = kwargs.pop('oneshot', True)
         super().__init__(label=label, style=style, **kwargs)
         self.custom_callback = callback
+        self.oneshot = oneshot
 
     @validate(in_view=True)
     async def callback(
@@ -267,7 +269,32 @@ class CallbackButton(discord.ui.Button):
         self.view.callback_result = await self.custom_callback(
             self.view, interaction
         )
-        self.view.stop()
+        if self.oneshot:
+            self.view.stop()
+
+
+class CallbackButtonView(BaseView):
+    """
+    A view that contains a callback button.
+    """
+    def __init__(
+        self, buttons: List[CallbackButton],
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        for button in buttons:
+            self.add_item(button)
+
+    def perform_action(self, interaction, value):
+        """Perform the action.
+
+        :param interaction: The interaction that triggered the callback.
+        :type interaction: :class:`discord.Interaction`
+        :param value: The value to be set.
+        :type value: bool
+        """
+        self.value = value
+        self.user = interaction.user
 
 
 class ConfirmView(BaseView):
@@ -511,8 +538,10 @@ class GambleCounter(BaseView):
         usr = interaction.user
         bal = Profiles(usr).get("balance")
         if bal < self.fee:
-            await self.gamble_cmd.handle_low_bal(
-                usr, interaction.message.channel
+            await self.gamble_cmd.handle_low_balance(
+                interaction, usr,
+                private=False,
+                channel=interaction.message.channel
             )
             return
         if interaction.user not in self.registration_list:

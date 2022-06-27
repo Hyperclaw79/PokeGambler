@@ -10,6 +10,8 @@ Basecommand
 
 .. autofunction:: scripts.commands.basecommand.get_profile
 
+.. autofunction:: scripts.commands.basecommand.get_commands_btn_view
+
 
 Decorators
 ==========

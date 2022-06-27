@@ -361,13 +361,7 @@ class TradeCommands(Commands):
         author_prof = Profiles(message.author)
         mention_prof = Profiles(user)
         if author_prof.get("balance") < chips:
-            await message.reply(
-                embed=get_embed(
-                    f"You don't have enough {self.chip_emoji}.",
-                    embed_type="error",
-                    title="Low Balance"
-                )
-            )
+            await self.handle_low_balance(message, author_prof)
             return
         author_prof.debit(chips)
         mention_prof.credit(chips)
@@ -375,7 +369,7 @@ class TradeCommands(Commands):
             message.author,
             user, chips
         ).save()
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 f"chips transferred: **{chips}** {self.chip_emoji}"
                 f"\nRecipient: **{user}**",

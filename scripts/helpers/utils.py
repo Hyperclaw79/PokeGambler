@@ -248,7 +248,8 @@ def get_embed(
     image: Optional[str] = None,
     thumbnail: Optional[str] = None,
     color: Optional[int] = None,
-    no_icon: bool = False
+    no_icon: Optional[bool] = False,
+    fields: Optional[Dict[str, str]] = None
 ) -> Embed:
     """Creates a Discord Embed with appropriate color, \
         title and description.
@@ -268,7 +269,9 @@ def get_embed(
     :param color: The color of the embed.
     :type color: Optional[int]
     :param no_icon: If True, no icon will be shown.
-    :type no_icon: bool
+    :type no_icon: Optional[bool]
+    :param fields: The fields of the embed.
+    :type fields: Optional[Dict[str, str]]
     :return: The embed
     :rtype: :class:`discord.Embed`
     """
@@ -310,6 +313,9 @@ def get_embed(
         emb.set_thumbnail(url=thumbnail)
     if color:
         emb.color = color
+    if fields:
+        for key, value in fields.items():
+            emb.add_field(name=key, value=value, inline=True)
     return emb
 
 

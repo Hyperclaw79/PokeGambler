@@ -210,13 +210,9 @@ class DuelCommands(Commands):
         if profile.get(
             charges[levels.index(choice)]
         ) < 200:
-            await dm_send(
+            await self.handle_low_balance(
                 message, message.author,
-                embed=get_embed(
-                    "You cannot afford to create that action.",
-                    embed_type="error",
-                    title="Insufficient Balance"
-                )
+                is_pokebonds=bool(levels.index(choice))
             )
             return
         action_inp_msg = await dm_send(
@@ -569,14 +565,8 @@ class DuelCommands(Commands):
                     )
                 )
         if user_profile.get('balance') < amount:
-            await dm_send(
-                message, message.author,
-                embed=get_embed(
-                    f"You do not have enough {self.chip_emoji}\n"
-                    "Contact an admin for details on how to get more.",
-                    embed_type="error",
-                    title="Insufficient Balance"
-                )
+            await self.handle_low_balance(
+                message, message.author
             )
             return 0
         return amount
