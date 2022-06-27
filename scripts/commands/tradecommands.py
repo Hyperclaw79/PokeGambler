@@ -44,7 +44,10 @@ from ..base.shop import (
     BoostItem, PremiumBoostItem,
     PremiumShop, Shop, Title
 )
-from ..base.views import ConfirmView, ConfirmOrCancelView, SelectConfirmView
+from ..base.views import (
+    ConfirmView, ConfirmOrCancelView,
+    LinkView, SelectConfirmView
+)
 
 from ..helpers.utils import (
     dedent, dm_send,
@@ -55,7 +58,7 @@ from ..helpers.validators import HexValidator, MinMaxValidator
 
 from .basecommand import (
     Commands, alias, check_completion,
-    dealer_only, defer, ensure_item, model, os_only
+    dealer_only, defer, ensure_item, model, os_only, suggest_actions
 )
 
 if TYPE_CHECKING:
@@ -487,6 +490,10 @@ class TradeCommands(Commands):
         await message.reply(embed=emb)
 
     @model([Loots, Profiles, Chest, Inventory])
+    @suggest_actions([
+        ("profilecommands", "loot"),
+        ("profilecommands", "daily")
+    ])
     async def cmd_open(
         self, message: Message,
         itemid: Optional[str] = None,
@@ -577,7 +584,8 @@ class TradeCommands(Commands):
                     "Make sure you actually own this Item.",
                     embed_type="error",
                     title="Invalid Chest/Lootbag ID"
-                )
+                ),
+                view=kwargs.get('view')
             )
             return
         await self.__open_handle_rewards(message, openables)
@@ -775,6 +783,9 @@ class TradeCommands(Commands):
 
     @defer
     @model([Item, Profiles])
+    @suggest_actions([
+        ("tradecommands", "shop")
+    ])
     async def cmd_shop(
         self, message: Message,
         category: Optional[str] = None,
@@ -843,6 +854,11 @@ class TradeCommands(Commands):
                         " who purchased PokeBonds.",
                         embed_type="error",
                         title="Premium Only"
+                    ),
+                    view=LinkView(
+                        url="https://pokegambler.vercel.app/store",
+                        label="Buy Pokebonds",
+                        emoji=self.bond_emoji
                     )
                 )
                 return
@@ -864,7 +880,8 @@ class TradeCommands(Commands):
                     f"Try one of these:\n```diff\n{cat_str}\n```",
                     embed_type="error",
                     title="Invalid Category"
-                )
+                ),
+                view=kwargs.get("view")
             )
             return
         if not category:

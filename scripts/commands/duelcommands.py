@@ -49,7 +49,7 @@ from ..helpers.validators import (
 )
 from .basecommand import (
     Commands, alias, autocomplete, check_completion,
-    cooldown, model, needs_ticket
+    cooldown, model, needs_ticket, suggest_actions
 )
 
 if TYPE_CHECKING:
@@ -295,6 +295,9 @@ class DuelCommands(Commands):
     @cooldown(300)
     @model([Blacklist, Duels, Inventory, Item, Profiles])
     @alias(["fight", "gladiator", "battle"])
+    @suggest_actions([
+        ("tradecommands", "shop", {"category": "Gladiator"})
+    ])
     async def cmd_duel(
         self, message: Message,
         opponent: Member,
@@ -363,7 +366,8 @@ class DuelCommands(Commands):
         if not amount:
             return
         gladiator1 = await self.__duel_get_gladiator(
-            message, message.author, user_profile
+            message, message.author, user_profile,
+            **kwargs
         )
         if not gladiator1:
             return
@@ -397,7 +401,7 @@ class DuelCommands(Commands):
             return
         gladiator2 = await self.__duel_get_gladiator(
             message, opponent, other_profile,
-            notify=False
+            notify=False, **kwargs
         )
         if not gladiator2:
             await message.channel.send(
@@ -573,7 +577,8 @@ class DuelCommands(Commands):
 
     async def __duel_get_gladiator(
         self, message: Message, user: Member,
-        profile: Profiles, notify: bool = True
+        profile: Profiles, notify: bool = True,
+        **kwargs
     ) -> Gladiator:
         inv = Inventory(user)
         glads, _ = inv.get(category='Gladiator')
@@ -586,7 +591,8 @@ class DuelCommands(Commands):
                         "Buy one form the Shop first.",
                         embed_type="error",
                         title="No Gladiators Found"
-                    )
+                    ),
+                    view=kwargs.get("view")
                 )
             return None
         available = []

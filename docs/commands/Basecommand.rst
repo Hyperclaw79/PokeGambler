@@ -54,3 +54,5 @@ Decorators
 .. autodecorator:: scripts.commands.basecommand.needs_ticket
 
 .. autodecorator:: scripts.commands.basecommand.model
+
+.. autodecorator:: scripts.commands.basecommand.suggest_actions

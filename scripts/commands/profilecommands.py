@@ -54,7 +54,7 @@ from ..helpers.validators import HexValidator, ImageUrlValidator
 
 from .basecommand import (
     Commands, alias, check_completion, cache_images,
-    cooldown, defer, model, get_profile, needs_ticket
+    cooldown, defer, get_commands_btn_view, model, get_profile, needs_ticket
 )
 
 if TYPE_CHECKING:
@@ -920,6 +920,7 @@ class ProfileCommands(Commands):
         streak = votes.vote_streak
         profile = Profiles(user)
         emb, elapsed = self.__vote_prep_embed(votes, streak, profile)
+        loot_view = None
         if not votes.reward_claimed:
             profile.credit(100)
             content = "Thanks for voting, you've been given " + \
@@ -946,6 +947,9 @@ class ProfileCommands(Commands):
                 )
                 content += "\nCooldowns cleared for following commands:" + \
                     f"\n```md\n{cd_cmd_str}\n```"
+                loot_view = get_commands_btn_view(
+                    message, [self.ctx.profilecommands.cmd_loot], [{}]
+                )
             votes.update(reward_claimed=True)
             emb.add_field(
                 name="Rewards Added",
@@ -984,6 +988,8 @@ class ProfileCommands(Commands):
         }
         if elapsed >= 12:
             to_send["view"] = vote_button
+        if loot_view:
+            to_send["view"] = loot_view
         await message.reply(**to_send)
 
     @staticmethod

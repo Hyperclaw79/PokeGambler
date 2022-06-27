@@ -89,7 +89,7 @@ class PokeGambler(discord.AutoShardedClient):
         else:
             _set_api_version(9)
         super().__init__(intents=intents)
-        self.version = "v1.4.0"
+        self.version = "v1.5.0"
         self.error_log_path = kwargs["error_log_path"]
         self.assets_path = kwargs["assets_path"]
         self.__update_configs()

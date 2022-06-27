@@ -29,7 +29,7 @@ from functools import wraps
 import json
 from typing import (
     Any, Callable, Coroutine, Dict, List, Optional,
-    TYPE_CHECKING, Union
+    TYPE_CHECKING, Tuple, Union
 )
 
 import discord
@@ -166,6 +166,9 @@ def dealer_only(func: Callable):
         ]):
             return func(self, *args, message=message, **kwargs)
         func_name = func.__name__.replace("cmd_", "/")
+        command_view = get_commands_btn_view(
+            message, [self.ctx.tradecommands.cmd_shop], [{"category": "Titles"}]
+        )
         return message.reply(
             embed=get_embed(
                 f'Command `{func_name}` can only be used by '
@@ -173,7 +176,8 @@ def dealer_only(func: Callable):
                 'And this command can only be used in '
                 'the official server.',
                 embed_type="error"
-            )
+            ),
+            view=command_view
         )
     return wrapped
 
@@ -389,13 +393,17 @@ def ensure_item(func: Callable):
     '''
     @wraps(func)
     def wrapped(self, message, *args, **kwargs):
+        command_view = get_commands_btn_view(
+            message, [self.ctx.tradecommands.cmd_shop], [{}]
+        )
         if not kwargs.get("itemid", None):
             return message.reply(
                 embed=get_embed(
                     "You need to provide am Item ID.",
                     embed_type="error",
                     title="No Item ID"
-                )
+                ),
+                view=command_view
             )
         if not HexValidator(
             message=message
@@ -405,7 +413,8 @@ def ensure_item(func: Callable):
                     "You need to provide a valid item ID.",
                     embed_type="error",
                     title="Invalid ID"
-                )
+                ),
+                view=command_view
             )
         item = Item.from_id(kwargs["itemid"])
         if not item:
@@ -414,7 +423,8 @@ def ensure_item(func: Callable):
                     "Could not find any item with the given ID.",
                     embed_type="error",
                     title="Item Does Not Exist"
-                )
+                ),
+                view=command_view
             )
         kwargs["item"] = item
         return func(self, message=message, **kwargs)
@@ -540,15 +550,35 @@ def needs_ticket(name: str):
                     embed_content = f"You do not have any **{name}** tickets.\n" + \
                         "You can buy one from the Consumables Shop."
                     if itemid:
-                        embed_content += "\nUse `/buy" + \
-                            f" itemid:{itemid}` to buy it."
+                        tkt = Shop.get_item(itemid) or PremiumShop.get_item(itemid)
+                        price = (
+                            tkt.price if not tkt.premium
+                            else tkt.price // 10
+                        )
+                        curr = (
+                            self.chip_emoji if not tkt.premium
+                            else self.bond_emoji
+                        )
+                        embed_content = embed_content.removesuffix(".") + \
+                            f" for **{price}** {curr}."
+                        command_view = get_commands_btn_view(
+                            message,
+                            [self.ctx.tradecommands.cmd_buy],
+                            [{"itemid": itemid}]
+                        )
+                    else:
+                        command_view = get_commands_btn_view(
+                            message,
+                            [self.ctx.tradecommands.cmd_shop],
+                            [{"category": "Consumables"}]
+                        )
                     await message.reply(
                         embed=get_embed(
                             embed_content,
                             embed_type="error",
                             title="Insufficient Tickets"
                         ),
-                        ephemeral=True
+                        view=command_view
                     )
                 return no_tix()
             kwargs["tickets"] = tickets
@@ -615,6 +645,39 @@ def os_only(func: Callable):
             )
         return func(self, *args, message=message, **kwargs)
     return wrapped
+
+
+def suggest_actions(
+    commands: List[Tuple[
+        str, str, Optional[Dict[str, Any]]
+    ]]
+):
+    '''Suggests actions to be taken when a command fails.
+
+    :param commands: The commands to be suggested. (Category, Command, Kwargs)
+    :type commands: List[Tuple[str, str, Optional[Dict[str, Any]]]]
+    :return: The decorated function.
+    :rtype: Callable
+    '''
+    def decorator(func: Callable):
+        @wraps(func)
+        def wrapped(self, message, *args, **kwargs):
+            cmds = [
+                (
+                    getattr(
+                        getattr(self.ctx, cmd[0]),
+                        f"cmd_{cmd[1]}"
+                    ),
+                    cmd[2] if len(cmd) > 2 else {}
+                )
+                for cmd in commands
+            ]
+            cmds, cmd_kwargs = zip(*cmds)
+            commands_view = get_commands_btn_view(message, cmds, cmd_kwargs)
+            kwargs["view"] = commands_view
+            return func(self, *args, message=message, **kwargs)
+        return wrapped
+    return decorator
 
 # endregion
 
