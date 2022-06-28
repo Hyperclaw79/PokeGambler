@@ -197,7 +197,7 @@ class ProfileCommands(Commands):
         ).get()
         data = {
             key: (
-                f"{val:,}" if key in [
+                f"{int(val):,}" if key in [
                     "won_chips", "pokebonds", "balance"
                 ]
                 else str(val)
@@ -620,7 +620,7 @@ class ProfileCommands(Commands):
             if not self.ctx.get_user(int(data["user_id"])):
                 continue
             data["rank"] = idx + 1
-            data["balance"] = f'{data["balance"]:,}'
+            data["balance"] = f'{int(data["balance"]):,}'
             lbd.append(data)
             idx += 1
         embeds = []
@@ -775,7 +775,7 @@ class ProfileCommands(Commands):
         await user.display_avatar.with_size(512).save(avatar_byio)
         avatar = Image.open(avatar_byio)
         name = profile["name"]
-        balance = f'{profile["balance"]:,}'
+        balance = f'{int(profile["balance"]):,}'
         num_played = str(profile["num_matches"])
         num_won = str(profile["num_wins"])
         background = None
@@ -826,7 +826,7 @@ class ProfileCommands(Commands):
             rank = profile.get_rank()
             data = profile.get()
             data["rank"] = rank or 0
-            data["balance"] = f'{data["balance"]:,}'
+            data["balance"] = f'{int(data["balance"]):,}'
         with LineTimer(self.logger, "Create Rank Image"):
             img = await self.lbg.get_rankcard(self.ctx, data, heading=True)
             discord_file = img2file(
