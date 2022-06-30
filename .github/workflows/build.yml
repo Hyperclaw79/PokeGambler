@@ -155,9 +155,11 @@ jobs:
 
     - name: Send Restart Webhook to Discord
       continue-on-error: true
+      env:
+        COMMITS: ${{ toJSON(github.event.commits) }}
       run: |-
         changes=$(
-          echo '${{ toJson(github.event.commits) }}' \
+          echo $COMMITS \
           | jq -r '.[] | select(.message | startswith("[Update]")) | .message' \
           | awk '{printf "%d. %s\\n", NR, $s}' \
           | sed "s/\[Update\]//g"
