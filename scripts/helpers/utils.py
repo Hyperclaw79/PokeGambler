@@ -523,7 +523,20 @@ async def online_now(ctx: PokeGambler):
             "\u200B\n\u200B\n"
         ])
     }
-    await ctx.sess.post(url=url, data=body)
+    ctx.logger.pprint(
+        "Sending online notification to webhook.\n",
+        color="blue"
+    )
+    try:
+        await ctx.sess.post(url=url, data=body)
+        ctx.logger.pprint(
+            "Online notification sent.\n",
+            color="green"
+        )
+    except Exception as error:  # pylint: disable=broad-except
+        ctx.logger.pprint(
+            error, color="red"
+        )
 
 
 def parse_command(prefix: str, msg: str) -> Dict:
