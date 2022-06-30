@@ -17,6 +17,7 @@ on:
     tags:
       - v*.*.*
     types: [published]
+  workflow_dispatch:
 
 jobs:
   Build_and_Push:
