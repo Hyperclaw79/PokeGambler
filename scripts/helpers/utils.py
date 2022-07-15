@@ -22,13 +22,15 @@ Compilation of Utility Functions
 from __future__ import annotations
 import asyncio
 import cProfile
+from datetime import date, datetime
 from io import BytesIO
+import json
 import os
 import random
 import re
 import time
 from typing import (
-    Any, Callable, Dict, Iterable, List,
+    Any, Callable, Dict, Iterable, List, Literal,
     Optional, TYPE_CHECKING, Tuple, Union
 )
 from cachetools import Cache, TTLCache
@@ -146,6 +148,75 @@ class ImageCacher:
         return self.cache.get(self.keys)
 
 
+# pylint: disable=too-few-public-methods
+class EmbedFieldsConfig:
+    """
+    A config class for :meth:`get_embed`.
+    """
+    class FieldConfig:
+        """
+        Config for single Embed Field.
+        """
+        def __init__(
+            self,  parent: EmbedFieldsConfig,
+            inline: bool = None,
+            highlight: bool = None,
+            highlight_lang: str = ""
+        ):
+            #: The parent EmbedFieldsConfig
+            self.parent = parent
+            #: Whether the field is inline or not.
+            self.inline = inline
+            #: Whether to wrap the field in a code block.
+            self.highlight = highlight
+            #: The language to highlight the field in.
+            self.highlight_lang = highlight_lang
+
+        def get(self, attr: str) -> Any:
+            """
+            Returns the value of the attribute.
+            Checks for master overrides in the parent.
+            """
+            if attr == "highlight_lang":
+                return self.highlight_lang
+            if attr in {"inline", "highlight"}:
+                field_attr = getattr(self, attr)
+                if field_attr is None:
+                    return getattr(self.parent, attr)
+                return field_attr
+            return None
+
+    def __init__(
+        self,
+        field_config_map: Dict[
+            str, Literal["inline", "highlight", "highlight_lang"]
+        ] = None,
+        highlight: bool = False,
+        inline: bool = True
+    ):
+        #: Whether to wrap the fields in a codeblock.
+        self.highlight = highlight
+        #: Whether to display the fields inline.
+        self.inline = inline
+        #: A mapping of field names to FieldConfig objects.
+        self.field_config_map = {
+            key: self.FieldConfig(self, **val)
+            for key, val in (field_config_map or {}).items()
+        }
+
+    def get(self, key: str) -> Union[bool, FieldConfig]:
+        """Returns the config for a field.
+
+        :param key: The key to get the value of.
+        :type key: str
+        :return: The value of the key.
+        :rtype: Union[bool, :class:`EmbedFieldsConfig.FieldConfig`]
+        """
+        if key in {"inline", "highlight"}:
+            return getattr(self, key)
+        return self.field_config_map.get(key, self.FieldConfig(self))
+
+
 def dedent(message: str) -> str:
     """Strips whitespaces from the left of every line.
 
@@ -249,7 +320,8 @@ def get_embed(
     thumbnail: Optional[str] = None,
     color: Optional[int] = None,
     no_icon: Optional[bool] = False,
-    fields: Optional[Dict[str, str]] = None
+    fields: Optional[Dict[str, str]] = None,
+    fields_config: Optional[EmbedFieldsConfig] = None
 ) -> Embed:
     """Creates a Discord Embed with appropriate color, \
         title and description.
@@ -272,9 +344,40 @@ def get_embed(
     :type no_icon: Optional[bool]
     :param fields: The fields of the embed.
     :type fields: Optional[Dict[str, str]]
+    :param fields_config: The fields config of the embed.
+    :type fields_config: Optional[:class:`EmbedFieldsConfig`]
     :return: The embed
     :rtype: :class:`discord.Embed`
     """
+    def handle_fields(emb):
+        def date_serializer(obj):
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            raise TypeError(f"Type {type(obj)} not serializable")
+
+        for key, value in fields.items():
+            hl_rule = fields_config.get(key)
+            lang = hl_rule.get('highlight_lang')
+            highlight = hl_rule.get('highlight')
+            if isinstance(value, (dict, list)):
+                dumped = json.dumps(
+                    value, indent=3,
+                    default=date_serializer
+                )
+                val = f"```json\n{dumped}\n```"
+            elif highlight:
+                val = f"```{lang}\n{value}\n```"
+            else:
+                val = value
+            emb.add_field(
+                name=key.title(),
+                value=val,
+                inline=(
+                    not isinstance(value, (dict, list))
+                    and hl_rule.get('inline')
+                )
+            )
+
     embed_params = {
         "info": {
             "name": "INFORMATION",
@@ -314,8 +417,7 @@ def get_embed(
     if color:
         emb.color = color
     if fields:
-        for key, value in fields.items():
-            emb.add_field(name=key, value=value, inline=True)
+        handle_fields(emb)
     return emb
 
 
