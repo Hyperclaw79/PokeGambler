@@ -254,6 +254,40 @@ class Item(ABC):
         return cls._new_item(item, force_new=force_new)
 
     @classmethod
+    def bulk_from_id(
+        cls: Type[Item], itemids: List[str],
+        force_new: bool = False
+    ) -> List[Item]:
+        """Returns a list of Items from the Collection base on their itemids.
+
+        :param itemids: The ids of the Items.
+        :type itemids: List[str]
+        :param force_new: Force a new Item to be created, defaults to False.
+        :type force_new: bool
+        :return: The existing/newly created Items.
+        :rtype: List[:class:`Item`]
+        """
+        new_items = []
+        item_dict_list = []
+        for item in cls.bulk_get(itemids):
+            # Bulk Get returns a distinct list of items.
+            for _ in range(itemids.count(item['_id'])):
+                new_item = cls._new_item(item, force_new=False)
+                attrs = dict(new_item)
+                attrs.pop("itemid")
+                attrs['_id'] = md5(
+                    str(datetime.utcnow()).encode()
+                    + random.randbytes(16)
+                ).hexdigest()[:8]
+                attrs["created_on"] = datetime.now()
+                new_item.itemid = attrs['_id']
+                new_items.append(new_item)
+                item_dict_list.append(attrs)
+        if force_new:
+            cls.insert_many(item_dict_list)
+        return new_items
+
+    @classmethod
     def from_name(
         cls: Type[Item], name: str,
         force_new: bool = False
@@ -301,6 +335,17 @@ class Item(ABC):
         :rtype: Dict
         """
         return cls.mongo.find_one({"_id": itemid})
+
+    @classmethod
+    def bulk_get(cls: Type[Item], itemids: List[str]) -> List[Dict]:
+        """Returns a list of Items from the Collection base on their itemids.
+
+        :param itemids: The ids of the Items.
+        :type itemids: List[str]
+        :return: The list of dictionaries of the Items.
+        :rtype: List[Dict]
+        """
+        return cls.mongo.find({"_id": {"$in": itemids}})
 
     @classmethod
     def get_category(cls: Type[Item], item: Dict) -> Type[Item]:

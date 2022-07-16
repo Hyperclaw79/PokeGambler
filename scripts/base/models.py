@@ -951,6 +951,23 @@ class Inventory(Model):
             "obtained_on": datetime.now()
         })
 
+    def bulk_insert(self, items: List[str]):
+        """Inserts a list of items to a player's inventory.
+
+        :param items: The list of item ids to insert.
+        :type items: List[str]
+        """
+        new_items = Item.bulk_from_id(items, force_new=True)
+        self.mongo.insert_many([
+            {
+                "user_id": self.user_id,
+                "user": to_dict(self.user),
+                "itemid": item.itemid,
+                "obtained_on": datetime.now()
+            }
+            for item in new_items
+        ])
+
 
 class Matches(Model):
     """Wrapper for Gamble matches based DB actions
@@ -1094,6 +1111,132 @@ class Trades(Model):
         self.given_items = given_items
         self.taken_items = taken_items
 
+
+class Transactions(Model):
+    """Wrapper for webshop transactions based DB actions.
+
+    :param user: The user to map the collection to.
+    :type user: :class:`discord.Member`
+    :param created_on: The date and time of the transaction.
+    :type created_on: datetime
+    :param tx_id: The transaction ID.
+    :type tx_id: str
+    :param gateway: The gateway used for the transaction.
+    :type gateway: str
+    :param webitem_id: The ID of the webitem.
+    :type webitem_id: str
+    :param quantity: The quantity of the webitem purchased.
+    :type quantity: int
+    :param total_price: The total price of the transaction.
+    :type total_price: float
+    :param redeemed: Was the webitem redeemed?
+    :type redeemed: bool
+    """
+
+    sort_order: Optional[List] = [
+        'created_at',
+        "user",
+        "tx_id",
+        "gateway",
+        "webitem",
+        "quantity",
+        "total_price",
+        "redeemed"
+    ]
+
+    def __init__(
+        self, user: discord.Member,
+        created_at: datetime = None,
+        tx_id: str = None,
+        gateway: str = None,
+        webitem_id: str = None,
+        quantity: int = None,
+        total_price: float = None,
+        redeemed: bool = False
+    ):
+        super().__init__(user)
+        self.created_at = created_at
+        self.tx_id = tx_id
+        self.gateway = gateway
+        self.webitem_id = webitem_id
+        self.quantity = quantity
+        self.total_price = total_price
+        self.redeemed = redeemed
+
+    # pylint: disable=arguments-differ
+    def get(self, **kwargs) -> List[Transactions]:
+        """Get all transactions for the user.
+
+        :return: List of transactions.
+        :rtype: List[Transactions]
+        """
+        pipeline = [
+            {
+                '$match': {
+                    'user_id': str(self.user.id),
+                    **kwargs
+                }
+            },
+            {
+                '$addFields': {
+                    'webitem_obj_id': {
+                        '$toObjectId': '$webitem_id'
+                    }
+                }
+            },
+            {
+                '$lookup': {
+                    'from': 'webshop',
+                    'localField': 'webitem_obj_id',
+                    'foreignField': '_id',
+                    'as': 'webitem'
+                }
+            },
+            {
+                '$unwind': {
+                    'path': '$webitem'
+                }
+            }
+        ]
+        txns = []
+        for raw_tx in self.mongo.aggregate(pipeline):
+            txn = Transactions(
+                user=self.user,
+                created_at=raw_tx['created_at'],
+                tx_id=raw_tx['tx_id'],
+                gateway=raw_tx['gateway'],
+                webitem_id=raw_tx['webitem_id'],
+                quantity=raw_tx['quantity'],
+                total_price=raw_tx['total_price'],
+                redeemed=raw_tx['redeemed']
+            )
+            # pylint: disable=attribute-defined-outside-init
+            txn.webitem = Webshop(name=raw_tx['webitem']['name'])
+            del txn.webitem_id
+            txns.append(txn)
+        return txns
+
+    def from_tx_id(self, tx_id: str) -> Transactions:
+        """Get the transaction with the given ID.
+
+        :param tx_id: The transaction ID.
+        :type tx_id: str
+        :return: The transaction.
+        :rtype: Transactions
+        """
+        txs = self.get(tx_id=tx_id)
+        return txs[0] if txs else None
+
+    def redeem(self):
+        """Redeem the transaction.
+
+        :return: The transaction.
+        :rtype: Transactions
+        """
+        self.mongo.update_one(
+            {'tx_id': self.tx_id},
+            {'$set': {'redeemed': True}}
+        )
 
 # region Submodels
 
@@ -1788,6 +1931,139 @@ class Votes(UnlockedModel):
 
 
 # region Unbound Models
+
+class Webshop(UnboundModel, UnlockedModel):
+    """Wrapper for Webshop Model.
+
+    :param name: The name of the item.
+    :type name: str
+    :param description: The description of the item.
+    :type description: str
+    :param image: The image of the item.
+    :type image: str
+    :param price: The price of the item.
+    :type price: float
+    :param offer_price: Any special offer price for the item.
+    :type offer_price: float
+    :param reward_pokechips: The amount of Pokechips held by the item.
+    :type reward_pokechips: int
+    :param reward_pokebonds: The amount of Pokebonds held by the item.
+    :type reward_pokebonds: int
+    :param reward_items: The ingame Items held by the item.
+    :type reward_items: List[:class:`~.items.Item`]
+    :param meta: Metadata Dictionary
+    :type meta: Dict[str, bool]
+    """
+
+    pk_field: str = "name"
+    no_uinfo: bool = True
+    read_only: bool = True
+    uid_fields: List[str] = []
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # pylint: disable=import-outside-toplevel
+        import urllib.parse
+
+        self.image = urllib.parse.urljoin(
+            'https://pokegambler.vercel.app/',
+            self.image
+        )
+
+    def _query_existing(self):
+        rwd_itm_query = {
+            '$map': {
+                'input': '$reward_items',
+                'as': 'first',
+                'in': {
+                    '$mergeObjects': [
+                        '$$first', {
+                            '$arrayElemAt': [
+                                {
+                                    '$filter': {
+                                        'input': '$items',
+                                        'as': 'second',
+                                        'cond': {
+                                            '$eq': [
+                                                '$$second._id',
+                                                '$$first.itemid'
+                                            ]
+                                        }
+                                    }
+                                }, 0
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+
+        def to_item(item):
+            quantity = item.pop('quantity', None)
+            item_item = Item.from_dict(item)
+            return {
+                "item": item_item,
+                "quantity": quantity
+            }
+
+        existing = next(self.mongo.aggregate([
+            {
+                "$match": {
+                    "name": self.name
+                }
+            },
+            {
+                '$addFields': {
+                    'discount': {
+                        '$round': [
+                            {
+                                '$subtract': [
+                                    '$price', '$offer_price'
+                                ]
+                            }, 2
+                        ]
+                    },
+                    'id': '$_id'
+                }
+            }, {
+                '$unset': '_id'
+            }, {
+                '$lookup': {
+                    'from': 'items',
+                    'localField': 'reward_items.itemid',
+                    'foreignField': '_id',
+                    'as': 'items'
+                }
+            }, {
+                '$set': {
+                    'reward_items': rwd_itm_query
+                }
+            }, {
+                '$unset': 'items'
+            }
+        ]), None)
+        if existing:
+            existing["reward_items"] = [
+                to_item(item)
+                for item in existing["reward_items"]
+            ]
+        return existing
+
+    def _default(self):
+        self.name: str = ""
+        self.description: str = ""
+        self.image: str = ""
+        self.price: float = 0.0
+        self.offer_price: float = 0.0
+        self.reward_pokechips: int = 0
+        self.reward_pokebonds: int = 0
+        self.reward_items: List[Item] = []
+        self.meta: Dict[str, bool] = {
+            "has_currency": False,
+            "is_bundle": False,
+            "ready_for_sale": False
+        }
+
 # endregion
 
 
