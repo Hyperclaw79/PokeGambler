@@ -37,6 +37,7 @@ from typing import (
 import discord
 from discord import Guild, Member, TextChannel, User, Role
 from pymongo import UpdateOne
+from bson import ObjectId
 
 if TYPE_CHECKING:
     from bot import PokeGambler
@@ -105,6 +106,7 @@ class NameSetter(type):
     """
     Metaclass to set the mongo collection for the model.
     Useful for DB actions in Classmethods.
+    Also used for setting default class attributes.
 
     :meta private:
     """
@@ -116,6 +118,8 @@ class NameSetter(type):
         new_cl.mongo = DB_CLIENT[new_cl.model_name]
         new_cl.no_uinfo = dct.get('no_uinfo', False)
         new_cl._uid_fields = dct.get('uid_fields', [])
+        new_cl.sort_order = dct.get('sort_order', [])
+        new_cl.read_only = dct.get('read_only', False)
         return new_cl
 
 
@@ -134,7 +138,31 @@ class Model(metaclass=NameSetter):
         self.user = user
 
     def __iter__(self):
-        for attr in dir(self):
+        def serialize(obj):
+            if isinstance(obj, list):
+                return [serialize(item) for item in obj]
+            if isinstance(obj, dict):
+                return {
+                    key: serialize(value)
+                    for key, value in obj.items()
+                }
+            if isinstance(obj, (Model, Item)):
+                return dict(obj)
+            if isinstance(obj, ObjectId):
+                return str(obj)
+            return obj
+
+        iterable = dir(self)
+        if self.sort_order:
+            iterable = sorted(
+                iterable,
+                key=lambda x: (
+                    self.sort_order.index(x)
+                    if x in self.sort_order
+                    else len(self.sort_order)
+                )
+            )
+        for attr in iterable:
             # Patch for Full_Info being executed before Profile creation.
             if attr in getattr(self, "excludes", []):
                 continue
@@ -149,7 +177,8 @@ class Model(metaclass=NameSetter):
                     "model_name", "mongo",
                     "excludes", "no_uinfo",
                     "uid_fields", "classes",
-                    "count"
+                    "count", "pk_field",
+                    "sort_order", "read_only"
                 ],
                 not ismethod(getattr(self, attr)),
                 not isinstance(
@@ -162,6 +191,7 @@ class Model(metaclass=NameSetter):
                     attr = 'user_info'
                     res = to_dict(res)
                     res.pop('id')
+                res = serialize(res)
                 yield (attr, res)
 
     @classmethod
@@ -181,6 +211,8 @@ class Model(metaclass=NameSetter):
         """
         Deletes all entries in the Collection for the user.
         """
+        if self.read_only:
+            raise MethodNotAllowed("This model is read-only.")
         self.mongo.delete_many({
             "$or": [
                 {"user_id": str(self.user.id)},
@@ -205,6 +237,8 @@ class Model(metaclass=NameSetter):
         """
         Saves the Model object to the Collection.
         """
+        if self.read_only:
+            raise MethodNotAllowed("This model is read-only.")
         self.mongo.insert_one(dict(self))
 
     @classmethod
@@ -232,6 +266,8 @@ class Model(metaclass=NameSetter):
         """
         Deletes all entries in the Collection.
         """
+        if cls.read_only:
+            raise MethodNotAllowed("This model is read-only.")
         cls.mongo.delete_many({})
 
     @classmethod
@@ -1061,6 +1097,7 @@ class Trades(Model):
 
 # region Submodels
 
+
 class Minigame(Model):
     """
     Base class for Minigames.
@@ -1163,32 +1200,6 @@ class Minigame(Model):
         }
 
 
-class TaskModel(Model):
-    """
-    A special subset of Models representing automated tasks.
-    They have no user associated with them.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(None, *args, **kwargs)
-
-    def drop(self):
-        """
-        Overriden Drop method to disable it.
-        """
-        raise MethodNotAllowed(
-            "Taks Models are not bound to a user."
-        )
-
-    def save(self):
-        """
-        Overriden Save method to pop the user field.
-        """
-        save_data = dict(self)
-        save_data.pop('user', None)
-        self.mongo.insert_one(save_data)
-
-
 class UnlockedModel(Model):
     """The Base Unlocked Model class which can be modified after creation.
 
@@ -1196,14 +1207,32 @@ class UnlockedModel(Model):
     :type user: :class:`discord.Member`
     """
 
-    def __init__(self, user: discord.Member):
-        super().__init__(user)
-        if existing := self.mongo.find_one({"user_id": str(self.user.id)}):
+    #: The name of the primary key.
+    pk_field: str = "user_id"
+
+    def __init__(self, user: discord.Member, *args, **kwargs):
+        super().__init__(user, *args, **kwargs)
+        if getattr(self, "_prefetched", False):
+            return
+        if existing := self._query_existing():
             for key, val in existing.items():
                 setattr(self, key, val)
+            self._prefetched = True
         else:
             self._default()
             self.save()
+
+    def _query_existing(self):
+        """
+        Send a MongoDB query to prepopulate the Model if a record exists.
+        Can be overridden to implement custom logic. (eg. Lookups)
+        """
+        return self.mongo.find_one({
+            self.pk_field: (
+                str(self.user.id) if self.pk_field == 'user_id'
+                else getattr(self, self.pk_field)
+            )
+        })
 
     @expire_cache
     def reset(self):
@@ -1212,15 +1241,7 @@ class UnlockedModel(Model):
         """
         self._default()
         kwargs = dict(self)
-        kwargs.pop("user_id")
-        self.mongo.update_one(
-            {
-                "user_id": str(self.user.id)
-            },
-            {
-                "$set": {**kwargs}
-            }
-        )
+        self.update(**kwargs)
 
     @expire_cache
     def save(self):
@@ -1235,7 +1256,10 @@ class UnlockedModel(Model):
             return
         self.mongo.update_one(
             {
-                "user_id": str(self.user.id)
+                self.pk_field: (
+                    str(self.user.id) if self.pk_field == 'user_id'
+                    else getattr(self, self.pk_field)
+                )
             },
             {
                 "$set": kwargs
@@ -1249,6 +1273,68 @@ class UnlockedModel(Model):
         The default values to be used for init.
         """
         raise NotImplementedError
+
+
+class UnboundModel(Model):
+    """
+    A special subset of Models which don't have a user associated with them.
+
+    :param pk_value: The value of the primary key.
+    :type pk_value: Optional[Any]
+    """
+
+    #: The name of the primary key.
+    pk_field: str = "_id"
+    no_uinfo = True
+    uid_fields = []
+
+    def __init__(self, *args, **kwargs):
+        pk_value = kwargs.get(self.pk_field)
+        setattr(self, self.pk_field, pk_value)
+        super().__init__(None, *args, **kwargs)
+        default_flag = False
+        if pk_value is not None and not getattr(self, "_prefetched", False):
+            if existing := self._query_existing():
+                for key, val in existing.items():
+                    setattr(self, key, val)
+                self._prefetched = True
+            else:
+                default_flag = True
+        elif getattr(self, "_prefetched", False):
+            default_flag = False
+        elif hasattr(self, "_default"):
+            default_flag = True
+        if default_flag:
+            self._default()
+
+    def _query_existing(self):
+        return self.mongo.find_one({
+            self.pk_field: getattr(self, self.pk_field)
+        })
+
+    def drop(self):
+        """
+        Overriden Drop method to disable it.
+        """
+        raise MethodNotAllowed(
+            "Unbound Models are not bound to a user."
+        )
+
+    def save(self):
+        """
+        Overriden Save method to pop the user field.
+        """
+        save_data = dict(self)
+        save_data.pop('user', None)
+        self.mongo.insert_one(save_data)
+
+
+class TaskModel(UnboundModel):
+    """
+    A special subset of UnboundModels representing automated tasks.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(None, *args, **kwargs)
 
 # endregion
 
@@ -1701,6 +1787,10 @@ class Votes(UnlockedModel):
 # endregion
 
 
+# region Unbound Models
+# endregion
+
+
 # region Minigames
 
 class Duels(Minigame):
@@ -1851,8 +1941,8 @@ class Checkpoints(TaskModel):
     :type ctx: :class:`bot.PokeGambler`
     """
 
-    def __init__(self, ctx: PokeGambler):
-        super().__init__()
+    def __init__(self, ctx: PokeGambler, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.created_on = datetime.now()
         #: The number of profiles created till this checkpoint.
         self.num_profiles = Profiles.count()
@@ -1907,8 +1997,6 @@ class Checkpoints(TaskModel):
 class Nitro(TaskModel):
     """Wrapper for Nitro Reward records.
 
-    :param user: The user to map the collection to.
-    :type user: :class:`discord.Member`
     :param boosters: The list of the nitro boosters.
     :type boosters: List[:class:`discord.Member`]
     :param rewardboxes: The list of IDs of nitro reward boxes.
@@ -1918,11 +2006,12 @@ class Nitro(TaskModel):
     uid_fields = [('boosters', list)]
 
     def __init__(
-        self,
+        self, *args,
         boosters: List[discord.Member] = None,
-        rewardboxes: List[str] = None
+        rewardboxes: List[str] = None,
+        **kwargs
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self.last_rewarded = datetime.now()
         self.boosters = [
             to_dict(user)

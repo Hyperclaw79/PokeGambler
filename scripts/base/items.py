@@ -278,6 +278,20 @@ class Item(ABC):
         return cls._new_item(item, force_new=force_new)
 
     @classmethod
+    def from_dict(
+        cls: Type[Item],
+        data: Dict
+    ) -> Item:
+        """Returns an Item based on available data.
+
+        :param data: The data of the Item.
+        :type data: Dict
+        :return: The prepopulated Item.
+        :rtype: :class:`Item`
+        """
+        return cls._new_item(data, force_new=False)
+
+    @classmethod
     def get(cls: Type[Item], itemid: str) -> Dict:
         """Returns an Item from the Collection base on its itemid.
 
@@ -460,9 +474,9 @@ class Item(ABC):
         old_item = {**existing_item}
         category = cls.get_category(old_item)
         old_item.pop('category', None)
-        itemid = old_item.pop('_id', None)
-        if not itemid:
-            itemid = old_item.pop('itemid', None)
+        item_id = old_item.pop('_id', None)
+        itemid = old_item.pop('itemid', None)
+        itemid = itemid or item_id
         new_item = type(
             "".join(
                 word.title()
