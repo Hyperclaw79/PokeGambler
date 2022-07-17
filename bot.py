@@ -56,7 +56,7 @@ from scripts.helpers.utils import (
     dm_send, get_ascii, get_commands,
     get_formatted_time, get_modules,
     prettify_discord, get_embed, parse_command,
-    get_rand_headers, is_owner, online_now
+    is_owner, online_now
 )
 
 
@@ -326,8 +326,7 @@ class PokeGambler(discord.AutoShardedClient):
         """
         if not getattr(self, "owner", False):
             self.owner = self.get_user(self.owner_id)
-        headers = get_rand_headers()
-        self.sess = aiohttp.ClientSession(loop=self.loop, headers=headers)
+        self.sess = aiohttp.ClientSession(loop=self.loop)
         self.__pprinter()
         self.ready = True
         Shop.refresh_tradables()

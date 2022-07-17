@@ -26,7 +26,6 @@ from datetime import date, datetime
 from io import BytesIO
 import json
 import os
-import random
 import re
 import time
 from typing import (
@@ -504,37 +503,6 @@ def get_modules(ctx: PokeGambler) -> List[Commands]:
     )
 
 
-def get_rand_headers() -> Dict:
-    """Generates a random header for the aiohttp session.
-
-    .. warning:: Will be deprecated in the future.
-
-    :return: A header with a random User-Agent.
-    :rtype: Dict
-    """
-    browsers = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "AppleWebKit/537.36 (KHTML, like Gecko)",
-        "discord/0.0.306",
-        "Chrome/80.0.3987.132",
-        "Discord/1.6.15",
-        "Safari/537.36",
-        "Electron/7.1.11"
-    ]
-    return {
-        "User-Agent": ' '.join(
-            set(
-                random.choices(
-                    browsers,
-                    k=random.randint(1, len(browsers))
-                )
-            )
-        ),
-        "Referer": "https://discordapp.com",
-        "Origin": "https://discordapp.com"
-    }
-
-
 def is_admin(user: Member) -> bool:
     """Checks if user is an admin in the official server.
 
@@ -630,11 +598,25 @@ async def online_now(ctx: PokeGambler):
         color="blue"
     )
     try:
-        await ctx.sess.post(url=url, data=body)
-        ctx.logger.pprint(
-            "Online notification sent.\n",
-            color="green"
-        )
+        async with ctx.sess.post(
+            url=url,
+            json=body,
+            headers={
+                "User-Agent": f"PokeGambler {ctx.version}",
+                "Content-Type": "application/json"
+            }
+        ) as resp:
+            if resp.status >= 400:
+                ctx.logger.pprint(
+                    f"Failed to send online notification to webhook.\n"
+                    f"Error: {(await resp.json())['message']}",
+                    color="red"
+                )
+            else:
+                ctx.logger.pprint(
+                    "Online notification sent.\n",
+                    color="green"
+                )
     except Exception as error:  # pylint: disable=broad-except
         ctx.logger.pprint(
             error, color="red"
