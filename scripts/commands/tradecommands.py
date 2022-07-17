@@ -31,26 +31,28 @@ from typing import (
 )
 import re
 
+from bson import ObjectId
 import discord
 
 from ..base.enums import CurrencyExchange
+from ..base.handlers import CustomInteraction
 from ..base.items import Item, Chest, Lootbag, Rewardbox
 from ..base.modals import EmbedReplyModal
 from ..base.models import (
     Blacklist, Exchanges, Inventory, Loots,
-    Profiles, Trades
+    Profiles, Trades, Transactions
 )
 from ..base.shop import (
     BoostItem, PremiumBoostItem,
     PremiumShop, Shop, Title
 )
 from ..base.views import (
-    ConfirmView, ConfirmOrCancelView,
+    CallbackButton, CallbackButtonView, ConfirmView, ConfirmOrCancelView,
     LinkView, SelectConfirmView
 )
 
 from ..helpers.utils import (
-    dedent, dm_send,
+    EmbedFieldsConfig, dedent, dm_send,
     get_embed, get_formatted_time, get_modules,
     is_admin, is_owner
 )
@@ -589,6 +591,49 @@ class TradeCommands(Commands):
             )
             return
         await self.__open_handle_rewards(message, openables)
+
+    @model([Transactions, Inventory, Profiles])
+    async def cmd_redeem(
+        self, message: Message,
+        code: str, **kwargs
+    ):
+        """
+        :param message: The message which triggered this command.
+        :type message: :class:`discord.Message`
+        :param code: The code to redeem.
+        :type code: str
+
+        .. meta::
+            :description: Redeem the webshop code for rewards.
+
+        .. rubric:: Syntax
+        .. code:: coffee
+            :force:
+
+            /redeem code:Code
+
+        .. rubric:: Description
+
+        Redeem the webshop code for rewards.
+
+        .. rubric:: Examples
+
+        * To redeem the code `0000AAAA`
+
+        .. code:: coffee
+            :force:
+
+            /redeem code:0000AAAA
+        """
+        transaction = await self.__redeem_get_transaction(message, code)
+        if not transaction:
+            return
+        emb = self.__redeem_get_embed(transaction)
+        confirm_view = self.__redeem_get_confirm_view(message, transaction)
+        await message.reply(
+            embed=emb,
+            view=confirm_view
+        )
 
     @model(Profiles)
     async def cmd_redeem_chips(
@@ -1425,6 +1470,172 @@ class TradeCommands(Commands):
                 color=profile.get('embed_color')
             )
         )
+
+    def __redeem_get_confirm_view(self, message, transaction):
+        async def claim_callback(view, intcn, **kwargs):
+            async def balance_callback(view, intcn, **kwargs):
+                await self.ctx.profilecommands.cmd_balance(
+                    CustomInteraction(intcn)
+                )
+
+            async def inventory_callback(view, intcn, **kwargs):
+                await self.ctx.tradecommands.cmd_inventory(
+                    CustomInteraction(intcn)
+                )
+
+            buttons = []
+            checklist = []
+
+            if transaction.webitem.meta.get('has_currency'):
+                profile = Profiles(message.author)
+                # pylint: disable=no-member
+                won_chips = profile.won_chips
+                pokebonds = profile.pokebonds
+                balance = profile.balance
+                profile.update(
+                    won_chips=won_chips + (
+                        transaction.webitem.reward_pokechips
+                        * transaction.quantity
+                    ),
+                    pokebonds=pokebonds + (
+                        transaction.webitem.reward_pokebonds
+                        * transaction.quantity
+                    ),
+                    balance=(
+                        balance
+                        + (
+                            transaction.webitem.reward_pokechips
+                            * transaction.quantity
+                        )
+                        + (
+                            transaction.webitem.reward_pokebonds
+                            * transaction.quantity
+                            * 10
+                        )
+                    )
+                )
+                buttons.append(
+                    CallbackButton(
+                        callback=balance_callback,
+                        label="Check Balance"
+                    )
+                )
+                checklist.append('`Balance`')
+            if transaction.webitem.meta.get('is_bundle'):
+                inventory = Inventory(message.author)
+                inventory.bulk_insert([
+                    item['item'].itemid
+                    for item in transaction.webitem.reward_items
+                    for _ in range(item['quantity'])
+                    for _ in range(transaction.quantity)
+                ])
+                buttons.append(
+                    CallbackButton(
+                        callback=inventory_callback,
+                        label="Open Inventory"
+                    )
+                )
+                checklist.append('`Inventory`')
+            transaction.redeem()
+            btn_view = CallbackButtonView(
+                buttons=buttons,
+                check=lambda intcn: intcn.user.id == message.author.id,
+            )
+            check_msg = (
+                checklist[0]
+                if len(checklist) == 1
+                else ' and '.join(checklist)
+            )
+            await CustomInteraction(intcn).reply(
+                embed=get_embed(
+                    content="You have successfully claimed your rewards.\n"
+                    f"Check your {check_msg}.",
+                ),
+                view=btn_view
+            )
+        confirm_view = CallbackButtonView(
+            buttons=[
+                CallbackButton(
+                    callback=claim_callback,
+                    label="Claim",
+                )
+            ],
+            check=lambda intcn: intcn.user.id == message.author.id
+        )
+        return confirm_view
+
+    @staticmethod
+    def __redeem_get_embed(transaction):
+        fields = {}
+        emb_config_map = {}
+        webitem = transaction.webitem
+        if webitem.meta['has_currency']:
+            if pokechips := webitem.reward_pokechips:
+                fields['Pokechips'] = pokechips * transaction.quantity
+                emb_config_map['Pokechips'] = {
+                    'highlight_lang': 'py'
+                }
+            if pokebonds := webitem.reward_pokebonds:
+                fields['Pokebonds'] = pokebonds * transaction.quantity
+                emb_config_map['Pokebonds'] = {
+                    'highlight_lang': 'py'
+                }
+        if webitem.meta['is_bundle']:
+            fields['Items'] = '\n'.join(
+                f"【{item['item'].name}】 x {item['quantity'] * transaction.quantity}"
+                for item in webitem.reward_items
+            )
+            emb_config_map['Items'] = {
+                'inline': False,
+                'highlight': True,
+                'highlight_lang': 'py'
+            }
+        name = f'【{webitem.name}】'
+        if transaction.quantity > 1:
+            name += f'x {transaction.quantity}'
+        emb = get_embed(
+            title=f"{name} - Claim Your Rewards",
+            content="You can claim all these items.",
+            # image=webitem.image,
+            fields=fields,
+            fields_config=EmbedFieldsConfig(
+                highlight=True,
+                field_config_map=emb_config_map
+            )
+        )
+        return emb
+
+    async def __redeem_get_transaction(self, message, code):
+        valid = await HexValidator(
+            message=message,
+            on_error={
+                'title': "Invalid Claim Code",
+                'description': "You need to enter a valid claim code."
+            },
+            on_null={
+                'title': "No Claim Code specified",
+                'description': "You need to enter a claim code."
+            }
+        ).validate(code)
+        if not valid:
+            return
+        transaction = Transactions(message.author).get(
+            _id=ObjectId(code)
+        )[0]
+        if transaction.redeemed:
+            await message.reply(
+                embed=get_embed(
+                    content="This claim code has already been redeemed.",
+                    embed_type='error'
+                ),
+                view=LinkView(
+                    url="https://pokegambler.vercel.app/store",
+                    label="Visit Store",
+                    emoji=self.bond_emoji
+                )
+            )
+            return
+        return transaction
 
     @staticmethod
     def __shop_get_catogs(shop, profile):
