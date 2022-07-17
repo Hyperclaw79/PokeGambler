@@ -56,7 +56,7 @@ from ..helpers.utils import (
     get_embed, get_formatted_time, get_modules,
     is_admin, is_owner
 )
-from ..helpers.validators import HexValidator, MinMaxValidator
+from ..helpers.validators import HexValidator, MinMaxLengthValidator, MinMaxValidator
 
 from .basecommand import (
     Commands, alias, check_completion,
@@ -77,6 +77,8 @@ class TradeCommands(Commands):
         'Rewardbox': 'Reward Boxe',
         'Giftbox': 'Gift Boxe'
     }
+
+    redeem_lock: Dict[Tuple[str, int], str] = {}
 
     @defer
     @model([Profiles, Loots, Inventory])
@@ -593,6 +595,7 @@ class TradeCommands(Commands):
         await self.__open_handle_rewards(message, openables)
 
     @model([Transactions, Inventory, Profiles])
+    @check_completion
     async def cmd_redeem(
         self, message: Message,
         code: str, **kwargs
@@ -629,7 +632,9 @@ class TradeCommands(Commands):
         if not transaction:
             return
         emb = self.__redeem_get_embed(transaction)
-        confirm_view = self.__redeem_get_confirm_view(message, transaction)
+        confirm_view = self.__redeem_get_confirm_view(
+            message, transaction, code
+        )
         await message.reply(
             embed=emb,
             view=confirm_view
@@ -1471,7 +1476,7 @@ class TradeCommands(Commands):
             )
         )
 
-    def __redeem_get_confirm_view(self, message, transaction):
+    def __redeem_get_confirm_view(self, message, transaction, code):
         async def claim_callback(view, intcn, **kwargs):
             async def balance_callback(view, intcn, **kwargs):
                 await self.ctx.profilecommands.cmd_balance(
@@ -1536,6 +1541,9 @@ class TradeCommands(Commands):
                     )
                 )
                 checklist.append('`Inventory`')
+            self.redeem_lock[
+                (code, message.author.id)
+            ] = "You have already claimed this code."
             transaction.redeem()
             btn_view = CallbackButtonView(
                 buttons=buttons,
@@ -1606,22 +1614,52 @@ class TradeCommands(Commands):
         return emb
 
     async def __redeem_get_transaction(self, message, code):
-        valid = await HexValidator(
-            message=message,
-            on_error={
+        if (code, message.author.id) in self.redeem_lock:
+            await message.reply(
+                embed=get_embed(
+                    title="Duplicate Claim Request",
+                    content=self.redeem_lock[(code, message.author.id)],
+                    embed_type="warning"
+                )
+            )
+            return
+        self.redeem_lock[
+            (code, message.author.id)
+        ] = "You have a pending claim request."
+        validator_kwargs = {
+            "message": message,
+            "on_error": {
                 'title': "Invalid Claim Code",
                 'description': "You need to enter a valid claim code."
             },
-            on_null={
+            "on_null": {
                 'title': "No Claim Code specified",
                 'description': "You need to enter a claim code."
             }
-        ).validate(code)
-        if not valid:
+        }
+        valid_hex = await HexValidator(**validator_kwargs).validate(code)
+        if not valid_hex:
             return
-        transaction = Transactions(message.author).get(
+        valid_length = await MinMaxLengthValidator(
+            min_length=24,
+            max_length=24,
+            **validator_kwargs
+        ).validate(code)
+        if not valid_length:
+            return
+        transactions = Transactions(message.author).get(
             _id=ObjectId(code)
-        )[0]
+        )
+        if not transactions:
+            await message.reply(
+                embed=get_embed(
+                    title="Invalid Claim Code",
+                    content="You need to enter a valid claim code.",
+                    embed_type="error"
+                )
+            )
+            return
+        transaction = transactions[0]
         if transaction.redeemed:
             await message.reply(
                 embed=get_embed(

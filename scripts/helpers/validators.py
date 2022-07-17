@@ -298,6 +298,61 @@ class MaxLengthValidator(Validator):
         return len(value) <= self.max_length
 
 
+class MinLengthValidator(Validator):
+    """Validates a string to be of a certain length.
+
+    :param min_length: The minimum permissible length of the string.
+    :type min_length: int
+    :kwargs: Additional keyword arguments to pass to the superclass.
+    :type kwargs: Dict
+    """
+    error_embed_title = "Invalid Input"
+    #:
+    error_embed_desc = "Input value has too few characters."
+
+    def __init__(self, min_length: int, **kwargs):
+        super().__init__(**kwargs)
+        self.min_length = min_length
+        if not kwargs.get("on_error"):
+            self.error_embed_desc += f"\nMin length: **{min_length}**"
+
+    def check(self, value) -> bool:
+        return len(value) >= self.min_length
+
+
+class MinMaxLengthValidator(Validator):
+    """
+    A combination of :class:`MinLengthValidator` and :class:`MaxLengthValidator`.
+    Used for Length based validations.
+
+    :param min_length: The minimum permissible length of the string.
+    :type min_length: int
+    :param max_length: The maximum permissible length of the string.
+    :type max_length: int
+    :kwargs: Additional keyword arguments to pass to the superclass.
+    :type kwargs: Dict
+    """
+    error_embed_title = "Invalid Input"
+    #:
+    error_embed_desc = "Input value has too few or too many characters."
+
+    def __init__(self, min_length: int, max_length: int, **kwargs):
+        super().__init__(**kwargs)
+        self.min_length_validator = MinLengthValidator(min_length, **kwargs)
+        self.max_length_validator = MaxLengthValidator(max_length, **kwargs)
+
+    def check(self, value) -> bool:
+        if not self.min_length_validator.check(value):
+            self.error_embed_title = self.min_length_validator.error_embed_title
+            self.error_embed_desc = self.min_length_validator.error_embed_desc
+            return False
+        if not self.max_length_validator.check(value):
+            self.error_embed_title = self.max_length_validator.error_embed_title
+            self.error_embed_desc = self.max_length_validator.error_embed_desc
+            return False
+        return True
+
+
 class RegexValidator(Validator):
     """Validates a string against a regular expression.
 
