@@ -42,7 +42,11 @@ from ..helpers.utils import (
     get_embed, get_enum_embed,
     img2file
 )
-from ..helpers.validators import MinMaxValidator
+from ..helpers.validators import (
+    ChainValidator, MaxValidator,
+    MinValidator
+)
+
 from .basecommand import (
     Commands, alias, check_completion,
     dealer_only, model
@@ -611,10 +615,18 @@ class GambleCommands(Commands):
         profile, min_chips, max_chips
     ):
         if amount:
-            proceed = await MinMaxValidator(
-                min_chips, max_chips,
-                message=message,
-                dm_user=True
+            proceed = await ChainValidator(
+                message,
+                {
+                    MinValidator: {
+                        "message": message,
+                        "min_value": min_chips
+                    },
+                    MaxValidator: {
+                        "message": message,
+                        "max_value": max_chips
+                    }
+                }
             ).validate(amount)
             if not proceed:
                 return None

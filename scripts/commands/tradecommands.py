@@ -37,7 +37,7 @@ import discord
 from ..base.enums import CurrencyExchange
 from ..base.handlers import CustomInteraction
 from ..base.items import Item, Chest, Lootbag, Rewardbox
-from ..base.modals import EmbedReplyModal
+from ..base.modals import CallbackReplyModal
 from ..base.models import (
     Blacklist, Exchanges, Inventory, Loots,
     Profiles, Trades, Transactions
@@ -47,8 +47,8 @@ from ..base.shop import (
     PremiumShop, Shop, Title
 )
 from ..base.views import (
-    CallbackButton, CallbackButtonView, ConfirmView, ConfirmOrCancelView,
-    LinkView, SelectConfirmView
+    CallbackButton, CallbackButtonView, ConfirmView,
+    ConfirmOrCancelView, LinkView, SelectConfirmView
 )
 
 from ..helpers.utils import (
@@ -56,11 +56,16 @@ from ..helpers.utils import (
     get_embed, get_formatted_time, get_modules,
     is_admin, is_owner
 )
-from ..helpers.validators import HexValidator, MinMaxLengthValidator, MinMaxValidator
+from ..helpers.validators import (
+    ChainValidator, HexValidator,
+    MaxLengthValidator, MinLengthValidator,
+    MaxValidator, MinValidator
+)
 
 from .basecommand import (
     Commands, alias, check_completion,
-    dealer_only, defer, ensure_item, model, os_only, suggest_actions
+    dealer_only, defer, ensure_item, model,
+    os_only, suggest_actions
 )
 
 if TYPE_CHECKING:
@@ -1140,18 +1145,41 @@ class TradeCommands(Commands):
             return None, None
 
         async def create_modal(view, interaction):
+            async def modal_callback(modal, intcn):
+                proceed = await ChainValidator(
+                    intcn,
+                    {
+                        MinValidator: {
+                            "message": intcn,
+                            "min_value": bounds[0],
+                            "dm_user": True
+                        },
+                        MaxValidator: {
+                            "message": intcn,
+                            "max_value": bounds[1],
+                            "dm_user": True
+                        }
+                    }
+                ).validate(modal.results[0])
+                if not proceed:
+                    modal.results = [None]
+                else:
+                    return {
+                        "embed": get_embed(
+                            content="Our admins have been notified.\n"
+                            "Please wait till one of them accepts"
+                            " or retry after 10 minutes.",
+                            title="Request Registered."
+                        )
+                    }
+
             if view.value is None:
                 return
             pokename = str(view.value).split('#', maxsplit=1)[0]
-            amount_modal = EmbedReplyModal(
+            amount_modal = CallbackReplyModal(
+                callback=modal_callback,
                 title=f"Exchange Amount for {pokename} Credits",
-                timeout=120,
-                embed=get_embed(
-                    content="Our admins have been notified.\n"
-                    "Please wait till one of them accepts"
-                    " or retry after 10 minutes.",
-                    title="Request Registered."
-                )
+                timeout=120
             )
             amount_modal.add_short(
                 f"How much do you want to {mode}?",
@@ -1185,13 +1213,6 @@ class TradeCommands(Commands):
         await choices_view.dispatch(self)
         pokebot = choices_view.value
         if not pokebot or not choices_view.callback_result:
-            return None, None
-        proceed = await MinMaxValidator(
-            *bounds,
-            message=message,
-            dm_user=True
-        ).validate(choices_view.callback_result)
-        if not proceed:
             return None, None
         quantity = int(choices_view.callback_result.replace(',', ''))
         return pokebot, quantity
@@ -1637,15 +1658,21 @@ class TradeCommands(Commands):
                 'description': "You need to enter a claim code."
             }
         }
-        valid_hex = await HexValidator(**validator_kwargs).validate(code)
-        if not valid_hex:
-            return
-        valid_length = await MinMaxLengthValidator(
-            min_length=24,
-            max_length=24,
-            **validator_kwargs
+        validator_spec = {
+            HexValidator: validator_kwargs,
+            MinLengthValidator: {
+                **validator_kwargs,
+                'min_length': 24
+            },
+            MaxLengthValidator: {
+                **validator_kwargs,
+                'max_length': 24
+            }
+        }
+        valid = await ChainValidator(
+            message, validator_spec
         ).validate(code)
-        if not valid_length:
+        if not valid:
             return
         transactions = Transactions(message.author).get(
             _id=ObjectId(code)

@@ -78,6 +78,7 @@ class BaseModal(Modal):
         self.title = title
         self._check = check
         self.latest_interaction = None
+        self._results = None
 
     def add_short(self, text: str, **kwargs):
         """Adds a short text input to the modal.
@@ -107,12 +108,21 @@ class BaseModal(Modal):
         :return: The results of the modal.
         :rtype: :class:`~scripts.base.modals.Lookup`
         """
-        return Lookup(
+        return self._results or Lookup(
             {
                 item.label: item.value
                 for item in self.children
             }
         )
+
+    @results.setter
+    def results(self, results: Any) -> None:
+        """
+        Sets the results of the modal.
+        :param results: The results to set.
+        :type results: Any
+        """
+        self._results = results
 
     # pylint: disable=unused-argument, no-self-use
     async def on_submit(self, interaction: Interaction):
