@@ -169,7 +169,7 @@ class PokeGambler(discord.AutoShardedClient):
                 cmd_err_msg = f"Command `{cmd_name}` does not exist!"
                 if closest:
                     cmd_err_msg += f"\nDid you mean `{closest}`?"
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         cmd_err_msg,
                         embed_type="error",
@@ -505,7 +505,7 @@ class PokeGambler(discord.AutoShardedClient):
             self.prefix.lower()
         ):
             with suppress(discord.Forbidden):
-                await message.channel.send(
+                await message.reply(
                     embed=get_embed(
                         "I currently do not support commands in the DMs.\n"
                         "Please use the command in a server.",
@@ -696,7 +696,7 @@ class PokeGambler(discord.AutoShardedClient):
             await message.add_reaction("🚫")
             return False
         if self.owner_mode and not is_owner(self, message.author):
-            await message.channel.send(
+            await message.reply(
                     embed=get_embed(
                         "PokeGambler is currently in **owner mode**.\n"
                         "Only the bot owner can use the commands.\n"

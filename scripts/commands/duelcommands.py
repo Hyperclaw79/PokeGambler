@@ -254,7 +254,7 @@ class DuelCommands(Commands):
         ).strip()
         proceed = await RegexValidator(
             pattern=r"<g1>\s.+",
-            message=message,
+            message=reply,
             on_error={
                 "title": "No Gladiator 1 Placeholder",
                 "description": "You need to include at "
@@ -468,12 +468,12 @@ class DuelCommands(Commands):
         profile = Profiles(message.author)
         glad = Item.from_id(gladiator)
 
-        async def callback(modal):
+        async def callback(modal, interaction):
             if not modal.results:
                 return
             new_nick = modal.results[0]
             proceed = await ItemNameValidator(
-                message=message,
+                message=interaction,
                 on_error={
                     "title": "Invalid Nickname",
                     "description": "That name is not allowed, keep it simple."

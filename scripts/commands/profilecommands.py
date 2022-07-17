@@ -38,7 +38,7 @@ from ..base.models import (
 )
 from ..base.shop import BoostItem
 from ..base.views import CallbackButton, LinkView, SelectView
-from ..base.modals import BaseModal
+from ..base.modals import CallbackReplyModal
 
 from ..helpers.checks import user_check
 from ..helpers.imageclasses import (
@@ -502,41 +502,43 @@ class ProfileCommands(Commands):
             The Embed Color Change ticket can be purchased
             from the secret Consumables :class:`~scripts.base.shop.Shop`
         """
-        profile = Profiles(message.author)
-        modal = BaseModal(
-            "Enter the Color Hexadecimal Code",
+        async def callback(modal, interaction):
+            if not modal.results:
+                return
+            color_hex = modal.results[0]
+            proceed = await HexValidator(
+                message=(modal.latest_interaction or message),
+                on_error={
+                    "title": "Invalid Hexadecimal Color Code",
+                    "description": "You need to enter a valid hex code."
+                },
+                dm_user=True
+            ).validate(color_hex)
+            if not proceed:
+                return
+            hexcode = color_hex.lstrip('#')
+            profile = Profiles(message.author)
+            profile.update(
+                embed_color=int(hexcode, 16)
+            )
+            inv = Inventory(message.author)
+            tickets = kwargs["tickets"]
+            inv.delete(tickets[0], quantity=1)
+            await dm_send(
+                interaction, message.author,
+                embed=get_embed(
+                    title="Succesfully updated your Embed Color.",
+                    color=profile.get('embed_color')
+                )
+            )
+
+        modal = CallbackReplyModal(
+            callback=callback,
+            title="Enter the Color Hexadecimal Code",
             check=lambda x: x.user.id == message.author.id
         )
         modal.add_short("Enter Color Code")
         await message.response.send_modal(modal)
-        await modal.wait()
-        if not modal.results:
-            return
-        color_hex = modal.results[0]
-        proceed = await HexValidator(
-            message=message,
-            on_error={
-                "title": "Invalid Hexadecimal Color Code",
-                "description": "You need to enter a valid hex code."
-            },
-            dm_user=True
-        ).validate(color_hex)
-        if not proceed:
-            return
-        hexcode = color_hex.lstrip('#')
-        profile.update(
-            embed_color=int(hexcode, 16)
-        )
-        inv = Inventory(message.author)
-        tickets = kwargs["tickets"]
-        inv.delete(tickets[0], quantity=1)
-        await dm_send(
-            message, message.author,
-            embed=get_embed(
-                title="Succesfully updated your Embed Color.",
-                color=profile.get('embed_color')
-            )
-        )
 
     @defer
     @model(Profiles)

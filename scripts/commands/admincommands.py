@@ -97,7 +97,7 @@ class AdminCommands(Commands):
         ``🛡️ Admin Command``
         Make PokeGambler send an announcement in the announcement channel.
         """
-        async def callback(modal):
+        async def callback(modal, interaction):
             content = modal.results[0]
             if ping:
                 content = f"Hey {ping.mention}\n{content}"
@@ -259,7 +259,7 @@ class AdminCommands(Commands):
             is_admin(user),
             is_owner(self.ctx, user)
         ]):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "You cannot blacklist owners and admins!",
                     embed_type="error",
@@ -318,7 +318,7 @@ class AdminCommands(Commands):
         if not data:
             return
         content = f'```json\n{json.dumps(data, indent=3, default=str)}\n```'
-        await message.channel.send(content)
+        await message.reply(content)
 
     @admin_only
     @os_only
@@ -363,7 +363,7 @@ class AdminCommands(Commands):
             is_admin(user),
             is_owner(self.ctx, user)
         ]):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "Owners and Admins are never blacklisted.",
                     embed_type="error",
@@ -372,7 +372,7 @@ class AdminCommands(Commands):
             )
             return
         if not Blacklist.is_blacklisted(str(user.id)):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "User is not blacklisted.",
                     embed_type="error",
@@ -499,9 +499,10 @@ class AdminCommands(Commands):
                     required=False
                 )
 
-            async def modal_callback(modal):
+            async def modal_callback(modal, interaction):
                 to_update = {}
                 updates = []
+                invalids = {}
                 for child in modal.children:
                     if child.value:
                         validator = chosen_fields[child.label][1]
@@ -512,6 +513,12 @@ class AdminCommands(Commands):
                                 child.value
                             )
                             if cleaned is None:
+                                invalids[
+                                    chosen_fields[child.label][0]
+                                ] = (
+                                    validator.error_embed_desc
+                                    or "Enter a valid value."
+                                )
                                 continue
                             to_update[chosen_fields[child.label][0]] = cleaned
                         else:
@@ -526,14 +533,23 @@ class AdminCommands(Commands):
                         to_update["balance"] = new_bal
                 profile.update(**to_update)
                 field_str = ", ".join(updates)
-                return {
-                    "embed": get_embed(
-                        f"Succesfully updated the fields: {field_str}.",
-                    ) if field_str else get_embed(
+                if field_str:
+                    emb = get_embed(
+                        f"Succesfully updated the fields: {field_str}."
+                    )
+                elif invalids:
+                    emb = get_embed(
+                        title="Invalid Values",
+                        content="The following fields were invalid.",
+                        embed_type="error",
+                        fields=invalids
+                    )
+                else:
+                    emb = get_embed(
                         "No fields were updated.",
                         embed_type="warning"
                     )
-                }
+                return {"embed": emb}
 
             modal.add_callback(modal_callback)
             await interaction.response.send_modal(modal)
@@ -681,13 +697,14 @@ class AdminCommands(Commands):
             elif "price" in labels:
                 labels["price (pokechips)"] = labels.pop("price")
 
-            async def modal_callback(modal):
-                details = await self.__item_get_details(modal, labels)
-                if details is None:
+            async def modal_callback(modal, interaction):
+                details, invalids = await self.__item_get_details(modal, labels)
+                if invalids:
                     return {
                         "embed": get_embed(
                             "All fields must be filled out correctly.",
-                            embed_type="error"
+                            embed_type="error",
+                            fields=invalids
                         )
                     }
                 if premium:
@@ -798,13 +815,14 @@ class AdminCommands(Commands):
             return
         labels = self.__item_get_labels(message, item.category_class)
 
-        async def modal_callback(modal):
-            details = await self.__item_get_details(modal, labels)
-            if details is None:
+        async def modal_callback(modal, interaction):
+            details, invalids = await self.__item_get_details(modal, labels)
+            if invalids:
                 return {
                     "embed": get_embed(
                         "All fields must be filled out correctly.",
-                        embed_type="error"
+                        embed_type="error",
+                        fields=invalids
                     )
                 }
             item.update(
@@ -878,7 +896,7 @@ class AdminCommands(Commands):
         """
         item: Item = kwargs.get("item")
         if item.premium and not is_owner(self.ctx, message.author):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "Only owners can delete a premium item.",
                     embed_type="error",
@@ -929,7 +947,7 @@ class AdminCommands(Commands):
         """
         item: Item = kwargs["item"]
         if item.premium and not is_owner(self.ctx, message.author):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "Only the owners can give Premium Items.",
                     embed_type="error",
@@ -1003,7 +1021,7 @@ class AdminCommands(Commands):
             /give_item user:ABCD#1234 itemid:0000FFFF
         """
         if not Item.get(itemid):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "Make sure those IDs are correct.",
                     embed_type="error",
@@ -1017,7 +1035,7 @@ class AdminCommands(Commands):
             item.premium
             and not is_owner(self.ctx, message.author)
         ):
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "Only the owners can give Premium Items.",
                     embed_type="error",
@@ -1064,22 +1082,30 @@ class AdminCommands(Commands):
     @staticmethod
     async def __item_get_details(modal, labels):
         details = {}
+        invalids = {}
         for child in modal.children:
             validator = labels[child.label]['validator']
             if validator and child.value:
                 value = await validator.cleaned(child.value)
                 if not value:
-                    return None
-                details[child.label] = value
+                    invalids[child.label] = (
+                        validator.error_embed_desc
+                        or "Enter a Valid value."
+                    )
+                else:
+                    details[child.label] = value
             elif child.value:
                 details[child.label] = child.value
-        return details
+        return details, invalids
 
     @staticmethod
     def __item_get_labels(message, catogclass):
         labels = {
             "name": {
-                "validator": ItemNameValidator(message=message)
+                "validator": ItemNameValidator(
+                    message=message,
+                    notify=False
+                )
             }
         } | {
             field.name: {
@@ -1092,12 +1118,16 @@ class AdminCommands(Commands):
             ])
         }
 
-        labels['asset_url']['validator'] = ImageUrlValidator(message=message)
+        labels['asset_url']['validator'] = ImageUrlValidator(
+            message=message,
+            notify=False
+        )
         if issubclass(catogclass, Tradable):
             labels["price"] = {
                 "validator": MinValidator(
                     message=message,
-                    min_value=1
+                    min_value=1,
+                    notify=False
                 )
             }
         for key, value in labels.items():
@@ -1113,6 +1143,7 @@ class AdminCommands(Commands):
                     "won_chips",
                     IntegerValidator(
                         message=message,
+                        notify=False
                     )
                 )
             },
@@ -1121,25 +1152,29 @@ class AdminCommands(Commands):
                 "Matches Won": (
                     "num_wins",
                     IntegerValidator(
-                        message=message
+                        message=message,
+                        notify=False
                     )
                 ),
                 "Matches Played": (
                     "num_matches",
                     IntegerValidator(
-                        message=message
+                        message=message,
+                        notify=False
                     )
                 ),
                 "Background": (
                     "background",
                     ImageUrlValidator(
-                        message=message
+                        message=message,
+                        notify=False
                     )
                 ),
                 "Embed Color": (
                     "embed_color",
                     HexValidator(
-                        message=message
+                        message=message,
+                        notify=False
                     )
                 )
             }
@@ -1148,7 +1183,8 @@ class AdminCommands(Commands):
             field_dict["Currency"]["Pokebonds"] = (
                 "pokebonds",
                 IntegerValidator(
-                    message=message
+                    message=message,
+                    notify=False
                 )
             )
         return field_dict

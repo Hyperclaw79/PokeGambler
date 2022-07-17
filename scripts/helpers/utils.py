@@ -320,7 +320,7 @@ def get_embed(
     color: Optional[int] = None,
     no_icon: Optional[bool] = False,
     fields: Optional[Dict[str, str]] = None,
-    fields_config: Optional[EmbedFieldsConfig] = None
+    fields_config: Optional[EmbedFieldsConfig] = EmbedFieldsConfig()
 ) -> Embed:
     """Creates a Discord Embed with appropriate color, \
         title and description.

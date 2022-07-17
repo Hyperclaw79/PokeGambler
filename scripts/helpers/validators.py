@@ -42,6 +42,8 @@ class Validator(ABC):
     :type on_error: Dict
     :param dm_user: Route the message to user\'s DM?
     :type dm_user: bool
+    :param notify: Notify the user if the validation fails?
+    :type notify: bool
     """
 
     error_embed_title = ""
@@ -52,11 +54,13 @@ class Validator(ABC):
     null_embed_kwargs = {}
     cleaner = None
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self, message: Message,
         on_error: Optional[Dict[str, str]] = None,
         on_null: Optional[Dict[str, str]] = None,
-        dm_user: bool = False
+        dm_user: bool = False,
+        notify: bool = True
     ):
         self.message = message
         on_error = on_error or {}
@@ -72,6 +76,7 @@ class Validator(ABC):
         self.error_embed_kwargs.update(on_error)
         self.null_embed_kwargs.update(on_null)
         self.dm_user = dm_user
+        self.notify = notify
 
     @abstractmethod
     def check(self, value) -> bool:
@@ -117,11 +122,11 @@ class Validator(ABC):
         """
         Performs the notifier function.
         """
+        if not self.notify:
+            return
         embed = self.null_embed if is_null else self.error_embed
         if not self.dm_user:
-            await self.message.channel.send(
-                embed=embed
-            )
+            await self.message.reply(embed=embed)
         else:
             await dm_send(
                 self.message, self.message.author,

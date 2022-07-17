@@ -29,6 +29,8 @@ from typing import (
 from discord.ui import TextInput, Modal
 from discord.enums import TextStyle
 
+from .handlers import CustomInteraction
+
 if TYPE_CHECKING:
     from discord import Interaction
 
@@ -75,6 +77,7 @@ class BaseModal(Modal):
         super().__init__(title=title, **kwargs)
         self.title = title
         self._check = check
+        self.latest_interaction = None
 
     def add_short(self, text: str, **kwargs):
         """Adds a short text input to the modal.
@@ -116,6 +119,7 @@ class BaseModal(Modal):
         """
         Called when the modal is submitted.
         """
+        self.latest_interaction = CustomInteraction(interaction)
         await interaction.response.send_message(
             content="\u200B",
             ephemeral=True
@@ -153,6 +157,7 @@ class ContentReplyModal(BaseModal):
         """
         Called when the modal is submitted.
         """
+        self.latest_interaction = CustomInteraction(interaction)
         await interaction.response.send_message(
             content=self.content,
             ephemeral=True
@@ -171,6 +176,7 @@ class EmbedReplyModal(BaseModal):
         """
         Called when the modal is submitted.
         """
+        self.latest_interaction = CustomInteraction(interaction)
         await interaction.response.send_message(
             embed=self.embed,
             ephemeral=True
@@ -189,6 +195,7 @@ class FullReplyModal(BaseModal):
         """
         Called when the modal is submitted.
         """
+        self.latest_interaction = CustomInteraction(interaction)
         await interaction.response.send_message(
             **self.reply,
             ephemeral=True
@@ -218,12 +225,18 @@ class CallbackReplyModal(BaseModal):
         """
         Called when the modal is submitted.
         """
+        self.latest_interaction = CustomInteraction(interaction)
         if self.callback is None:
             return
         if inspect.iscoroutinefunction(self.callback):
-            callback_res = await self.callback(self)
+            callback_res = await self.callback(
+                self, CustomInteraction(interaction)
+            )
         else:
-            callback_res = self.callback(self)
-        await interaction.response.send_message(
-            **callback_res, ephemeral=True
-        )
+            callback_res = self.callback(
+                self, CustomInteraction(interaction)
+            )
+        if callback_res is not None:
+            await interaction.response.send_message(
+                **callback_res, ephemeral=True
+            )

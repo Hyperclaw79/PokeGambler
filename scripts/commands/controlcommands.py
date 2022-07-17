@@ -191,7 +191,7 @@ class ControlCommands(Commands):
             filter_["admin_cmd"] = admin_cmd
         history = CommandData.history(limit=limit, **filter_)
         if not history:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     "No commands logged yet."
                 )
@@ -261,7 +261,7 @@ class ControlCommands(Commands):
         byio.write(jsonified.encode())
         byio.seek(0)
         export_fl = discord.File(byio, "items.json")
-        await message.channel.send(file=export_fl)
+        await message.reply(file=export_fl)
 
     # pylint: disable=no-self-use
     @owner_only
@@ -338,7 +338,7 @@ class ControlCommands(Commands):
             return
         documents = cltn.latest(limit=limit)
         if not documents:
-            await message.channel.send(
+            await message.reply(
                 embed=get_embed(
                     title="No documents found.",
                     embed_type="warning"
@@ -527,7 +527,7 @@ class ControlCommands(Commands):
         await command(message=message, **kwargs)
         end = time.time()
         tot = round(end - start, 2)
-        await message.channel.send(
+        await message.reply(
             embed=get_embed(
                 f"Command `/{cmd}` "
                 f"took **{tot}** seconds to execute."
@@ -626,7 +626,7 @@ class ControlCommands(Commands):
             },
             serializer=lambda x: x.__name__
         )
-        await message.channel.send(
+        await message.reply(
             "Which table do you wanna select?",
             view=choices_view
         )
