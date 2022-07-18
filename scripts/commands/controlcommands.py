@@ -60,6 +60,7 @@ class ControlCommands(Commands):
         Only the Owners have access to these commands.
     '''
 
+    # pylint: disable=too-many-locals
     @owner_only
     @defer
     @no_log
@@ -104,15 +105,46 @@ class ControlCommands(Commands):
             )
             return
         dframe = pd.DataFrame(records)
+        dframe['created_on'] = dframe['created_on'].map(lambda x: x.date())
         dframe.index = dframe.pop('created_on')
         colors = ['r', 'g', 'b', 'y']
         embeds = []
         files = []
-        for column, color in zip(dframe.columns, colors):
-            axes = dframe[[column]].plot(color=color)
-            axes.xaxis.set_visible(False)
+        columns = dframe.columns
+        dframe = dframe.reindex(
+            pd.date_range(
+                dframe.index.min(),
+                dframe.index.max() + pd.Timedelta(days=1)
+            ),
+            fill_value=0
+        )
+        for record in CommandData.trend(
+            include_os=False,
+            start_time=dframe.index[0].to_pydatetime(),
+            end_time=dframe.index[-1].to_pydatetime()
+        ):
+            dframe.loc[record['date'], 'num_commands_unofficial'] = record['count']
+        dframe[['num_commands_unofficial']] = dframe[
+            ['num_commands_unofficial']
+        ].fillna(0).astype(int)
+        dframe = dframe[dframe['num_commands'] > 0]
+        for column, color in zip(columns, colors):
             byio = BytesIO()
-            axes.figure.savefig(byio)
+            if column == 'num_commands':
+                axes = dframe[[column, 'num_commands_unofficial']].plot(
+                    subplots=True,
+                    layout=(2, 1)
+                )
+                axes[0, 0].set_title('All Commands till Date')
+                axes[1, 0].set_title('Unofficial Commands Trend')
+                axes[1, 0].xaxis.set_visible(False)
+                fig = axes[0, 0].get_figure()
+                fig.tight_layout()
+                fig.savefig(byio)
+            else:
+                axes = dframe[[column]].plot(color=color)
+                axes.xaxis.set_visible(False)
+                axes.figure.savefig(byio)
             byio.seek(0)
             d_fl = discord.File(byio, f"{column}.jpeg")
             emb = discord.Embed(

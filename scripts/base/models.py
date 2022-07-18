@@ -29,7 +29,7 @@ from functools import wraps
 from inspect import ismethod
 import os
 from typing import (
-    Any, Callable, Dict, List,
+    Any, Callable, Dict, Iterable, List,
     Optional, Tuple, Type, Union,
     TYPE_CHECKING
 )
@@ -620,6 +620,82 @@ class CommandData(Model):
                 }
             }
         ).modified_count
+
+    @classmethod
+    def trend(
+        cls, include_os: bool = True,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None
+    ) -> Iterable[Dict[str, Union[int, datetime]]]:
+        """Returns the number of commands used on PG per day.
+
+        :param include_os: Whether to include commands used on the Official Server.
+        :type include_os: bool
+        :param start_time: The start time of the period.
+        :type start_time: Optional[datetime]
+        :param end_time: The end time of the period.
+        :type end_time: Optional[datetime]
+        :return: The number of commands used on PG.
+        :rtype: Iterable[Dict[str, Union[int, datetime]]]
+        """
+        if include_os:
+            match = {}
+        else:
+            match = {
+                '$match': {
+                    'guild.id': {
+                        '$nin': [
+                            int(os.getenv('OFFICIAL_SERVER')),
+                            int((
+                                os.getenv('BLACKLIST_GUILDS')
+                                if os.getenv('IS_PROD') == 'True'
+                                else os.getenv('WHITELIST_GUILDS')
+                            ).split(', ')[0])
+                        ]
+                    }
+                }
+            }
+        if start_time is None:
+            start_time = datetime(2021, 1, 1)
+        if end_time is None:
+            end_time = datetime.now()
+        match['$match']['used_at'] = {
+            '$gte': start_time,
+            '$lte': end_time
+        }
+        return cls.mongo.aggregate([
+            match,
+            {
+                '$group': {
+                    '_id': {
+                        '$dateToString': {
+                            'format': '%Y-%m-%d',
+                            'date': '$used_at'
+                        }
+                    },
+                    'count': {
+                        '$sum': 1
+                    }
+                }
+            },
+            {
+                '$sort': {
+                    '_id': 1
+                }
+            },
+            {
+                '$project': {
+                    "date": {
+                        "$dateFromString": {
+                            "format": "%Y-%m-%d",
+                            "dateString": "$_id"
+                        }
+                    },
+                    "_id": 0,
+                    "count": 1
+                }
+            }
+        ])
 
 
 class DuelActionsModel(Model):
@@ -2255,6 +2331,11 @@ class Checkpoints(TaskModel):
                         "$gte": start_time,
                         "$lte": end_time
                     }
+                }
+            },
+            {
+                "$sort": {
+                    "created_on": 1
                 }
             },
             {
