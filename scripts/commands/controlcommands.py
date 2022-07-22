@@ -40,11 +40,11 @@ from ..base.models import (
 from ..base.views import SelectView
 from ..helpers.utils import (
     get_embed, get_enum_embed,
-    get_modules
+    get_modules, get_modules_from_path
 )
 from .basecommand import (
-    defer, model, owner_only,
-    no_log, alias, Commands
+    defer, model, override_docs,
+    owner_only, no_log, alias, Commands
 )
 
 if TYPE_CHECKING:
@@ -459,6 +459,12 @@ class ControlCommands(Commands):
             purger()
         await message.add_reaction("👍")
 
+    @override_docs(
+        lambda docs: docs.replace(
+            "%MODULES%",
+            get_modules_from_path(__file__)
+        )
+    )
     @owner_only
     @no_log
     async def cmd_reload(
@@ -471,7 +477,7 @@ class ControlCommands(Commands):
         :type message: :class:`discord.Message`
         :param module: The module to reload.
         :type module: str
-        :choices module: [Admin, Control, Normal, Duel, Gamble, Profile, Trade]
+        :choices module: %MODULES%
 
         .. meta::
             :description: Reloads a command module.

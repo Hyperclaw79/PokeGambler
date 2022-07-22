@@ -620,6 +620,24 @@ def no_slash(func: Callable):
     return wrapped
 
 
+def override_docs(modifier: Callable[[str], str]):
+    '''Overrides the docstring of a command.
+
+    :param modifier: The function to replace the docstring.
+    :type modifier: Callable[[str], str]
+    :return: The decorated function.
+    :rtype: Callable
+    '''
+    def decorator(func: Callable):
+        func.__doc__ = modifier(func.__doc__)
+
+        @wraps(func)
+        def wrapped(self, message, *args, **kwargs):
+            return func(self, *args, message=message, **kwargs)
+        return wrapped
+    return decorator
+
+
 def os_only(func: Callable):
     '''These commands can only run in the official server.
 

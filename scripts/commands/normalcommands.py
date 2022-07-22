@@ -32,9 +32,9 @@ from ..base.views import LinkView, MorphView
 from ..helpers.parsers import CustomRstParser
 from ..helpers.utils import (
     get_commands, get_embed, get_modules,
-    dedent, showable_command
+    dedent, get_modules_from_path, showable_command
 )
-from .basecommand import alias, Commands, ctx_command, model
+from .basecommand import alias, Commands, ctx_command, model, override_docs
 
 if TYPE_CHECKING:
     from discord import Message
@@ -47,6 +47,15 @@ class NormalCommands(Commands):
 
     @ctx_command
     @alias("cmds")
+    @override_docs(
+        lambda docs: docs.replace(
+            "%MODULES%",
+            get_modules_from_path(
+                __file__,
+                ["Profile", "Gamble", "Duel", "Normal", "Trade"]
+            )
+        )
+    )
     async def cmd_commands(
         self, message: Message,
         module: Optional[str] = None,
@@ -58,7 +67,7 @@ class NormalCommands(Commands):
         :type message: :class:`discord.Message`
         :param module: The module to show commands for.
         :type module: Optional[str]
-        :choices module: [Profile, Gamble, Duel, Normal, Trade, Control, Admin]
+        :choices module: %MODULES%
         :param role: The role to show commands for. (None/Admin/Owner)
         :type role: Optional[:class:`discord.Role`]
 

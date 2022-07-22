@@ -503,6 +503,37 @@ def get_modules(ctx: PokeGambler) -> List[Commands]:
     )
 
 
+def get_modules_from_path(
+    fname: str,
+    sort_order: Optional[List[str]] = None
+) -> str:
+    """Returns a list of all the modules using file path.
+    :param fname: The name of the file to be loaded.
+    :type fname: str
+    :param sort_order: The order in which the modules should be sorted.
+    :type sort_order: Optional[List[str]]
+    :return: A string concatenated list of all the command modules.
+    :rtype: str
+    """
+    scripts = (
+        script.replace('commands.py', '').title()
+        for script in os.listdir(os.sep.join(
+            fname.split(os.sep)[:-1])
+        )
+        if script.endswith('commands.py')
+    )
+    if sort_order:
+        scripts = sorted(
+            scripts,
+            key=lambda x: (
+                sort_order.index(x)
+                if x in sort_order
+                else len(sort_order)
+            )
+        )
+    return f"[{', '.join(scripts)}]"
+
+
 def is_admin(user: Member) -> bool:
     """Checks if user is an admin in the official server.
 

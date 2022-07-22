@@ -56,3 +56,5 @@ Decorators
 .. autodecorator:: scripts.commands.basecommand.model
 
 .. autodecorator:: scripts.commands.basecommand.suggest_actions
+
+.. autodecorator:: scripts.commands.basecommand.override_docs
