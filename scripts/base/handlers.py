@@ -365,7 +365,7 @@ class SlashHandler:
         }
         if self.ctx.is_prod:
             route_kwargs["guild_id"] = self.ctx.official_server
-        kwargs.update(route_kwargs)
+        kwargs |= route_kwargs
         route = self.get_route(**kwargs)
         try:
             await self.http.request(route)
@@ -507,14 +507,13 @@ class SlashHandler:
             route = self.get_route(**kwargs)
         else:
             route = self.get_route()
-        need_perms = any(
+        if any(
             hasattr(command, perm)
             for perm in (
                 'admin_only',
                 'owner_only'
             )
-        ) and self.ctx.is_prod
-        if need_perms:
+        ) and self.ctx.is_prod:
             route = self.get_route(guild_id=self.ctx.official_server)
             payload["default_member_permission"] = "0"
         try:
@@ -624,7 +623,7 @@ class ContextHandler:
             "method": "DELETE",
             "endpoint": cmd['id']
         }
-        kwargs.update(route_kwargs)
+        kwargs |= route_kwargs
         route = self.get_route(**kwargs)
         try:
             await self.http.request(route)

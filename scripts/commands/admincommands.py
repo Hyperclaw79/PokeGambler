@@ -762,7 +762,7 @@ class AdminCommands(Commands):
         itemid: str,
         modify_all: Optional[bool] = False,
         **kwargs
-    ):
+    ):  # sourcery skip: remove-unnecessary-cast
         """
         :param message: The message which triggered the command.
         :type message: :class:`discord.Message`

@@ -153,11 +153,11 @@ class GambleCommands(Commands):
             /gamble lower_wins:True
         """
         kwargs.pop("mentions", [])
-        kwargs.update({
+        kwargs |= {
             "fee": fee,
             "lower_wins": lower_wins,
             "max_players": max_players
-        })
+        }
         gamble_channel, hot_time = await self.__gamble_register(
             message, **kwargs
         )

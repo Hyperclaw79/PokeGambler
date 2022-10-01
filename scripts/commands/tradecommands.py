@@ -1234,10 +1234,11 @@ class TradeCommands(Commands):
         )
         await confirm_or_cancel.dispatch(self)
         if confirm_or_cancel.value:
-            content = None
-            if mode == "deposit":
-                content = f"{message.author.mention}, check your balance" + \
-                    " using the `/balance` command."
+            content = (
+                None if mode == "deposit"
+                else f"{message.author.mention}, check your balance"
+                " using the `/balance` command."
+            )
             getattr(
                 Profiles(message.author),
                 "credit" if mode == "deposit" else "debit"
