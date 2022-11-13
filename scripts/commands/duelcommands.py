@@ -588,7 +588,7 @@ class DuelCommands(Commands):
         if not glads:
             if notify:
                 await dm_send(
-                    message, message.author,
+                    message, (user or message.author),
                     embed=get_embed(
                         "You do not own any Gladitor.\n"
                         "Buy one form the Shop first.",
@@ -610,7 +610,7 @@ class DuelCommands(Commands):
                     for gld in available
                 },
                 no_response=True,
-                check=lambda x: x.user.id == message.author.id
+                check=lambda x: x.user.id == (user or message.author).id
             )
             await dm_send(
                 message, user,
