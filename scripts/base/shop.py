@@ -24,22 +24,17 @@ This module is a compilation of all in-game Shop related classes.
 # pylint: disable=too-many-instance-attributes
 
 from __future__ import annotations
+
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from queue import Queue
-from typing import (
-    Dict, List, Optional,
-    TYPE_CHECKING, Type, Union
-)
+from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
 
 from discord.errors import Forbidden, HTTPException
 
-from ..base.items import Item, DB_CLIENT
-from ..base.models import (
-    Boosts, Inventory,
-    Loots, Profiles
-)
+from ..base.items import DB_CLIENT, Item
+from ..base.models import Boosts, Inventory, Loots, Profiles
 from ..helpers.utils import get_embed
 
 if TYPE_CHECKING:
@@ -81,7 +76,7 @@ class Listing(Queue):
                 price
             )
 
-        queue = sorted(
+        yield from sorted(
             self.queue,
             key=lambda item: (
                 [True, False].index(
@@ -91,7 +86,6 @@ class Listing(Queue):
             ),
             reverse=True
         )
-        yield from queue
 
     def __len__(self) -> int:
         return len(self.queue)

@@ -23,6 +23,7 @@ This module contains schematics for all the items in the Pokegambler world.
 # pylint: disable=too-many-instance-attributes
 
 from __future__ import annotations
+
 import os
 import random
 import re
@@ -32,10 +33,7 @@ from datetime import datetime
 from functools import total_ordering
 from hashlib import md5
 from io import BytesIO
-from typing import (
-    Dict, List, Optional,
-    Tuple, Type, TYPE_CHECKING
-)
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Type
 
 import certifi
 from dotenv import load_dotenv
@@ -657,8 +655,7 @@ class Chest(Treasure):
         rand_val = random.randint(scale, scale * 9)
         # To make sure lower tier chests are always less worthy
         rand_val = max(rand_val, int(5.7735 ** self.tier) * 9)
-        rand_val = min(rand_val, int(5.7735 ** (self.tier + 2)))
-        return rand_val
+        return min(rand_val, int(5.7735 ** (self.tier + 2)))
 
     @classmethod
     def get_chest(cls: Type[Chest], tier: int) -> Chest:

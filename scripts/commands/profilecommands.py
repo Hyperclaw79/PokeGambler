@@ -23,23 +23,23 @@ Profile Commands Module
 # pylint: disable=too-many-locals, too-many-lines
 
 from __future__ import annotations
+
 import random
 from datetime import datetime, timedelta
 from io import BytesIO
-from typing import Dict, List, Optional, TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
-from PIL import Image
 import discord
+from PIL import Image
 
 from ..base.items import Chest
+from ..base.modals import CallbackReplyModal
 from ..base.models import (
-    Blacklist, Boosts, CommandData, Inventory, Loots,
-    Matches, Minigame, Profiles, Votes
+    Blacklist, Boosts, CommandData, Inventory,
+    Loots, Matches, Minigame, Profiles, Votes
 )
 from ..base.shop import BoostItem
 from ..base.views import CallbackButton, LinkView, SelectView
-from ..base.modals import CallbackReplyModal
-
 from ..helpers.checks import user_check
 from ..helpers.imageclasses import (
     BadgeGenerator, LeaderBoardGenerator,
@@ -54,11 +54,12 @@ from ..helpers.validators import HexValidator, ImageUrlValidator
 
 from .basecommand import (
     Commands, alias, check_completion, cache_images,
-    cooldown, defer, get_commands_btn_view, model, get_profile, needs_ticket
+    cooldown, defer, get_commands_btn_view, model,
+    get_profile, needs_ticket
 )
 
 if TYPE_CHECKING:
-    from discord import Message, Member
+    from discord import Member, Message
 
 
 class ProfileCommands(Commands):

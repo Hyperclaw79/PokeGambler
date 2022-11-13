@@ -22,6 +22,7 @@ Module which extends Discord.py to allow for custom application commands.
 # pylint: disable=no-member, too-many-lines
 
 from __future__ import annotations
+
 import inspect
 import itertools
 from typing import (
@@ -29,21 +30,19 @@ from typing import (
     Dict, List, Optional, Tuple, Type, Union
 )
 
-from cachetools import TTLCache
 import discord
-from discord.http import Route
+from cachetools import TTLCache
 from discord.app_commands import Choice
+from discord.http import Route
 
 from scripts.base.enums import OptionTypes
 
-from .components import (
-    AppCommand, ContextMenu,
-    GuildEvent, GuildEventType,
-    SlashCommand
-)
-
 from ..helpers.parsers import CustomRstParser
 from ..helpers.utils import get_modules
+from .components import (
+    AppCommand, ContextMenu, GuildEvent,
+    GuildEventType, SlashCommand
+)
 
 if TYPE_CHECKING:
     from bot import PokeGambler

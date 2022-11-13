@@ -24,12 +24,13 @@ Compilation of Discord UI Views
 # pylint: disable=attribute-defined-outside-init
 
 from __future__ import annotations
+
+import math
 from datetime import datetime
 from functools import wraps
-import math
 from typing import (
-    Callable, Coroutine, Dict, List,
-    Optional, TYPE_CHECKING
+    TYPE_CHECKING, Callable, Coroutine,
+    Dict, List, Optional
 )
 
 import discord

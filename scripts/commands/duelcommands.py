@@ -22,21 +22,23 @@ Gambling Commands Module
 # pylint: disable=too-few-public-methods, too-many-locals, unused-argument
 
 from __future__ import annotations
+
 import asyncio
-from collections import namedtuple
 import random
 import re
-from typing import Dict, List, Optional, TYPE_CHECKING
-from cachetools import TTLCache, cached
+from collections import namedtuple
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import discord
+from cachetools import TTLCache, cached
 
 from ..base.items import Gladiator, Item
+from ..base.modals import CallbackReplyModal
 from ..base.models import (
-    Blacklist, DuelActionsModel, Inventory, Profiles, Duels
+    Blacklist, DuelActionsModel,
+    Duels, Inventory, Profiles
 )
 from ..base.views import ConfirmView, SelectView
-from ..base.modals import CallbackReplyModal
 from ..helpers.checks import user_check
 from ..helpers.imageclasses import GladitorMatchHandler
 from ..helpers.utils import (
@@ -53,8 +55,9 @@ from .basecommand import (
 )
 
 if TYPE_CHECKING:
+    from discord import Member, Message
+
     from bot import PokeGambler
-    from discord import Message, Member
 
 
 class DuelActions:

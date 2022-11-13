@@ -23,27 +23,27 @@ This module contains a compilation of data models.
 # pylint: disable=unused-argument, too-many-lines, no-member
 
 from __future__ import annotations
+
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import wraps
 from inspect import ismethod
-import os
 from typing import (
-    Any, Callable, Dict, Iterable, List,
-    Optional, Tuple, Type, Union,
-    TYPE_CHECKING
+    TYPE_CHECKING, Any, Callable, Dict, Iterable,
+    List, Optional, Tuple, Type, Union
 )
 
 import discord
-from discord import Guild, Member, TextChannel, User, Role
-from pymongo import UpdateOne
 from bson import ObjectId
+from discord import Guild, Member, Role, TextChannel, User
+from pymongo import UpdateOne
 
 if TYPE_CHECKING:
     from bot import PokeGambler
 
 # pylint: disable=cyclic-import, wrong-import-position
-from ..base.items import Item, DB_CLIENT
+from ..base.items import DB_CLIENT, Item
 
 
 def expire_cache(func: Callable):
@@ -385,7 +385,7 @@ class Blacklist(Model):
         Also resets their profile.
         """
         # pylint: disable=import-outside-toplevel, cyclic-import
-        from .shop import Shop, PremiumShop
+        from .shop import PremiumShop, Shop
 
         super().save()
         Profiles(self.user).reset()

@@ -22,18 +22,13 @@ Module which contains different discord application command components.
 # pylint: disable=too-many-instance-attributes
 
 from __future__ import annotations
-from dataclasses import (
-    dataclass, field,
-    fields, make_dataclass
-)
+
 import dataclasses
+from dataclasses import dataclass, field, fields, make_dataclass
 from datetime import datetime
 from enum import Enum
 from functools import total_ordering
-from typing import (
-    Any, Callable, Dict,
-    List, Set, Tuple, Union
-)
+from typing import Any, Callable, Dict, List, Set, Tuple, Union
 
 import discord
 

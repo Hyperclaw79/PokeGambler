@@ -20,20 +20,21 @@ Compilation of Utility Functions
 """
 
 from __future__ import annotations
+
 import asyncio
 import cProfile
-from datetime import date, datetime
-from io import BytesIO
 import json
 import os
 import re
 import time
+from datetime import date, datetime
+from io import BytesIO
 from typing import (
     Any, Callable, Dict, Iterable, List, Literal,
     Optional, TYPE_CHECKING, Tuple, Union
 )
-from cachetools import Cache, TTLCache
 
+from cachetools import Cache, TTLCache
 import discord
 
 if TYPE_CHECKING:
@@ -305,8 +306,7 @@ def get_ascii(msg: str) -> str:
         for i in range(6)
     )
 
-    art = '\t\t\t' + art.replace('\n', '\n\t\t\t')
-    return art
+    return '\t\t\t' + art.replace('\n', '\n\t\t\t')
 
 
 # pylint: disable=too-many-arguments

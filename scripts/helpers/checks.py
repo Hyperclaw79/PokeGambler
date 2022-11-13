@@ -21,6 +21,7 @@ A couple of wait_for checks.
 # pylint: skip-file
 
 from typing import Optional, Union
+
 from discord import (
     Message, TextChannel,
     Member, Reaction, Emoji

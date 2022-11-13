@@ -22,6 +22,7 @@ This module is a compilation of user input validators.
 # pylint: disable=too-few-public-methods
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, TYPE_CHECKING, Union
 import re

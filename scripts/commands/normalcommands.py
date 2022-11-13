@@ -22,8 +22,9 @@ Normal Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
+
 import re
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Optional
 
 import discord
 
@@ -34,7 +35,7 @@ from ..helpers.utils import (
     get_commands, get_embed, get_modules,
     dedent, get_modules_from_path, showable_command
 )
-from .basecommand import alias, Commands, ctx_command, model, override_docs
+from .basecommand import Commands, alias, ctx_command, model, override_docs
 
 if TYPE_CHECKING:
     from discord import Message
@@ -362,13 +363,12 @@ class NormalCommands(Commands):
         if cmd.__doc__:
             if getattr(cmd, "disabled", False):
                 cmd_name = cmd.__name__.replace('cmd_', '').title()
-                emb = get_embed(
+                return get_embed(
                     f"**{cmd_name}** is under maintainence.\n"
                     "Details unavailable, so wait for updates.",
                     embed_type="warning",
                     title="Command under Maintainence."
                 )
-                return emb
             got_doc = True
             doc_str = cmd.__doc__.replace(
                 "{pokechip_emoji}",

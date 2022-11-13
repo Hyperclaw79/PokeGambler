@@ -22,11 +22,12 @@ Control Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
-from io import BytesIO
+
 import json
 import time
+from io import BytesIO
 from typing import (
-    List, Optional, TYPE_CHECKING,
+    TYPE_CHECKING, List, Optional,
     Tuple, Type, Union
 )
 

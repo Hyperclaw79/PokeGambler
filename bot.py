@@ -21,44 +21,43 @@ The Main Module which serves as the brain of the code.
 
 # pylint: disable=no-member
 
-from collections import namedtuple
-from contextlib import suppress
 import difflib
 import importlib
-from io import BytesIO
 import os
 import sys
 import traceback
+from collections import namedtuple
+from contextlib import suppress
 from datetime import datetime
+from io import BytesIO
 from typing import Callable
 
 import aiohttp
 import discord
-from discord import InteractionType, Message, Interaction
+import topgg
+from discord import Interaction, InteractionType, Message
 from discord.ext import tasks
 from discord.http import _set_api_version
 from dotenv import load_dotenv
-import topgg
 
 from scripts.base.cardgen import CardGambler
-from scripts.base.models import (
-    Blacklist, CommandData, Inventory,
-    Nitro, Profiles, Checkpoints
+from scripts.base.handlers import (
+    AutocompleteHandler, ContextHandler, SlashHandler
 )
 from scripts.base.items import Item
+from scripts.base.models import (
+    Blacklist, Checkpoints, CommandData,
+    Inventory, Nitro, Profiles
+)
 from scripts.base.shop import PremiumShop, Shop
-from scripts.base.handlers import AutocompleteHandler, ContextHandler, SlashHandler
 from scripts.base.views import MoreInfoView
-
 from scripts.helpers.logger import CustomLogger
 # pylint: disable=cyclic-import
 from scripts.helpers.utils import (
-    dm_send, get_ascii, get_commands,
-    get_formatted_time, get_modules,
-    prettify_discord, get_embed, parse_command,
-    is_owner, online_now
+    dm_send, get_ascii, get_commands, get_embed,
+    get_formatted_time, get_modules, is_owner,
+    online_now, parse_command, prettify_discord
 )
-
 
 load_dotenv()
 

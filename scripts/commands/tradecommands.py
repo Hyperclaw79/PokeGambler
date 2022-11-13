@@ -23,20 +23,21 @@ Trade Commands Module
 # pylint: disable=unused-argument
 
 from __future__ import annotations
+
 import asyncio
+import re
 from datetime import datetime, timedelta
 from typing import (
     List, Optional, TYPE_CHECKING, Tuple,
     Type, Union, Dict
 )
-import re
 
-from bson import ObjectId
 import discord
+from bson import ObjectId
 
 from ..base.enums import CurrencyExchange
 from ..base.handlers import CustomInteraction
-from ..base.items import Item, Chest, Lootbag, Rewardbox
+from ..base.items import Chest, Item, Lootbag, Rewardbox
 from ..base.modals import CallbackReplyModal
 from ..base.models import (
     Blacklist, Exchanges, Inventory, Loots,
@@ -69,7 +70,7 @@ from .basecommand import (
 )
 
 if TYPE_CHECKING:
-    from discord import Embed, Message, Member
+    from discord import Embed, Member, Message
 
 
 class TradeCommands(Commands):

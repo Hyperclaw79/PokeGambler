@@ -23,17 +23,15 @@ Gambling Commands Module
 # pylint: disable=too-many-instance-attributes, unused-argument
 
 from __future__ import annotations
+
 import asyncio
 import math
 import random
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import discord
 
-from ..base.models import (
-    Boosts, Flips, Loots, Matches,
-    Moles, Profiles
-)
+from ..base.models import Boosts, Flips, Loots, Matches, Moles, Profiles
 from ..base.shop import BoostItem
 from ..base.views import GambleCounter, MultiSelectView, SelectView
 from ..helpers.checks import user_rctn
