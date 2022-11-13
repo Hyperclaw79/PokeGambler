@@ -49,6 +49,9 @@ def validate(in_view=False):
     :return: The decorated function.
     :rtype: Callable
     """
+    async def ignore_invalid_intcn(intcn):
+        pass
+
     def decorator(func: Callable):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -66,7 +69,7 @@ def validate(in_view=False):
                 checker is not None
                 and not checker(interaction)
             ):
-                return None
+                return ignore_invalid_intcn(interaction)
             return func(self, *args, **kwargs)
         return wrapper
     return decorator
