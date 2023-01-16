@@ -705,6 +705,16 @@ class Chest(Treasure):
         col_dict = random.choice(collectibles)
         return Item.from_id(col_dict["itemid"])
 
+    @classmethod
+    def get_items(cls: Type[Chest], chest_id: str) -> List[Item]:
+        """Get a list of all :class:`Chest` items.
+
+        :return: A list of all :class:`Chest` items.
+        :rtype: List[:class:`Item`]
+        """
+        chest: Chest = Item.from_id(chest_id)
+        return [chest.get_random_collectible()]
+
 
 class CommonChest(Chest):
     """
@@ -803,7 +813,10 @@ class Lootbag(Treasure):
     Premium Lootbags can also contain Premium Items.
     """
     def __init__(
-        self, **kwargs
+        self,
+        chips: Optional[int] = None,
+        items: Optional[List[int]] = None,
+        **kwargs
     ):
         super().__init__(
             category=kwargs.pop(
@@ -812,6 +825,9 @@ class Lootbag(Treasure):
             ),
             **kwargs
         )
+        self._chips = chips
+        self.items = items or []
+        self.attrs += ("chips", "items")
 
     @property
     def chips(self) -> int:
@@ -824,8 +840,19 @@ class Lootbag(Treasure):
         :return: An amount of Pokechips.
         :rtype: int
         """
+        if self._chips:
+            return self._chips
         limits = [500, 1000] if self.premium else [100, 499]
         return random.randint(*limits)
+
+    @chips.setter
+    def chips(self, value: int):
+        """Set the amount of Pokechips.
+
+        :param value: The amount of Pokechips.
+        :type value: int
+        """
+        self._chips = value
 
     def get_random_items(
         self, categories: Optional[List[str]] = None,
@@ -904,6 +931,23 @@ class Lootbag(Treasure):
         return [
             Item.from_id(itm_dict["_id"])
             for itm_dict in rand_items
+        ]
+
+    @classmethod
+    def get_items(cls, bagid: int) -> List[Item]:
+        """Get items stored in a :class:`Lootbag`.
+
+        :param boxid: The itemid of the :class:`Lootbag`.
+        :type boxid: int
+        :return: A list of stored items.
+        :rtype: List[:class:`Item`]
+        """
+        bag: Lootbag = Item.from_id(bagid)
+        if not bag.items:
+            return bag.get_random_items()
+        return [
+            Item.from_id(item, force_new=True)
+            for item in bag.items
         ]
 
 

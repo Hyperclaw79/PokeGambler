@@ -22,6 +22,7 @@ Administration Commands
 # pylint: disable=unused-argument, too-many-lines
 
 from __future__ import annotations
+import asyncio
 
 import json
 import os
@@ -901,6 +902,7 @@ class AdminCommands(Commands):
 
     @admin_only
     @os_only
+    @defer
     @ensure_item
     @model([Inventory, Item, Profiles])
     @alias("item_all")
@@ -952,13 +954,22 @@ class AdminCommands(Commands):
             int(self.ctx.official_server)
         )
         count = 0
+
+        import pymongo  # pylint: disable=import-outside-toplevel
+
         for uid in ids:
             if not uid:
                 continue
             user = official_guild.get_member(int(uid))
             if not user:
                 continue
-            Inventory(user).save(item.itemid)
+            while True:
+                try:
+                    Inventory(user).save(item.itemid)
+                    break
+                except pymongo.errors.DuplicateKeyError:
+                    await asyncio.sleep(0.1)
+                    continue
             count += 1
         await message.reply(
             embed=get_embed(

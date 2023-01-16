@@ -37,7 +37,7 @@ from bson import ObjectId
 
 from ..base.enums import CurrencyExchange
 from ..base.handlers import CustomInteraction
-from ..base.items import Chest, Item, Lootbag, Rewardbox
+from ..base.items import Chest, Item, LegendaryChest, Lootbag, Rewardbox
 from ..base.modals import CallbackReplyModal
 from ..base.models import (
     Blacklist, Exchanges, Inventory, Loots,
@@ -499,6 +499,7 @@ class TradeCommands(Commands):
                 )
         await message.reply(embed=emb)
 
+    @defer
     @model([Loots, Profiles, Chest, Inventory])
     @suggest_actions([
         ("profilecommands", "loot"),
@@ -1468,15 +1469,15 @@ class TradeCommands(Commands):
         content = f"You have recieved **{chips}** {self.chip_emoji}."
         items = []
         for openable in openables:
-            item = None
+            embedded_items = None
             if openable.name == "Legendary Chest":
-                item = openable.get_random_collectible()
-            elif openable.category == 'Lootbag':
-                item = openable.get_random_items()
-            elif openable.category == 'Rewardbox':
-                item = Rewardbox.get_items(openable.itemid)
-            if item:
-                items.extend(item)
+                embedded_items = LegendaryChest.get_items(openable.itemid)
+            if openable.category == 'Lootbag':
+                embedded_items = Lootbag.get_items(openable.itemid)
+            if openable.category == 'Rewardbox':
+                embedded_items = Rewardbox.get_items(openable.itemid)
+            if embedded_items:
+                items.extend(embedded_items)
         if items:
             item_str = '\n'.join(
                 f"**『{item.emoji}』 {item} x{items.count(item)}**"
@@ -1484,8 +1485,8 @@ class TradeCommands(Commands):
             )
             content += f"\nAnd woah, you also got:\n{item_str}"
         inv = Inventory(message.author)
-        for item in items:
-            inv.save(item.itemid)
+        for embedded_items in items:
+            inv.save(embedded_items.itemid)
         inv.delete([
             openable.itemid
             for openable in openables
