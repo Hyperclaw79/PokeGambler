@@ -19,6 +19,10 @@ on:
     types: [published]
   workflow_dispatch:
 
+permissions:
+  contents: 'read'
+  id-token: 'write'
+
 jobs:
   Build_and_Push:
     runs-on: ubuntu-latest
@@ -48,10 +52,14 @@ jobs:
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Auth
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GOOGLE_FEDERATED_IDENTITY }}
+        service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+
     - name: Setup Cloud SDK
       uses: google-github-actions/setup-gcloud@v0
-      with:
-        service_account_key: ${{ secrets.GCLOUD_AUTH }}
 
     - name: Authorize Docker push
       run: gcloud auth configure-docker
@@ -112,11 +120,14 @@ jobs:
       with:
         ref: ${{ github.ref }}
 
+    - name: Auth
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GOOGLE_FEDERATED_IDENTITY }}
+        service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+
     - name: Setup Cloud SDK
       uses: google-github-actions/setup-gcloud@v0
-      with:
-        service_account_key: ${{ secrets.GCLOUD_AUTH }}
-        export_default_credentials: true
 
     - name: Authorize Docker push
       run: gcloud auth configure-docker
