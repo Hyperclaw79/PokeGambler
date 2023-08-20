@@ -83,8 +83,8 @@ jobs:
           tags: |
             ghcr.io/hyperclaw79/pokegambler:${{ env.TAG }}
             gcr.io/pokegambler/pokegambler:${{ env.TAG }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
     - name: Image digest
       run: echo ${{ steps.docker_build.outputs.digest }}
