@@ -239,6 +239,8 @@ class PokeGambler(discord.AutoShardedClient):
             method, kwargs = await self.slasher.parse_response(interaction)
             if not (method and kwargs):
                 return
+            # Hotfix for high latency causing all commands to fail.
+            await interaction.response.defer()
             await self.__exec_command(method, kwargs, is_interaction=True)
         elif interaction.data.get('type') in (2, 3):
             await self.ctx_cmds.execute(interaction)
